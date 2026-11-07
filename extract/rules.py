@@ -85,15 +85,24 @@ def extract_entities(blocks: Iterable[Block]) -> List[Entity]:
             for formula in sorted(FORMULAS, key=lambda s: (-len(s), s)):
                 if formula in text:
                     add(formula.rstrip("方"), "方剂", formula)
-            for pat in NATURE_PATTERNS:
-                m = re.search(pat, text)
-                if m:
-                    add(m.group(0), "性味")
+            # 性味：去掉被更长命中包含的短词（如「味辛」被「味辛温」包含），
+            # 但保留互不包含的并列词（如「无毒」），与 GT 的一行多实体口径一致。
+            nature_hits = [m.group(0) for pat in NATURE_PATTERNS
+                           for m in [re.search(pat, text)] if m]
+            if nature_hits:
+                longest = max(nature_hits, key=len)
+                seen_nature = set()
+                for h in sorted(set(nature_hits), key=lambda s: -len(s)):
+                    if h not in longest or h == longest:
+                        if h not in seen_nature:
+                            seen_nature.add(h)
+                            add(h, "性味")
             for dose in _DOSE_R.findall(text):
                 add(dose[1], "剂量", dose[1])
-            for eff in sorted(EFFECT_WORDS, key=lambda s: (-len(s), s)):
-                if eff in text:
-                    add(eff, "功效")
+            # 功效：GT 每行只标一个主功效，取最长命中，避免短词重复造成误报
+            eff_hits = [w for w in EFFECT_WORDS if w in text]
+            if eff_hits:
+                add(max(eff_hits, key=len), "功效")
             m = _ZHUZHI_R.search(text)
             if m:
                 add(m.group(1), "主治", m.group(1))

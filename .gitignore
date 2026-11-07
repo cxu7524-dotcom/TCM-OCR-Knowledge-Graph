@@ -23,6 +23,9 @@ data/uploads/*
 !data/uploads/.gitkeep
 data/reports/*
 !data/reports/.gitkeep
+# 正式评测报告与明细作为交付物提交；预测 / 日志 / 复核队列可重跑，不进仓库
+!data/reports/正式评测报告.md
+!data/reports/评测明细.json
 *.log
 *.db
 *.db-journal
@@ -38,15 +41,16 @@ secrets.local.json
 *.bin
 *.safetensors
 
-# ---------- 样本合规：真实扫描页与人工标注不进仓库 ----------
+# ---------- 样本合规：真实扫描页与命题单位标注不进仓库 ----------
+# 合成 GT 与页面元数据可进仓库（保证评测可复现）；合成影像可本地重建，不进仓库
 data/samples/*.png
 data/samples/*.jpg
 data/samples/*.jpeg
 data/samples/*.tif
 data/samples/*.pdf
-data/annotation/*.jsonl
-data/annotation/*.json
-!data/annotation/README.md
+data/samples/synthetic/pages/
+data/annotation/official/
+data/annotation/*.jsonl.tmp
 
 # ---------- 备份与编辑器 ----------
 *.bak

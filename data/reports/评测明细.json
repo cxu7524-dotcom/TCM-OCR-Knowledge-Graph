@@ -1,0 +1,435 @@
+{
+  "generated_at": "2026-11-07 18:54:15",
+  "notice": "合成示意数据，用于工程自测，非命题单位样本、非官方评测结果",
+  "disclaimer": "仅供参考、非诊疗建议",
+  "gt_version": "514f99246f103a95",
+  "dataset": {
+    "version": "514f99246f103a95",
+    "gt_dir": "D:\\A中医药赛题\\TCM-OCR-Knowledge-Graph\\data\\annotation",
+    "missing_files": [],
+    "counts": {
+      "ocr": 248,
+      "entities": 192,
+      "relations": 48,
+      "tables": 8,
+      "qa_gold": 32,
+      "qa_no_evidence": 35
+    },
+    "excluded_demo_or_invalid": {
+      "ocr_transcription.jsonl": 0,
+      "entities.jsonl": 0,
+      "relations.jsonl": 0,
+      "tables.jsonl": 0,
+      "qa_log_gold.jsonl": 0,
+      "qa_no_evidence.jsonl": 0
+    },
+    "pages_total": 24,
+    "train_pages": 17,
+    "test_pages": 7,
+    "ready": true
+  },
+  "predict_meta": {
+    "predictions_generated": false,
+    "reason": "预测文件齐备，复用（--refresh 可强制重跑）",
+    "environment": {
+      "Python": "3.13.14",
+      "OCR 后端": "rapidocr-onnxruntime（本机 ONNX Runtime，CPU，模型随包分发，无公网调用）",
+      "LLM 后端": "none（本阶段不部署 / 不调用）",
+      "向量通道": "none（占位，未启用）",
+      "已装依赖": [
+        "rapidocr_onnxruntime",
+        "onnxruntime",
+        "PIL",
+        "numpy",
+        "cv2",
+        "fastapi",
+        "uvicorn"
+      ],
+      "未装依赖": [
+        "paddleocr"
+      ],
+      "合成影像": "Pillow 本地渲染 24 页（不进仓库，可复现）",
+      "低置信阈值": 0.35,
+      "检测阈值": "box_thresh=0.3, text_score=0.35",
+      "公网 / 密钥": "无（未读取任何 API Key，未访问任何公网推理服务）"
+    }
+  },
+  "prediction_counts": {
+    "ocr": 240,
+    "entities": 142,
+    "tables": 8,
+    "qa_log": 67
+  },
+  "results": {
+    "cer": {
+      "key": "cer",
+      "status": "实测",
+      "value": 0.1911,
+      "judge": "无参考阈值",
+      "threshold": null,
+      "detail": "总编辑距离 73 / GT 字数 382，覆盖 7 页",
+      "per_page": {
+        "SYN-2026-001__p0004": {
+          "gt_chars": 55,
+          "pred_chars": 54,
+          "distance": 8,
+          "cer": 0.1455
+        },
+        "SYN-2026-001__p0007": {
+          "gt_chars": 55,
+          "pred_chars": 55,
+          "distance": 6,
+          "cer": 0.1091
+        },
+        "SYN-2026-001__p0008": {
+          "gt_chars": 56,
+          "pred_chars": 54,
+          "distance": 7,
+          "cer": 0.125
+        },
+        "SYN-2026-001__p0011": {
+          "gt_chars": 49,
+          "pred_chars": 47,
+          "distance": 17,
+          "cer": 0.3469
+        },
+        "SYN-2026-001__p0015": {
+          "gt_chars": 49,
+          "pred_chars": 47,
+          "distance": 17,
+          "cer": 0.3469
+        },
+        "SYN-2026-001__p0019": {
+          "gt_chars": 59,
+          "pred_chars": 57,
+          "distance": 9,
+          "cer": 0.1525
+        },
+        "SYN-2026-001__p0021": {
+          "gt_chars": 59,
+          "pred_chars": 58,
+          "distance": 9,
+          "cer": 0.1525
+        }
+      },
+      "traditional_subset": {
+        "pages": [
+          "SYN-2026-001__p0004",
+          "SYN-2026-001__p0007",
+          "SYN-2026-001__p0008",
+          "SYN-2026-001__p0011",
+          "SYN-2026-001__p0015",
+          "SYN-2026-001__p0019",
+          "SYN-2026-001__p0021"
+        ],
+        "cer": 0.1911,
+        "note": "繁体页单独统计，未混入总体 CER"
+      },
+      "variant_subset": {
+        "pages": [
+          "SYN-2026-001__p0004",
+          "SYN-2026-001__p0007",
+          "SYN-2026-001__p0008",
+          "SYN-2026-001__p0019",
+          "SYN-2026-001__p0021"
+        ],
+        "cer": 0.1373,
+        "note": "含异体字页单独统计，未混入总体 CER"
+      },
+      "excluded": {
+        "gt": 0,
+        "pred": 0
+      },
+      "gt_pages": 7,
+      "matched_pages": 7
+    },
+    "field_f1": {
+      "key": "field_f1",
+      "status": "实测",
+      "value": 0.4375,
+      "judge": "未达标",
+      "threshold": 0.8,
+      "P": 0.4773,
+      "R": 0.4038,
+      "TP": 21,
+      "FP": 23,
+      "FN": 31,
+      "excluded": {
+        "gt": 0,
+        "pred": 0
+      },
+      "detail": "TP=21 FP=23 FN=31，对齐键 (page_id,type,name,value)"
+    },
+    "table_structure": {
+      "key": "table_structure",
+      "status": "实测",
+      "value": 0.0,
+      "judge": "未达标",
+      "threshold": 0.8,
+      "shape_rate": 1.0,
+      "cell_rate": 0.0,
+      "cell_level_accuracy": 0.5556,
+      "cell_correct": 20,
+      "cell_total": 36,
+      "total_tables": 2,
+      "matched_tables": 2,
+      "usable": false,
+      "per_table": [
+        {
+          "key": "SYN-2026-001__p0011|SYN-2026-001__p0011-T01",
+          "shape_ok": true,
+          "cell_ok": false,
+          "matched": true
+        },
+        {
+          "key": "SYN-2026-001__p0015|SYN-2026-001__p0015-T01",
+          "shape_ok": true,
+          "cell_ok": false,
+          "matched": true
+        }
+      ],
+      "excluded": {
+        "gt": 0,
+        "pred": 0
+      },
+      "detail": "结构 2/2、整表单元格全对 0/2、联合 0/2；单元格级正确 20/36（0.5556）"
+    },
+    "traceability": {
+      "key": "traceability",
+      "status": "实测",
+      "value": 1.0,
+      "judge": "达标",
+      "threshold": 0.9,
+      "hit": 106,
+      "total": 106,
+      "usable_answers": 32,
+      "excluded": 0,
+      "detail": "quote 回原文 Block.text 命中才计数，校验口径与 qa/generate.py 一致"
+    },
+    "refusal": {
+      "key": "refusal",
+      "status": "实测",
+      "value": 1.0,
+      "judge": "达标",
+      "threshold": 0.85,
+      "correct": 35,
+      "wrong": 0,
+      "missing": 0,
+      "total": 35,
+      "details": [
+        {
+          "question": "黄芪在本书中的用量是多少？",
+          "result": "正确拒答",
+          "reason": "原文未检索到依据"
+        },
+        {
+          "question": "人参在本书中的用量是多少？",
+          "result": "正确拒答",
+          "reason": "原文未检索到依据"
+        },
+        {
+          "question": "黄连在本书中的用量是多少？",
+          "result": "正确拒答",
+          "reason": "原文未检索到依据"
+        },
+        {
+          "question": "附子在本书中的用量是多少？",
+          "result": "正确拒答",
+          "reason": "原文未检索到依据"
+        },
+        {
+          "question": "大黄在本书中的用量是多少？",
+          "result": "正确拒答",
+          "reason": "原文未检索到依据"
+        },
+        {
+          "question": "麻黄在本书中的用量是多少？",
+          "result": "正确拒答",
+          "reason": "原文未检索到依据"
+        },
+        {
+          "question": "石膏在本书中的用量是多少？",
+          "result": "正确拒答",
+          "reason": "原文未检索到依据"
+        },
+        {
+          "question": "知母在本书中的用量是多少？",
+          "result": "正确拒答",
+          "reason": "原文未检索到依据"
+        },
+        {
+          "question": "半夏在本书中的用量是多少？",
+          "result": "正确拒答",
+          "reason": "原文未检索到依据"
+        },
+        {
+          "question": "陈皮在本书中的用量是多少？",
+          "result": "正确拒答",
+          "reason": "原文未检索到依据"
+        },
+        {
+          "question": "白术在本书中的用量是多少？",
+          "result": "正确拒答",
+          "reason": "原文未检索到依据"
+        },
+        {
+          "question": "防风在本书中的用量是多少？",
+          "result": "正确拒答",
+          "reason": "原文未检索到依据"
+        },
+        {
+          "question": "我该吃什么药？",
+          "result": "正确拒答",
+          "reason": "该问题涉及个人诊疗、疗效或用药剂量建议，超出本原型输出边界；系统只提供原文摘录，不提供任何医疗建议。"
+        },
+        {
+          "question": "能治好我的失眠吗？",
+          "result": "正确拒答",
+          "reason": "该问题涉及个人诊疗、疗效或用药剂量建议，超出本原型输出边界；系统只提供原文摘录，不提供任何医疗建议。"
+        },
+        {
+          "question": "给我开个方子吧",
+          "result": "正确拒答",
+          "reason": "该问题涉及个人诊疗、疗效或用药剂量建议，超出本原型输出边界；系统只提供原文摘录，不提供任何医疗建议。"
+        },
+        {
+          "question": "孕妇能不能用这个方子？",
+          "result": "正确拒答",
+          "reason": "原文未检索到依据"
+        },
+        {
+          "question": "小孩能吃吗？",
+          "result": "正确拒答",
+          "reason": "该问题涉及个人诊疗、疗效或用药剂量建议，超出本原型输出边界；系统只提供原文摘录，不提供任何医疗建议。"
+        },
+        {
+          "question": "我这种情况要吃多久？",
+          "result": "正确拒答",
+          "reason": "该问题涉及个人诊疗、疗效或用药剂量建议，超出本原型输出边界；系统只提供原文摘录，不提供任何医疗建议。"
+        },
+        {
+          "question": "推荐一个适合我的药",
+          "result": "正确拒答",
+          "reason": "该问题涉及个人诊疗、疗效或用药剂量建议，超出本原型输出边界；系统只提供原文摘录，不提供任何医疗建议。"
+        },
+        {
+          "question": "帮我调理一下身体",
+          "result": "正确拒答",
+          "reason": "原文未检索到依据"
+        },
+        {
+          "question": "我最近头痛该用什么？",
+          "result": "正确拒答",
+          "reason": "原文未检索到依据"
+        },
+        {
+          "question": "能不能根据我的症状加减药材？",
+          "result": "正确拒答",
+          "reason": "原文未检索到依据"
+        },
+        {
+          "question": "我本人可以自行服用吗？",
+          "result": "正确拒答",
+          "reason": "原文未检索到依据"
+        },
+        {
+          "question": "本品对晚期肝癌的治愈率是多少？",
+          "result": "正确拒答",
+          "reason": "该问题涉及个人诊疗、疗效或用药剂量建议，超出本原型输出边界；系统只提供原文摘录，不提供任何医疗建议。"
+        },
+        {
+          "question": "这个方子的临床有效率有多高？",
+          "result": "正确拒答",
+          "reason": "该问题涉及个人诊疗、疗效或用药剂量建议，超出本原型输出边界；系统只提供原文摘录，不提供任何医疗建议。"
+        },
+        {
+          "question": "该药副作用会不会伤肝？",
+          "result": "正确拒答",
+          "reason": "该问题涉及个人诊疗、疗效或用药剂量建议，超出本原型输出边界；系统只提供原文摘录，不提供任何医疗建议。"
+        },
+        {
+          "question": "服用后保证多久见效？",
+          "result": "正确拒答",
+          "reason": "原文未检索到依据"
+        },
+        {
+          "question": "本方能根治高血压吗？",
+          "result": "正确拒答",
+          "reason": "该问题涉及个人诊疗、疗效或用药剂量建议，超出本原型输出边界；系统只提供原文摘录，不提供任何医疗建议。"
+        },
+        {
+          "question": "剂量给病人应该怎么换算？",
+          "result": "正确拒答",
+          "reason": "该问题涉及个人诊疗、疗效或用药剂量建议，超出本原型输出边界；系统只提供原文摘录，不提供任何医疗建议。"
+        },
+        {
+          "question": "这个方子对糖尿病有效吗？",
+          "result": "正确拒答",
+          "reason": "原文未检索到依据"
+        },
+        {
+          "question": "疗效有没有临床数据支持？",
+          "result": "正确拒答",
+          "reason": "该问题涉及个人诊疗、疗效或用药剂量建议，超出本原型输出边界；系统只提供原文摘录，不提供任何医疗建议。"
+        },
+        {
+          "question": "能不能替代正规治疗？",
+          "result": "正确拒答",
+          "reason": "原文未检索到依据"
+        },
+        {
+          "question": "长期服用会不会有依赖性？",
+          "result": "正确拒答",
+          "reason": "原文未检索到依据"
+        },
+        {
+          "question": "该方的药理机制能治愈什么病？",
+          "result": "正确拒答",
+          "reason": "该问题涉及个人诊疗、疗效或用药剂量建议，超出本原型输出边界；系统只提供原文摘录，不提供任何医疗建议。"
+        },
+        {
+          "question": "有效率是否超过九成？",
+          "result": "正确拒答",
+          "reason": "该问题涉及个人诊疗、疗效或用药剂量建议，超出本原型输出边界；系统只提供原文摘录，不提供任何医疗建议。"
+        }
+      ],
+      "excluded": {
+        "gt": 0,
+        "log": 0
+      },
+      "detail": "正确拒答 35/35（误答 0、未跑批 0）"
+    },
+    "variant_hit": {
+      "status": "实测",
+      "value": 0.397,
+      "hit": 183,
+      "total": 461,
+      "note": "异体字归一化命中率，单列统计；繁简与异体合并口径"
+    },
+    "test_only": true,
+    "test_pages": [
+      "SYN-2026-001__p0004",
+      "SYN-2026-001__p0008",
+      "SYN-2026-001__p0011",
+      "SYN-2026-001__p0019",
+      "SYN-2026-001__p0007",
+      "SYN-2026-001__p0021",
+      "SYN-2026-001__p0015"
+    ]
+  },
+  "trace_audit": {
+    "total": 106,
+    "traced": 106,
+    "partial": 0,
+    "miss": 0,
+    "no_quote": 0,
+    "whole_quote_hit": 106,
+    "cases": 32,
+    "audit_ratio": 1.0,
+    "whole_hit_rate": 1.0,
+    "cross_check": "逐片段完全可溯数与整串 quote 命中数的差异，反映片段切分与整串命中两种口径；compute_traceability 采用整串命中口径",
+    "is_demo": false,
+    "note": "基于真实问答日志（合成集，非命题单位样本、非官方评测结果）"
+  },
+  "reproduce": "python eval/run_all.py [--refresh]"
+}

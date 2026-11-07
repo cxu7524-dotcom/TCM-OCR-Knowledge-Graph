@@ -184,7 +184,7 @@
 <div class="disclaimer-bar">
   <b>仅供参考、非诊疗建议</b>
   <span class="grow" id="bannerText">本系统为赛事研发原型，所有内容不构成诊断、用药或治疗建议，不得用于临床决策。</span>
-  <span class="badge">全部指标：待测</span>
+  <span class="badge" id="metricChip">指标：见正式评测报告</span>
 </div>
 
 <nav class="steps">
@@ -200,7 +200,7 @@
     <div class="grid two">
       <div class="card">
         <h2>步骤一 · 上传古籍页</h2>
-        <p class="hint">上传一张古籍扫描页，或直接加载 <code>data/demo/</code> 示例数据走通全流程。本阶段 OCR / 版面模型未接入，上传任何图像都会返回结构完整的示例识别结果并显式标注。</p>
+        <p class="hint">上传一张古籍扫描页会调用本机 <code>rapidocr-onnxruntime</code>（ONNX CPU、离线）做<b>真实识别</b>，返回带 bbox 的识别文本；点击「加载示例古籍页」则走 <code>data/demo/</code> 示例数据（桩输出，界面会明确标注）。真实识别页的数据来源为合成示意页，非命题单位样本。</p>
         <div class="drop" id="drop">
           <b>点击选择图片，或拖拽到此处</b><br>
           支持 png / jpg / jpeg / bmp / webp / tif；文件仅保存在本机 data/uploads/
@@ -213,9 +213,9 @@
         </div>
         <h3>本阶段边界</h3>
         <ul class="note-list">
-          <li>不训练模型、不追指标、不编造任何实测数字；五项指标一律「待测」。</li>
-          <li>推理全本地、零密钥、零公网调用；不需要数据库服务与 GPU。</li>
-          <li>命题单位脱敏样本仅限赛事研发使用，不得外传。</li>
+          <li>阶段二已接入本地 OCR；五项实测指标由 <code>eval/run_all.py</code> 产出，未达标项如实标注。</li>
+          <li>推理全本地、零密钥、零公网调用；不需要数据库服务与 GPU；本地 LLM 仍为 <code>none</code>。</li>
+          <li>合成示意数据用于工程自测，非命题单位样本、非官方评测结果；命题单位脱敏样本未到位、不得外传。</li>
         </ul>
       </div>
       <div class="card">
@@ -307,7 +307,7 @@
 
 <footer>
   <b>仅供参考、非诊疗建议</b>：本系统为赛事研发原型，不构成诊断、用药或治疗建议；问答仅返回原文摘录，未做推断。<br>
-  当前阶段：<b>示例数据 / 模型未接入</b>，五项指标（CER / 字段 F1 / 表格结构还原 / 可溯源率 / 拒答率）<b>全部待测</b>，界面与报告中的任何数字都不是评测结论。<br>
+  当前阶段：<b>阶段二 · 本地 OCR 已接入</b>，五项指标（CER / 字段 F1 / 表格结构还原 / 可溯源率 / 拒答率）由 <code>python eval/run_all.py</code> 产出真实数值，见 <code>data/reports/正式评测报告.md</code>；<b>合成集结果不是官方评测结论</b>。<br>
   数据合规：命题单位脱敏样本仅限赛事研发使用，不得外传；真实扫描页与人工标注不进仓库、不上传任何外部服务。
 </footer>
 <div class="toast" id="toast"></div>
@@ -351,7 +351,8 @@ async function init() {
     const [h, m] = await Promise.all([api("/api/health"), api("/api/meta")]);
     S.meta = m;
     $("bannerText").textContent = m.banner;
-    $("demoChip").textContent = m.badge;
+    $("demoChip").textContent = h.badge || m.badge;
+    $("demoChip").className = "chip " + (h.is_demo ? "warn" : "ok");
     $("cfgChip").textContent = "OCR:" + h.config.ocr_backend + " · LLM:" + h.config.llm_backend + " · " + h.config.server;
     $("healthText").textContent = "服务正常";
     $("healthDot").classList.add("on");
@@ -375,10 +376,13 @@ async function ingest(fd, label) {
     const r = await api("/api/pages", { method: "POST", body: fd });
     S.pageId = r.page_id; S.ingest = r;
     $("s1hint").textContent = "已加载页面，可进入步骤二查看 OCR 与结构化结果。";
+    $("demoChip").textContent = r.badge || "示例数据 / 模型未接入";
+    $("demoChip").className = "chip " + (r.is_demo ? "warn" : "ok");
     $("pageInfo").innerHTML = [
-      ["page_id", r.page_id], ["识别后端", r.engine + (r.model_loaded ? "" : "（模型未接入）")],
+      ["page_id", r.page_id], ["识别后端", r.engine + (r.model_loaded ? "（本地模型）" : "（模型未接入）")],
       ["文本块", r.blocks], ["实体", r.entities], ["三元组", r.triples],
       ["图谱节点 / 边", r.graph_nodes + " / " + r.graph_edges],
+      ["数据状态", r.is_demo ? "示例数据" : "真实 OCR 识别 · 合成示意页"],
       ["演示标注", r.badge], ["免责声明", r.disclaimer], ["入库批次", r.ingest && r.ingest.run_id],
     ].map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(fmt(v))}</dd>`).join("");
     $("pageNotes").innerHTML = "<h3>识别说明</h3><ul class='note-list'>" +
@@ -411,12 +415,24 @@ async function loadOcr() {
   try {
     const r = await api("/api/pages/" + encodeURIComponent(S.pageId) + "/ocr");
     S.ocr = r;
-    $("s2badge").textContent = r.badge;
+    $("s2badge").textContent = r.badge || "示例数据 / 模型未接入";
+    $("demoChip").textContent = r.badge || "示例数据 / 模型未接入";
+    $("demoChip").className = "chip " + (r.is_demo ? "warn" : "ok");
     $("s2hint").textContent = "识别后端：" + r.engine + "（" + (r.model_loaded ? "模型已接入" : "模型未接入") + "）；共 " +
       (r.blocks || []).length + " 个文本块。所有坐标与摘抄均可回原文核对。";
     renderPreview(r.page || {}, r.blocks || []);
     renderBlocks(r.blocks || []);
     renderEntities(r.entities || [], r.triples || []);
+    // 从步骤四证据卡片跳转过来时，定位并高亮对应原文块
+    if (S.pendingHighlight) {
+      const i = (S.ocr.blocks || []).findIndex(b => b.line_id === S.pendingHighlight);
+      if (i >= 0) {
+        selectBlock(i);
+        const el = document.querySelector('.bbox[data-i="' + i + '"]');
+        if (el) el.scrollIntoView({ block: "center", behavior: "smooth" });
+      }
+      S.pendingHighlight = null;
+    }
   } catch (e) { $("s2hint").textContent = "读取失败：" + e.message; toast("读取失败：" + e.message); }
 }
 function renderPreview(page, blocks) {
@@ -466,6 +482,7 @@ async function loadGraph() {
     S.graph = r; S.nodes = (r.nodes || []).map(n => Object.assign({}, n));
     S.links = (r.links || []).filter(l => S.nodes.some(n => n.id === l.source) && S.nodes.some(n => n.id === l.target));
     $("graphBadge").textContent = r.badge || "示例数据 / 模型未接入";
+    $("demoChip").textContent = r.badge || "示例数据 / 模型未接入";
     const st = r.stats || {};
     $("graphHint").textContent = "共 " + S.nodes.length + " 个节点 / " + S.links.length + " 条边；" +
       (st.note || "示例数据 / 模型未接入");
@@ -562,17 +579,26 @@ async function ask(q) {
     const box = $("answerBox");
     box.textContent = r.text;
     box.classList.toggle("refused", !!r.refused);
+    if (r.badge) {
+      $("demoChip").textContent = r.badge;
+      $("demoChip").className = "chip " + (r.is_demo ? "warn" : "ok");
+    }
     $("traceBox").textContent = (r.trace || []).join("\n") + "\n\n免责声明：" + r.disclaimer;
     const evs = r.evidences || [];
     $("evHint").textContent = r.refused
       ? "已拒答（" + (r.refuse_reason || "") + "），无可用证据。仅供参考、非诊疗建议。"
       : "共 " + evs.length + " 条证据，quote 已逐条回原文校验。";
     $("evList").innerHTML = evs.length ? evs.map((e, i) =>
-      `<div class="ev-card"><div class="q">[${i + 1}] 「${esc(e.quote)}」</div>
+      `<div class="ev-card" data-line="${esc(e.line_id)}" data-page="${esc(e.page_id)}" style="cursor:pointer" title="点击定位到步骤二的原文块">
+       <div class="q">[${i + 1}] 「${esc(e.quote)}」</div>
        <div class="loc">page_id: ${esc(e.page_id)} · line_id: ${esc(e.line_id)} · bbox: ${esc(fmt(e.bbox))}<br>
        检索得分: ${esc(e.score)} · 通道: ${esc(e.channel)} · block_ref: ${esc(e.block_ref)}<br>
-       source_hash: ${esc(e.source_hash)}</div></div>`).join("")
+       source_hash: ${esc(e.source_hash)}<br><span style="color:var(--ink)">点击此卡片可高亮对应原文块</span></div></div>`).join("")
       : `<div class="empty">${r.refused ? "无依据，按约定拒答，不提供任何推断性内容。" : "暂无证据"}</div>`;
+    $("evList").querySelectorAll(".ev-card").forEach(el => el.onclick = () => {
+      S.pendingHighlight = el.dataset.line;
+      goto(2);
+    });
   } catch (e) {
     $("answerBox").textContent = "请求失败：" + e.message;
     toast("问答失败：" + e.message);

@@ -134,7 +134,8 @@ def sparse_scores(query: str, blocks: Iterable[Block]) -> Dict[str, float]:
 def hybrid_retrieve(query: str, blocks: Iterable[Block],
                     vector_index: Optional[VectorIndex] = None,
                     top_k: Optional[int] = None,
-                    min_score: Optional[float] = None) -> List[Evidence]:
+                    min_score: Optional[float] = None,
+                    is_demo: bool = True) -> List[Evidence]:
     """混合检索入口。
 
     输入：问题、Block 列表、可选向量索引
@@ -170,17 +171,18 @@ def hybrid_retrieve(query: str, blocks: Iterable[Block],
             out.append(Evidence(
                 page_id=b.page_id, bbox=list(b.bbox), line_id=b.line_id,
                 quote=b.text, source_hash=b.source_hash, score=round(score, 2),
-                block_ref=ref, channel=channel, is_demo=True,
+                block_ref=ref, channel=channel, is_demo=is_demo,
             ))
         return out
     except Exception:
         return []  # 检索失败 → 空证据 → 由 refuse.py 转拒答
 
 
-def retrieve_with_trace(query: str, blocks: List[Block]) -> Tuple[List[Evidence], List[str]]:
+def retrieve_with_trace(query: str, blocks: List[Block],
+                        is_demo: bool = True) -> Tuple[List[Evidence], List[str]]:
     """带 trace 的检索，供 Answer.trace 记录检索过程。"""
     terms = core_terms(query)
-    ev = hybrid_retrieve(query, blocks)
+    ev = hybrid_retrieve(query, blocks, is_demo=is_demo)
     trace = [f"检索词：{'、'.join(terms) or '（空）'}",
              f"候选块：{len(blocks)}，命中证据：{len(ev)}，阈值：{CONFIG.qa.min_score}",
              f"向量通道：{'启用' if CONFIG.vector.enabled else '关闭（占位）'}"]

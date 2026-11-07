@@ -121,6 +121,49 @@ def _summarize(items: List[AuditItem], is_demo: bool = True) -> AuditReport:
     )
 
 
+def audit_qa_logs(records: List[Dict], blocks_by_page: Dict[str, List[Block]]) -> Dict:
+    """阶段二：从**真实问答日志**做反向溯源审计，并与 compute_traceability 交叉核对。
+
+    只统计 is_demo=False 的非拒答答案；逐片段回原文核对，输出
+    完全 / 部分 / 未溯 三态与「整串 quote 命中数」，供报告交叉验证。
+    """
+    from app.schemas import quote_hits_blocks
+
+    total = traced = partial = miss = no_quote = whole_hit = 0
+    per_case = []
+    for rec in records or []:
+        if not isinstance(rec, dict) or rec.get("is_demo") is True or rec.get("refused"):
+            continue
+        page_blocks = blocks_by_page.get(str(rec.get("page_id", "")), [])
+        # 证据可能来自任意页，按证据自身的 page_id 找原文
+        for ev in rec.get("evidences") or []:
+            if not isinstance(ev, dict) or ev.get("is_demo") is True:
+                continue
+            total += 1
+            pool = blocks_by_page.get(str(ev.get("page_id", "")), []) or page_blocks
+            item = audit_quote(str(ev.get("quote", "")), pool,
+                               str(ev.get("page_id", "")), str(ev.get("line_id", "")))
+            traced += int(item.status == "traced")
+            partial += int(item.status == "partial")
+            miss += int(item.status == "miss")
+            no_quote += int(item.status == "no_quote")
+            whole_hit += int(quote_hits_blocks(str(ev.get("quote", "")), pool))
+        per_case.append({"question": rec.get("question", ""),
+                         "evidence_count": len(rec.get("evidences") or [])})
+    return {
+        "total": total, "traced": traced, "partial": partial,
+        "miss": miss, "no_quote": no_quote,
+        "whole_quote_hit": whole_hit,
+        "cases": len(per_case),
+        "audit_ratio": round(traced / total, 4) if total else None,
+        "whole_hit_rate": round(whole_hit / total, 4) if total else None,
+        "cross_check": ("逐片段完全可溯数与整串 quote 命中数的差异，"
+                        "反映片段切分与整串命中两种口径；compute_traceability 采用整串命中口径"),
+        "is_demo": False,
+        "note": "基于真实问答日志（合成集，非命题单位样本、非官方评测结果）",
+    }
+
+
 def self_check(blocks: List[Block], queries: List[str]) -> Dict:
     """链路自检：跑几条例示问题，输出审计明细（明确标注示例、非指标）。
 

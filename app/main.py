@@ -68,7 +68,24 @@ _STATE: Dict[str, Any] = {
     "graph": None,
     "vector_index": None,
     "last_ingest": None,
+    "ocr": None,
 }
+
+REAL_BADGE = "本地 OCR 已接入 · 合成示意数据（非命题单位样本、非官方评测结果）"
+
+
+def _flags_for(ocr: OCRResult) -> Dict[str, Any]:
+    """按识别结果动态给演示态标记：真实 OCR 不再显示「模型未接入」。"""
+    if ocr.is_demo:
+        return demo_flags()
+    return {
+        "is_demo": False,
+        "badge": REAL_BADGE,
+        "note": ("本地 ONNX OCR 真实识别；页面为合成示意页，用于工程自测，"
+                 "非命题单位样本、非官方评测结果"),
+        "model_loaded": bool(ocr.model_loaded),
+        "disclaimer": DISCLAIMER,
+    }
 
 
 # ------------------------------------------------------------------
@@ -85,6 +102,7 @@ def _ingest(ocr: OCRResult) -> Dict[str, Any]:
 
     _STATE.update({
         "page_id": ocr.page_id,
+        "ocr": ocr,
         "blocks": ocr.blocks,
         "entities": entities,
         "triples": triples,
@@ -103,7 +121,7 @@ def _ingest(ocr: OCRResult) -> Dict[str, Any]:
         "engine": ocr.engine,
         "model_loaded": ocr.model_loaded,
         "notes": ocr.notes,
-        **demo_flags(),
+        **_flags_for(ocr),
         "disclaimer": DISCLAIMER,
     }
 
@@ -159,16 +177,22 @@ def health():
         "current_page_id": _STATE["page_id"],
         "last_ingest": _STATE["last_ingest"],
         "modules": {
-            "ocr": {"backend": CONFIG.ocr.backend, "model_loaded": False, "is_demo": True},
+            "ocr": {"backend": (_STATE["ocr"].engine if _STATE["ocr"] else CONFIG.ocr.backend),
+                    "model_loaded": bool(_STATE["ocr"] and _STATE["ocr"].model_loaded),
+                    "is_demo": bool(_STATE["ocr"] is None or _STATE["ocr"].is_demo)},
             "extract": {"backend": "rules", "llm": CONFIG.llm.backend,
-                        "llm_loaded": False, "is_demo": True},
+                        "llm_loaded": False, "is_demo": False},
             "graph": {"nodes": len(_STATE["graph"].nodes) if _STATE["graph"] else 0,
-                      "is_demo": True},
+                      "is_demo": False},
             "qa": {"backend": CONFIG.llm.backend, "vector": CONFIG.vector.backend,
-                   "is_demo": True},
+                   "is_demo": False},
         },
-        "metrics": "待测（模型未接入、标注未采集）",
-        **demo_flags(),
+        "metrics": "阶段二已产出真实实测值，见 data/reports/正式评测报告.md",
+        **(_flags_for(_STATE["ocr"]) if _STATE["ocr"] else {
+            "is_demo": True,
+            "badge": "本地 OCR 后端已就绪 · 请上传页面或加载示例",
+            "note": "尚无已加载页面；后端能力由 /api/health 的 modules 字段给出",
+            "model_loaded": False, "disclaimer": DISCLAIMER}),
     }
 
 
@@ -227,8 +251,9 @@ async def upload_page(
 
 @app.get("/api/pages")
 def list_pages():
-    return {"pages": store.list_pages(), "is_demo": True,
-            "disclaimer": DISCLAIMER, "badge": CONFIG.demo_badge}
+    flags = _flags_for(_STATE["ocr"]) if _STATE["ocr"] else demo_flags()
+    return {"pages": store.list_pages(), "is_demo": flags["is_demo"],
+            "disclaimer": DISCLAIMER, "badge": flags["badge"]}
 
 
 # ------------------------------------------------------------------
@@ -251,7 +276,7 @@ def get_ocr(page_id: str):
         "engine": page.get("engine", "stub"),
         "model_loaded": page.get("model_loaded", False),
         "notes": page.get("notes", []),
-        **demo_flags(),
+        **_flags_for(OCRResult.from_dict(page)),
         "disclaimer": DISCLAIMER,
     }
 
@@ -265,8 +290,10 @@ def get_graph(page_id: Optional[str] = None):
     graph = _current_graph()
     if graph is None:
         return empty_payload("暂无图谱数据，请先在步骤一加载示例古籍页")
-    payload = to_vis_payload(graph)
+    payload = to_vis_payload(graph, badge=_flags_for(_STATE["ocr"])["badge"]
+                             if _STATE["ocr"] else CONFIG.demo_badge)
     payload["page_id"] = _STATE["page_id"]
+    payload["is_demo"] = bool(_STATE["ocr"] is None or _STATE["ocr"].is_demo)
     return payload
 
 
@@ -280,21 +307,24 @@ def ask(payload: Dict[str, Any] = Body(default={})):
     payload = payload or {}
     question = str(payload.get("question") or payload.get("q") or "").strip()
     page_id = payload.get("page_id") or _STATE["page_id"]
+    flags = _flags_for(_STATE["ocr"]) if _STATE["ocr"] else demo_flags()
     if not question:
         ans = Answer(
             text="问题为空，原文未检索到依据。" + DISCLAIMER,
             refused=True, refuse_reason="原文未检索到依据",
             disclaimer=DISCLAIMER, trace=["空问题直接拒答"],
-            backend="stub", is_demo=True,
+            backend="stub", is_demo=flags["is_demo"],
         )
     else:
         blocks = _blocks_for(page_id)
-        ans = qa_answer(question, blocks, vector_index=_STATE["vector_index"])
+        ans = qa_answer(question, blocks, vector_index=_STATE["vector_index"],
+                        is_demo=flags["is_demo"])
     try:
         store.log_qa(question, ans)
     except Exception:
         pass
-    return {**ans.to_dict(), **page_banner(), "page_id": page_id}
+    return {**ans.to_dict(), **page_banner(), "page_id": page_id,
+            "badge": flags["badge"], "is_demo": flags["is_demo"]}
 
 
 # ------------------------------------------------------------------
@@ -312,7 +342,8 @@ def _cli() -> None:
     import uvicorn
     print(f"服务启动： http://{args.host}:{args.port}/")
     print(f"免责声明： {DISCLAIMER}")
-    print(f"演示状态： {CONFIG.demo_badge}（指标一律待测）")
+    print("阶段二：本地 OCR 已接入；五项实测指标见 data/reports/正式评测报告.md")
+    print("数据声明：合成示意数据，用于工程自测，非命题单位样本、非官方评测结果")
     uvicorn.run(app, host=args.host, port=args.port, reload=args.reload)
 
 

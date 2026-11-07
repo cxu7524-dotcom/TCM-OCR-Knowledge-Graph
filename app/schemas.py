@@ -155,6 +155,7 @@ class LayoutResult(_Record):
     engine: str = "stub"
     is_demo: bool = True
     note: str = ""
+    detail: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

@@ -89,7 +89,12 @@ class OcrConfig:
 
     backend: str = _env("OCR_BACKEND", "rapidocr")
     lang: str = _env("OCR_LANG", "ch")
-    min_conf: float = _env_float("OCR_MIN_CONF", 0.50)
+    # 低置信过滤阈值。阶段二实测：默认 0.50 会把表格页 score≈0.37~0.47 的
+    # 真实单元格全部剔除，导致结构还原失真；调整为 0.35 并在报告中登记该差异。
+    min_conf: float = _env_float("OCR_MIN_CONF", 0.35)
+    # 检测阶段阈值（下调以提升方剂表小单元格召回，均为本地推理参数）
+    det_box_thresh: float = _env_float("OCR_BOX_THRESH", 0.30)
+    det_text_score: float = _env_float("OCR_TEXT_SCORE", 0.35)
     auto_fallback: bool = _env_bool("OCR_AUTO_FALLBACK", True)
     vertical_layout: bool = _env_bool("OCR_VERTICAL_LAYOUT", True)
     table_enabled: bool = _env_bool("OCR_TABLE_ENABLED", True)

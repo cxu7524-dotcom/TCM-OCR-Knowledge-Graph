@@ -72,7 +72,8 @@ def _refusal_text(reason: str) -> str:
 
 def generate_answer(query: str, evidences: List[Evidence], blocks: List[Block],
                     backend: Optional[str] = None,
-                    trace_extra: Optional[List[str]] = None) -> Answer:
+                    trace_extra: Optional[List[str]] = None,
+                    is_demo: bool = True) -> Answer:
     """生成入口（桩）。
 
     输入：问题、检索证据、原文块列表
@@ -82,6 +83,9 @@ def generate_answer(query: str, evidences: List[Evidence], blocks: List[Block],
     trace: List[str] = list(trace_extra or [])
     backend_name = backend or CONFIG.llm.backend
     try:
+        for e in evidences or []:
+            if isinstance(e, Evidence):
+                e.is_demo = is_demo
         verified, vtrace = verify_evidences(evidences, blocks)
         trace.extend(vtrace)
         quotes_ok = bool(verified) or not (evidences or [])
@@ -93,7 +97,7 @@ def generate_answer(query: str, evidences: List[Evidence], blocks: List[Block],
                 text=_refusal_text(reason), evidences=[], refused=True,
                 refuse_reason=reason, disclaimer=DISCLAIMER,
                 trace=trace + [f"生成后端：{backend_name}（拒答，不调用模型）"],
-                backend=backend_name, is_demo=True,
+                backend=backend_name, is_demo=is_demo,
             )
 
         if CONFIG.llm.enabled:
@@ -107,7 +111,7 @@ def generate_answer(query: str, evidences: List[Evidence], blocks: List[Block],
             refused=False, refuse_reason="", disclaimer=DISCLAIMER,
             trace=trace + ["输出边界：仅原文摘录，未做推断；已附免责声明"],
             backend="stub" if not CONFIG.llm.enabled else f"{backend_name}(stub)",
-            is_demo=True,
+            is_demo=is_demo,
         )
     except Exception as exc:
         reason = "原文未检索到依据"
@@ -115,28 +119,29 @@ def generate_answer(query: str, evidences: List[Evidence], blocks: List[Block],
             text=_refusal_text(reason), evidences=[], refused=True,
             refuse_reason=reason, disclaimer=DISCLAIMER,
             trace=trace + [f"生成异常，保守拒答：{type(exc).__name__}"],
-            backend=backend_name, is_demo=True,
+            backend=backend_name, is_demo=is_demo,
         )
 
 
 def answer(query: str, blocks: List[Block],
-           vector_index: Optional[VectorIndex] = None) -> Answer:
+           vector_index: Optional[VectorIndex] = None,
+           is_demo: bool = True) -> Answer:
     """端到端问答便捷入口：混合检索 → 证据校验 → 生成 / 拒答。
 
     main.py 的 POST /api/qa 只需调用本函数。
     """
     try:
         if vector_index is None:
-            ev, trace = retrieve_with_trace(query, blocks)
+            ev, trace = retrieve_with_trace(query, blocks, is_demo=is_demo)
         else:
-            ev = hybrid_retrieve(query, blocks, vector_index=vector_index)
+            ev = hybrid_retrieve(query, blocks, vector_index=vector_index, is_demo=is_demo)
             trace = [f"检索词通道：混合检索（向量={'启用' if vector_index.available() else '关闭'}）",
                      f"命中证据：{len(ev)} 条"]
-        return generate_answer(query, ev, blocks, trace_extra=trace)
+        return generate_answer(query, ev, blocks, trace_extra=trace, is_demo=is_demo)
     except Exception as exc:
         return Answer(
             text=_refusal_text("原文未检索到依据"), evidences=[], refused=True,
             refuse_reason="原文未检索到依据", disclaimer=DISCLAIMER,
             trace=[f"问答链路异常，保守拒答：{type(exc).__name__}"],
-            backend="stub", is_demo=True,
+            backend="stub", is_demo=is_demo,
         )

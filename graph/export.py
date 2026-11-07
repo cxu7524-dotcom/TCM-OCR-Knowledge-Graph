@@ -22,12 +22,12 @@ from app.config import CONFIG
 from app.schemas import GraphData
 
 
-def to_vis_payload(graph: GraphData) -> Dict[str, Any]:
-    """图谱 → 前端渲染负载。异常时返回空图 + 说明，不抛异常。"""
+def to_vis_payload(graph: GraphData, badge: Optional[str] = None) -> Dict[str, Any]:
+    """图谱 → 前端渲染负载。badge 由调用方按 is_demo 动态给出。"""
     try:
         payload = graph.to_vis_payload()
         payload["disclaimer"] = CONFIG.disclaimer
-        payload["badge"] = CONFIG.demo_badge
+        payload["badge"] = badge or CONFIG.demo_badge
         return payload
     except Exception as exc:
         return {"nodes": [], "links": [], "is_demo": True,

@@ -1,47 +1,46 @@
 # ============================================================
-# 赛题二原型 · 依赖分层（文件统一 UTF-8）
+# 赛题二原型 · 依赖（阶段二：本地 OCR 已接入并验证）
 #
-# 安装最小可运行环境（不需要数据库服务、不需要密钥、不需要 GPU、不联网推理）：
+# 安装：
 #     pip install -r requirements.txt
 #
-# 约定：「必装」区是唯一会随本文件被安装的依赖；
-#      「可选」区全部以注释形式给出，按需单独安装，避免原型阶段产生装机门槛。
+# 环境：Python 3.13 实测通过；纯 CPU 可跑；不需要数据库服务、不需要 GPU、
+#      不需要任何 API Key，不访问任何公网推理服务。
+# 版本策略：用 >= 下限约束并注明本机实测版本，避免锁死导致换机装不上。
 # ============================================================
 
-# ---------- core：Web 服务与上传，必装，纯 CPU ----------
-fastapi>=0.115,<1.0
-uvicorn>=0.30,<1.0
-python-multipart>=0.0.9
+# ---------- core：Web 服务与上传（必装） ----------
+fastapi>=0.115,<1.0            # 实测 0.162.0
+uvicorn>=0.30,<1.0             # 实测 0.54.0
+python-multipart>=0.0.9        # 实测 0.0.33（上传接口必需）
 
-# ---------- 标准库已覆盖，无需安装 ----------
-# sqlite3 / json / hashlib / urllib.request / dataclasses / argparse
-# 图谱可视化为原生 Canvas 实现，不依赖任何前端 CDN 或 npm 包。
+# ---------- OCR：本地 ONNX 推理（阶段二启用，CPU 可跑，全程离线） ----------
+# rapidocr-onnxruntime 包内自带 det/rec/cls 三个 ONNX 权重（约 14MB），
+# 不会在运行时下载模型；安装即用，无需额外配置。
+rapidocr-onnxruntime>=1.2      # 实测 1.2.3
+onnxruntime>=1.16              # 实测 1.31.1
+pillow>=10.0                   # 实测 13.0.0（合成页渲染 + 图像宽高读取）
+numpy>=1.26                    # 实测 2.5.4（OCR 预处理）
+opencv-python>=4.8             # 实测 5.0.0.93（rapidocr 的透视裁剪依赖）
 
-# ============================================================
-# 可选 ①  OCR（本地 CPU 推理，默认后端 rapidocr，缺失时自动降级为桩）
-#     pip install rapidocr-onnxruntime
-#   说明：ONNX Runtime 纯 CPU 可跑；不会访问公网下载模型权重，
-#         模型文件请自行放置于本机并在 app/config.py 中登记路径。
-#   备选：pip install paddleocr        （设 TCM_OCR_BACKEND=paddleocr）
-# ============================================================
-# rapidocr-onnxruntime>=1.3
+# ---------- 可选：其他 OCR 后端（未安装、未启用，选中会如实降级） ----------
 # paddleocr>=2.8
 
-# ============================================================
-# 可选 ②  本地 LLM（Ollama / vLLM 的 OpenAI 兼容 HTTP 接口）
-#   服务在本机运行，Python 侧用标准库 urllib 调用，通常无需额外安装包。
-#   如需官方 SDK（非必需）：pip install openai
-#   切换：set TCM_LLM_BACKEND=ollama && set TCM_LLM_MODEL=qwen2.5:7b
-#   严禁配置任何云端在线推理地址；app/config.py 会拒绝非本机的 URL。
-# ============================================================
+# ---------- 可选：本地 LLM（阶段二不部署、不调用，默认后端 none） ----------
+# 服务在本机运行（Ollama / vLLM 的 OpenAI 兼容 HTTP），Python 侧用标准库 urllib 调用。
+# 切换：set TCM_LLM_BACKEND=ollama && set TCM_LLM_MODEL=qwen2.5:7b
+# app/config.py 的 LlmConfig.is_local() 会硬拦截非 127.0.0.1 / localhost 的地址。
 # openai>=1.40
 
+# ---------- 可选：语义向量（阶段三，本阶段仍关闭） ----------
+# qa/index.py 的 hash 后端是零依赖占位实现，不是语义向量，不得用于指标实测。
+# sentence-transformers>=3.0
+
 # ============================================================
-# 可选 ③  向量检索（原型默认关闭；启用后仍需本地 embedding 模型）
-#     pip install numpy
-#   注意：qa/index.py 的 hash 后端为零依赖占位实现，不是语义向量、不得用于指标实测。
+# 标准库已覆盖，无需安装：
+#   sqlite3 / json / hashlib / urllib.request / dataclasses / argparse / unittest
+# 图谱可视化与前端为原生 Canvas + 原生 JS，不依赖任何前端 CDN 或 npm 包。
 # ============================================================
-# numpy>=1.26
 
 # ============================================================
 # 明确移除的旧依赖（不要恢复）：数据库服务端驱动、办公文档读写、
