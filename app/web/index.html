@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>中医古籍 OCR 与知识图谱智能问答原型</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232f5d50'/%3E%3Ctext x='32' y='44' font-size='30' font-family='serif' fill='white' text-anchor='middle'%3E%E6%9C%AC%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #f3f6fb; --card: #ffffff; --line: #e3e9f2; --line-soft: #eef2f8;
+    --text: #1e293b; --muted: #64748b; --blue: #2f6fed; --blue-dark: #1d4ed8;
+    --ink: #2f5d50; --seal: #b45309; --green: #16a34a; --red: #dc2626;
+    --amber: #d97706; --purple: #7c3aed; --teal: #0f766e;
+    --shadow-sm: 0 1px 3px rgba(15,35,80,.06);
+    --shadow-md: 0 6px 20px rgba(15,35,80,.08);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(165deg, #f3f6fb 0%, #eff4fa 55%, #eaf0f9 100%);
+    color: var(--text); font-size: 14px; padding-bottom: 28px;
+  }
+  header {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 0 22px; height: 62px; background: var(--card);
+    border-bottom: 1px solid var(--line); box-shadow: var(--shadow-sm);
+  }
+  .brand { display: flex; align-items: center; gap: 11px; min-width: 0; }
+  .logo {
+    width: 34px; height: 34px; border-radius: 10px; flex: 0 0 auto;
+    background: linear-gradient(135deg, var(--ink), #4a8b76);
+    color: #fff; display: flex; align-items: center; justify-content: center;
+    font-size: 19px; font-family: serif; box-shadow: 0 3px 8px rgba(47,93,80,.28);
+  }
+  .brand b { font-size: 15px; display: block; line-height: 1.35; white-space: nowrap; }
+  .brand .sub { font-size: 11.5px; color: var(--muted); }
+  .hdr-right { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); flex-wrap: wrap; justify-content: flex-end; }
+  .chip { border-radius: 999px; padding: 4px 11px; background: #eef2ff; color: #4338ca; white-space: nowrap; }
+  .chip.warn { background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; }
+  .chip.ok { background: #ecfdf5; color: #047857; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: #cbd5e1; display: inline-block; margin-right: 6px; }
+  .dot.on { background: var(--green); }
+
+  .disclaimer-bar {
+    margin: 14px 22px 0; padding: 10px 16px; border-radius: 10px;
+    background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412;
+    font-size: 13px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .disclaimer-bar b { font-weight: 700; letter-spacing: .3px; }
+  .disclaimer-bar .grow { flex: 1 1 240px; }
+
+  .steps { display: flex; gap: 10px; margin: 16px 22px 0; flex-wrap: wrap; }
+  .step-btn {
+    flex: 1 1 190px; display: flex; align-items: center; gap: 10px; text-align: left;
+    padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line);
+    background: var(--card); box-shadow: var(--shadow-sm); cursor: pointer;
+    color: var(--muted); transition: .18s; font-family: inherit; font-size: 13px;
+  }
+  .step-btn:hover { border-color: #b9cdf5; transform: translateY(-1px); }
+  .step-btn.active { border-color: var(--ink); background: #f0f7f4; color: var(--ink); box-shadow: var(--shadow-md); }
+  .step-btn.done { color: var(--ink); }
+  .step-num {
+    width: 26px; height: 26px; border-radius: 50%; flex: 0 0 auto;
+    display: flex; align-items: center; justify-content: center;
+    background: #eef2f8; color: var(--muted); font-weight: 700; font-size: 12px;
+  }
+  .step-btn.active .step-num { background: var(--ink); color: #fff; }
+  .step-btn.done .step-num { background: #d1fae5; color: #047857; }
+  .step-btn b { display: block; font-size: 13px; color: inherit; }
+  .step-btn small { display: block; font-size: 11px; opacity: .75; margin-top: 2px; }
+
+  main { margin: 16px 22px 0; }
+  .panel { display: none; }
+  .panel.active { display: block; animation: fade .22s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+  .grid { display: grid; gap: 16px; }
+  .grid.two { grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); }
+  @media (max-width: 980px) { .grid.two { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    box-shadow: var(--shadow-sm); padding: 18px; min-width: 0;
+  }
+  .card h2 { margin: 0 0 4px; font-size: 15px; }
+  .card .hint { color: var(--muted); font-size: 12px; line-height: 1.7; margin: 0 0 14px; }
+  .card h3 { font-size: 13px; margin: 18px 0 8px; color: var(--ink); }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .btn {
+    border: 1px solid var(--line); background: #fff; color: var(--text);
+    padding: 9px 15px; border-radius: 9px; cursor: pointer; font: inherit; font-size: 13px;
+    transition: .16s;
+  }
+  .btn:hover:not(:disabled) { border-color: var(--blue); color: var(--blue-dark); }
+  .btn.primary { background: var(--ink); border-color: var(--ink); color: #fff; font-weight: 600; }
+  .btn.primary:hover:not(:disabled) { background: #244a40; color: #fff; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn.sm { padding: 6px 11px; font-size: 12px; }
+  input[type=text], input[type=file] {
+    font: inherit; font-size: 13px; padding: 9px 11px; border-radius: 9px;
+    border: 1px solid var(--line); background: #fff; color: var(--text);
+  }
+  input[type=text] { flex: 1 1 260px; min-width: 0; }
+  .drop {
+    border: 1.5px dashed #cbd5e1; border-radius: 12px; padding: 26px 16px; text-align: center;
+    background: #fafbfe; color: var(--muted); font-size: 13px; line-height: 1.8; cursor: pointer;
+  }
+  .drop.hover { border-color: var(--ink); background: #f0f7f4; }
+  .drop b { color: var(--ink); }
+  .kv { display: grid; grid-template-columns: 118px 1fr; gap: 7px 12px; font-size: 12.5px; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; word-break: break-all; }
+  .badge { display: inline-block; border-radius: 999px; padding: 3px 10px; font-size: 11.5px; background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; }
+  .badge.gray { background: #f1f5f9; color: #475569; border-color: #e2e8f0; }
+  .badge.red { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+  .badge.green { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+  .note-list { margin: 10px 0 0; padding-left: 18px; color: var(--muted); font-size: 12px; line-height: 1.8; }
+
+  /* 步骤二：古籍页预览 */
+  .page-wrap { background: #f6f1e6; border: 1px solid #e6dcc5; border-radius: 10px; padding: 14px; overflow: auto; max-height: 620px; }
+  .page-canvas { position: relative; width: 100%; aspect-ratio: 720 / 1000; min-width: 330px; background: #fbf7ec; border: 1px solid #ddd0b3; box-shadow: inset 0 0 30px rgba(120,95,50,.08); }
+  .bbox {
+    position: absolute; border: 1px solid rgba(47,111,237,.55); background: rgba(47,111,237,.06);
+    border-radius: 2px; cursor: pointer; overflow: hidden;
+  }
+  .bbox:hover, .bbox.sel { border-color: var(--seal); background: rgba(180,83,9,.12); }
+  .bbox .vtext { writing-mode: vertical-rl; font-family: "KaiTi", "STKaiti", serif; font-size: 11px; line-height: 1.25; color: #3f3324; padding: 2px; height: 100%; overflow: hidden; }
+  .bbox .tag { position: absolute; right: 0; bottom: 0; font-size: 9px; background: rgba(47,111,237,.85); color: #fff; padding: 0 3px; border-radius: 2px; }
+  .bbox.sel .tag { background: var(--seal); }
+  .block-list { max-height: 300px; overflow: auto; }
+  .block-item { border: 1px solid var(--line-soft); border-radius: 8px; padding: 8px 10px; margin-bottom: 7px; font-size: 12px; cursor: pointer; }
+  .block-item:hover, .block-item.sel { border-color: var(--ink); background: #f0f7f4; }
+  .block-item .meta { color: var(--muted); font-size: 11px; margin-top: 4px; }
+  .block-item .txt { font-family: "KaiTi", "STKaiti", serif; font-size: 13px; color: #2f3a2f; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { text-align: left; padding: 7px 9px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; background: #fafbfe; position: sticky; top: 0; }
+  .scroll { max-height: 250px; overflow: auto; border: 1px solid var(--line-soft); border-radius: 8px; }
+
+  /* 步骤三：图谱 */
+  .graph-wrap { position: relative; border: 1px solid var(--line-soft); border-radius: 10px; background: #fbfcfe; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 520px; cursor: grab; }
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); margin-top: 10px; }
+  .legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+  .node-detail { font-size: 12.5px; line-height: 1.9; color: var(--muted); }
+  .node-detail b { color: var(--text); }
+
+  /* 步骤四：问答 */
+  .qchips { display: flex; gap: 7px; flex-wrap: wrap; margin: 10px 0 16px; }
+  .qchip { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 6px 12px; font-size: 12px; cursor: pointer; color: var(--text); }
+  .qchip:hover { border-color: var(--ink); color: var(--ink); }
+  .qchip.refuse { border-color: #fecaca; color: #b91c1c; background: #fffafa; }
+  .answer { border: 1px solid var(--line); border-radius: 12px; padding: 16px; background: #fbfcfe; white-space: pre-wrap; line-height: 1.9; font-size: 13.5px; min-height: 90px; }
+  .answer.refused { background: #fff7ed; border-color: #fed7aa; color: #9a3412; }
+  .ev-card { border: 1px solid var(--line-soft); border-left: 3px solid var(--ink); border-radius: 8px; padding: 10px 12px; margin-top: 9px; background: #fff; font-size: 12.5px; }
+  .ev-card .q { font-family: "KaiTi", "STKaiti", serif; font-size: 14px; color: #2f3a2f; margin-bottom: 6px; }
+  .ev-card .loc { color: var(--muted); font-size: 11px; word-break: break-all; line-height: 1.7; }
+  details { margin-top: 14px; font-size: 12px; color: var(--muted); }
+  summary { cursor: pointer; color: var(--blue-dark); }
+  details pre { white-space: pre-wrap; background: #f8fafc; border: 1px solid var(--line-soft); border-radius: 8px; padding: 10px; max-height: 220px; overflow: auto; }
+
+  footer { margin: 20px 22px 0; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11.5px; line-height: 1.9; }
+  .toast { position: fixed; right: 22px; bottom: 22px; background: #1e293b; color: #fff; padding: 11px 16px; border-radius: 9px; font-size: 12.5px; box-shadow: var(--shadow-md); opacity: 0; pointer-events: none; transition: .2s; z-index: 20; max-width: 380px; }
+  .toast.show { opacity: 1; }
+  .empty { color: var(--muted); font-size: 12.5px; padding: 18px 0; text-align: center; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo">本</div>
+    <div>
+      <b>中医古籍 OCR 与知识图谱智能问答原型</b>
+      <span class="sub">赛题二 · 框架搭建阶段 · 四步演示台</span>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <span class="chip" id="cfgChip">配置读取中…</span>
+    <span class="chip warn" id="demoChip">示例数据 / 模型未接入</span>
+    <span class="chip ok"><span class="dot on" id="healthDot"></span><span id="healthText">服务状态检查中</span></span>
+  </div>
+</header>
+
+<div class="disclaimer-bar">
+  <b>仅供参考、非诊疗建议</b>
+  <span class="grow" id="bannerText">本系统为赛事研发原型，所有内容不构成诊断、用药或治疗建议，不得用于临床决策。</span>
+  <span class="badge">全部指标：待测</span>
+</div>
+
+<nav class="steps">
+  <button class="step-btn active" data-step="1"><span class="step-num">1</span><span><b>上传古籍页</b><small>上传扫描页 / 加载示例数据</small></span></button>
+  <button class="step-btn" data-step="2"><span class="step-num">2</span><span><b>识别与结构化</b><small>OCR 文本块 · 实体 · 三元组</small></span></button>
+  <button class="step-btn" data-step="3"><span class="step-num">3</span><span><b>图谱可视化</b><small>本地力导向图 · 零外部依赖</small></span></button>
+  <button class="step-btn" data-step="4"><span class="step-num">4</span><span><b>可溯源问答</b><small>证据引用 · 无依据拒答</small></span></button>
+</nav>
+
+<main>
+  <!-- ================= 步骤一 ================= -->
+  <section class="panel active" id="panel1">
+    <div class="grid two">
+      <div class="card">
+        <h2>步骤一 · 上传古籍页</h2>
+        <p class="hint">上传一张古籍扫描页，或直接加载 <code>data/demo/</code> 示例数据走通全流程。本阶段 OCR / 版面模型未接入，上传任何图像都会返回结构完整的示例识别结果并显式标注。</p>
+        <div class="drop" id="drop">
+          <b>点击选择图片，或拖拽到此处</b><br>
+          支持 png / jpg / jpeg / bmp / webp / tif；文件仅保存在本机 data/uploads/
+          <div style="margin-top:10px"><input type="file" id="fileInput" accept="image/*,.tif,.tiff"></div>
+        </div>
+        <div class="row" style="margin-top:14px">
+          <button class="btn primary" id="btnDemo">加载示例古籍页（推荐）</button>
+          <button class="btn" id="btnUpload" disabled>上传所选图片</button>
+          <button class="btn" id="btnNext1" disabled>下一步：查看识别结果</button>
+        </div>
+        <h3>本阶段边界</h3>
+        <ul class="note-list">
+          <li>不训练模型、不追指标、不编造任何实测数字；五项指标一律「待测」。</li>
+          <li>推理全本地、零密钥、零公网调用；不需要数据库服务与 GPU。</li>
+          <li>命题单位脱敏样本仅限赛事研发使用，不得外传。</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h2>当前页面状态</h2>
+        <p class="hint" id="s1hint">尚未加载任何页面。点击左侧「加载示例古籍页」开始。</p>
+        <dl class="kv" id="pageInfo"></dl>
+        <div id="pageNotes"></div>
+        <h3>免责与演示标注</h3>
+        <p class="hint" style="margin:0">所有页面常驻「仅供参考、非诊疗建议」；接口与报告中的桩输出均标注「示例数据 / 模型未接入」。示例数据不得作为评测结果。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 步骤二 ================= -->
+  <section class="panel" id="panel2">
+    <div class="card" style="margin-bottom:16px">
+      <div class="row" style="justify-content:space-between">
+        <div><h2>步骤二 · OCR 与结构化结果</h2>
+          <p class="hint" style="margin:0" id="s2hint">左侧为带 bbox 的文本块预览，右侧为实体与三元组。点击文本块可查看溯源字段。</p></div>
+        <div class="row"><span class="badge" id="s2badge">示例数据 / 模型未接入</span><button class="btn sm" id="btnNext2">下一步：图谱可视化</button></div>
+      </div>
+    </div>
+    <div class="grid two">
+      <div class="card">
+        <h2>古籍页预览（合成示意）</h2>
+        <p class="hint" id="s2sub">竖排从右向左；蓝框为示例 bbox，点击可定位文本块。此页为合成示意数据，非真实古籍扫描页。</p>
+        <div class="page-wrap"><div class="page-canvas" id="pageCanvas"><div class="empty" style="padding:60px 0">请先在步骤一加载示例数据</div></div></div>
+        <h3>文本块明细</h3>
+        <div class="block-list" id="blockList"></div>
+      </div>
+      <div class="card">
+        <h2>结构化抽取</h2>
+        <p class="hint">实体与三元组由 <code>extract/rules.py</code> 的确定性规则从示例文本产出；每个对象都带 page_id / bbox / line_id / quote / source_hash。</p>
+        <h3>实体 <span class="badge gray" id="entCount">0</span></h3>
+        <div class="scroll"><table><thead><tr><th>名称</th><th>类型</th><th>值</th><th>出处</th></tr></thead><tbody id="entBody"></tbody></table></div>
+        <h3>三元组 <span class="badge gray" id="triCount">0</span></h3>
+        <div class="scroll"><table><thead><tr><th>头</th><th>关系</th><th>尾</th><th>出处</th></tr></thead><tbody id="triBody"></tbody></table></div>
+        <h3>选中文本块的溯源字段</h3>
+        <div class="node-detail" id="blockDetail">点击左侧任一文本块查看。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 步骤三 ================= -->
+  <section class="panel" id="panel3">
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <div><h2>步骤三 · 知识图谱可视化</h2>
+          <p class="hint" style="margin:0" id="graphHint">原生 Canvas 力导向图，零 CDN、零外部依赖；点击节点查看出处。</p></div>
+        <div class="row"><span class="badge" id="graphBadge">示例数据 / 模型未接入</span><button class="btn sm" id="btnReloadGraph">重新载入</button><button class="btn sm" id="btnNext3">下一步：可溯源问答</button></div>
+      </div>
+    </div>
+    <div class="grid two" style="margin-top:16px">
+      <div class="card">
+        <div class="graph-wrap"><canvas id="graphCanvas"></canvas></div>
+        <div class="legend" id="graphLegend"></div>
+      </div>
+      <div class="card">
+        <h2>图谱统计与节点详情</h2>
+        <p class="hint" id="graphStats">尚未载入图谱。</p>
+        <div class="node-detail" id="nodeDetail">点击图中任一节点查看溯源信息。</div>
+        <h3>关系类型</h3>
+        <div id="relList" class="row"></div>
+        <h3>说明</h3>
+        <p class="hint" style="margin:0">原型阶段图谱用文件 + SQLite + 前端原生力导向图实现，不引入 Neo4j / Elasticsearch 等服务端组件。当前节点与边全部来自示例数据，<b>规模不是评测指标</b>。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 步骤四 ================= -->
+  <section class="panel" id="panel4">
+    <div class="grid two">
+      <div class="card">
+        <h2>步骤四 · 可溯源问答</h2>
+        <p class="hint">只做原文摘录，不做推断。每条证据都必须能在原文文本块中命中，否则转拒答；无依据或涉及个人诊疗、疗效、用药建议的问题一律拒答并说明「原文未检索到依据」。</p>
+        <div class="row"><input type="text" id="qInput" placeholder="例如：甘草的性味是什么？"><button class="btn primary" id="btnAsk">提问</button></div>
+        <div class="qchips" id="qchips"></div>
+        <div class="answer" id="answerBox">请先在步骤一加载示例数据，然后点击上方示例问题或自行输入。</div>
+        <details><summary>查看生成链路 trace</summary><pre id="traceBox">（暂无）</pre></details>
+      </div>
+      <div class="card">
+        <h2>答案证据与溯源</h2>
+        <p class="hint" id="evHint">每条证据携带 quote / page_id / bbox / line_id / score / source_hash。</p>
+        <div id="evList"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <b>仅供参考、非诊疗建议</b>：本系统为赛事研发原型，不构成诊断、用药或治疗建议；问答仅返回原文摘录，未做推断。<br>
+  当前阶段：<b>示例数据 / 模型未接入</b>，五项指标（CER / 字段 F1 / 表格结构还原 / 可溯源率 / 拒答率）<b>全部待测</b>，界面与报告中的任何数字都不是评测结论。<br>
+  数据合规：命题单位脱敏样本仅限赛事研发使用，不得外传；真实扫描页与人工标注不进仓库、不上传任何外部服务。
+</footer>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* 四步演示台：零外部依赖（无 CDN、无 npm 包），离线可完整运行 */
+const S = { pageId: null, ingest: null, ocr: null, graph: null, meta: null, nodes: [], links: [], selected: null };
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+const fmt = v => v == null ? "—" : (typeof v === "object" ? JSON.stringify(v) : String(v));
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove("show"), 3200); }
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  if (!r.ok) { let d = ""; try { d = (await r.json()).detail || ""; } catch (e) {} throw new Error(d || ("HTTP " + r.status)); }
+  return r.json();
+}
+
+/* ---------------- 步骤切换 ---------------- */
+function goto(step) {
+  document.querySelectorAll(".step-btn").forEach(b => {
+    const n = +b.dataset.step;
+    b.classList.toggle("active", n === step);
+    b.classList.toggle("done", n < step);
+  });
+  document.querySelectorAll(".panel").forEach(p => p.classList.toggle("active", p.id === "panel" + step));
+  if (step === 2 && S.pageId) loadOcr();
+  if (step === 3) loadGraph();
+  if (step === 4) setTimeout(() => $("qInput").focus(), 60);
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+document.querySelectorAll(".step-btn").forEach(b => b.addEventListener("click", () => goto(+b.dataset.step)));
+$("btnNext1").onclick = () => goto(2);
+$("btnNext2").onclick = () => goto(3);
+$("btnNext3").onclick = () => goto(4);
+$("btnReloadGraph").onclick = () => loadGraph();
+
+/* ---------------- 初始化 ---------------- */
+async function init() {
+  try {
+    const [h, m] = await Promise.all([api("/api/health"), api("/api/meta")]);
+    S.meta = m;
+    $("bannerText").textContent = m.banner;
+    $("demoChip").textContent = m.badge;
+    $("cfgChip").textContent = "OCR:" + h.config.ocr_backend + " · LLM:" + h.config.llm_backend + " · " + h.config.server;
+    $("healthText").textContent = "服务正常";
+    $("healthDot").classList.add("on");
+    renderChips(m.questions || []);
+  } catch (e) {
+    $("healthText").textContent = "服务未就绪";
+    $("cfgChip").textContent = "无法读取配置";
+    toast("后端未就绪：" + e.message);
+  }
+}
+function renderChips(qs) {
+  $("qchips").innerHTML = qs.map(q =>
+    `<button class="qchip ${q.expect === "refuse" ? "refuse" : ""}" data-q="${esc(q.q)}" title="${esc(q.hint || "")}">${esc(q.q)}</button>`).join("");
+  $("qchips").querySelectorAll(".qchip").forEach(b => b.onclick = () => { $("qInput").value = b.dataset.q; ask(b.dataset.q); });
+}
+
+/* ---------------- 步骤一：上传 / 示例 ---------------- */
+async function ingest(fd, label) {
+  try {
+    $("s1hint").textContent = label + "，正在处理…";
+    const r = await api("/api/pages", { method: "POST", body: fd });
+    S.pageId = r.page_id; S.ingest = r;
+    $("s1hint").textContent = "已加载页面，可进入步骤二查看 OCR 与结构化结果。";
+    $("pageInfo").innerHTML = [
+      ["page_id", r.page_id], ["识别后端", r.engine + (r.model_loaded ? "" : "（模型未接入）")],
+      ["文本块", r.blocks], ["实体", r.entities], ["三元组", r.triples],
+      ["图谱节点 / 边", r.graph_nodes + " / " + r.graph_edges],
+      ["演示标注", r.badge], ["免责声明", r.disclaimer], ["入库批次", r.ingest && r.ingest.run_id],
+    ].map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(fmt(v))}</dd>`).join("");
+    $("pageNotes").innerHTML = "<h3>识别说明</h3><ul class='note-list'>" +
+      (r.notes || []).map(n => "<li>" + esc(n) + "</li>").join("") + "</ul>";
+    $("btnNext1").disabled = false;
+    document.querySelectorAll(".step-btn")[0].classList.add("done");
+    toast(label + "成功：" + r.page_id);
+  } catch (e) { $("s1hint").textContent = "处理失败：" + e.message; toast("处理失败：" + e.message); }
+}
+$("btnDemo").onclick = () => { const fd = new FormData(); fd.append("demo", "1"); ingest(fd, "加载示例数据"); };
+let picked = null;
+$("fileInput").onchange = e => { picked = e.target.files[0] || null; $("btnUpload").disabled = !picked; if (picked) toast("已选择：" + picked.name); };
+$("btnUpload").onclick = () => {
+  if (!picked) return;
+  const fd = new FormData(); fd.append("file", picked); fd.append("demo", "0");
+  ingest(fd, "上传图片（" + picked.name + "）");
+};
+const drop = $("drop");
+drop.onclick = e => { if (e.target.tagName !== "INPUT") $("fileInput").click(); };
+drop.ondragover = e => { e.preventDefault(); drop.classList.add("hover"); };
+drop.ondragleave = () => drop.classList.remove("hover");
+drop.ondrop = e => {
+  e.preventDefault(); drop.classList.remove("hover");
+  if (e.dataTransfer.files.length) { picked = e.dataTransfer.files[0]; $("btnUpload").disabled = false; toast("已选择：" + picked.name); }
+};
+
+/* ---------------- 步骤二：OCR 与结构化 ---------------- */
+async function loadOcr() {
+  if (!S.pageId) { toast("请先在步骤一加载示例数据"); return; }
+  try {
+    const r = await api("/api/pages/" + encodeURIComponent(S.pageId) + "/ocr");
+    S.ocr = r;
+    $("s2badge").textContent = r.badge;
+    $("s2hint").textContent = "识别后端：" + r.engine + "（" + (r.model_loaded ? "模型已接入" : "模型未接入") + "）；共 " +
+      (r.blocks || []).length + " 个文本块。所有坐标与摘抄均可回原文核对。";
+    renderPreview(r.page || {}, r.blocks || []);
+    renderBlocks(r.blocks || []);
+    renderEntities(r.entities || [], r.triples || []);
+  } catch (e) { $("s2hint").textContent = "读取失败：" + e.message; toast("读取失败：" + e.message); }
+}
+function renderPreview(page, blocks) {
+  const c = $("pageCanvas"), W = page.width || 720, H = page.height || 1000;
+  if (!blocks.length) { c.innerHTML = "<div class='empty'>无文本块</div>"; return; }
+  c.innerHTML = blocks.map((b, i) => {
+    const [x1, y1, x2, y2] = b.bbox || [0, 0, 0, 0];
+    const st = `left:${(x1 / W * 100).toFixed(2)}%;top:${(y1 / H * 100).toFixed(2)}%;width:${((x2 - x1) / W * 100).toFixed(2)}%;height:${((y2 - y1) / H * 100).toFixed(2)}%`;
+    return `<div class="bbox" data-i="${i}" style="${st}" title="${esc(b.text)}"><div class="vtext">${esc(b.text)}</div><span class="tag">${esc(b.line_id)}</span></div>`;
+  }).join("");
+  c.querySelectorAll(".bbox").forEach(el => el.onclick = () => selectBlock(+el.dataset.i));
+}
+function renderBlocks(blocks) {
+  $("blockList").innerHTML = blocks.map((b, i) =>
+    `<div class="block-item" data-i="${i}"><div class="txt">${esc(b.text)}</div>
+     <div class="meta">${esc(b.line_id)} · 列 ${esc(b.col_id)} · 序 ${esc(b.reading_order)} · ${esc(b.kind)} · conf ${esc(b.conf)}
+     · bbox ${esc(fmt(b.bbox))} · ${esc(b.block_ref)}</div></div>`).join("");
+  $("blockList").querySelectorAll(".block-item").forEach(el => el.onclick = () => selectBlock(+el.dataset.i));
+  if (blocks.length) selectBlock(0);
+}
+function selectBlock(i) {
+  const b = (S.ocr && S.ocr.blocks || [])[i]; if (!b) return;
+  document.querySelectorAll(".bbox, .block-item").forEach(el => el.classList.toggle("sel", el.dataset.i === String(i)));
+  $("blockDetail").innerHTML = [
+    ["text（原文）", b.text], ["text_norm", b.text_norm], ["quote", b.quote],
+    ["page_id", b.page_id], ["bbox", fmt(b.bbox)], ["line_id", b.line_id],
+    ["col_id / 阅读顺序", b.col_id + " / " + b.reading_order], ["block_ref", b.block_ref],
+    ["source_hash", b.source_hash], ["kind / conf", b.kind + " / " + b.conf],
+  ].map(([k, v]) => `<div><b>${esc(k)}：</b>${esc(fmt(v))}</div>`).join("");
+}
+function renderEntities(ents, tris) {
+  $("entCount").textContent = ents.length; $("triCount").textContent = tris.length;
+  $("entBody").innerHTML = ents.length ? ents.slice(0, 60).map(e =>
+    `<tr><td>${esc(e.name)}</td><td><span class="badge gray">${esc(e.type)}</span></td><td>${esc(e.value)}</td><td>${esc(e.line_id)}</td></tr>`).join("")
+    : "<tr><td colspan='4' class='empty'>暂无实体</td></tr>";
+  $("triBody").innerHTML = tris.length ? tris.slice(0, 60).map(t =>
+    `<tr><td>${esc(t.head)}</td><td>${esc(t.relation)}</td><td>${esc(t.tail)}</td><td>${esc(t.line_id)}</td></tr>`).join("")
+    : "<tr><td colspan='4' class='empty'>暂无三元组</td></tr>";
+}
+
+/* ---------------- 步骤三：原生力导向图 ---------------- */
+const COLORS = { "药材": "#2f6fed", "方剂": "#b45309", "剂量": "#7c3aed", "性味": "#0f766e", "主治": "#be185d", "功效": "#0891b2", "禁忌": "#dc2626", "实体": "#64748b" };
+const colorOf = t => COLORS[t] || "#64748b";
+async function loadGraph() {
+  try {
+    const r = await api("/api/graph");
+    S.graph = r; S.nodes = (r.nodes || []).map(n => Object.assign({}, n));
+    S.links = (r.links || []).filter(l => S.nodes.some(n => n.id === l.source) && S.nodes.some(n => n.id === l.target));
+    $("graphBadge").textContent = r.badge || "示例数据 / 模型未接入";
+    const st = r.stats || {};
+    $("graphHint").textContent = "共 " + S.nodes.length + " 个节点 / " + S.links.length + " 条边；" +
+      (st.note || "示例数据 / 模型未接入");
+    $("graphStats").innerHTML = "<b>节点数：</b>" + S.nodes.length + "　<b>边数：</b>" + S.links.length +
+      "<br><b>演示标注：</b>" + esc(r.badge || "示例数据 / 模型未接入") +
+      "<br><b>规模说明：</b>节点与边全部来自示例数据，不是评测指标。";
+    const rels = st.relations || {};
+    $("relList").innerHTML = Object.keys(rels).length ? Object.entries(rels).map(([k, v]) =>
+      `<span class="badge gray">${esc(k)} × ${esc(v)}</span>`).join("") : "<span class='badge gray'>暂无关系</span>";
+    $("graphLegend").innerHTML = Object.keys(COLORS).map(k =>
+      `<span><i style="background:${colorOf(k)}"></i>${esc(k)}</span>`).join("");
+    drawGraph();
+    $("nodeDetail").innerHTML = "点击图中任一节点查看溯源信息。";
+  } catch (e) { $("graphHint").textContent = "图谱读取失败：" + e.message; toast("图谱读取失败：" + e.message); }
+}
+function drawGraph() {
+  const cv = $("graphCanvas"), dpr = window.devicePixelRatio || 1;
+  const W = cv.clientWidth || 800, H = 520;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const ctx = cv.getContext("2d"); ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+  const n = S.nodes.length;
+  if (!n) { ctx.fillStyle = "#94a3b8"; ctx.font = "13px sans-serif"; ctx.textAlign = "center"; ctx.fillText("暂无图谱数据，请先在步骤一加载示例古籍页", W / 2, H / 2); return; }
+
+  // 初始位置：环形散布（确定性，刷新后布局一致）
+  S.nodes.forEach((nd, i) => { const a = i * 2.399963; const r = Math.min(W, H) * (0.16 + 0.22 * Math.sqrt(i / Math.max(1, n))); nd.x = W / 2 + Math.cos(a) * r; nd.y = H / 2 + Math.sin(a) * r; nd.vx = 0; nd.vy = 0; });
+  const idx = {}; S.nodes.forEach((nd, i) => idx[nd.id] = i);
+  const edges = S.links.map(l => [idx[l.source], idx[l.target]]).filter(p => p[0] != null && p[1] != null);
+  for (let it = 0; it < 230; it++) {
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+      const a = S.nodes[i], b = S.nodes[j];
+      let dx = a.x - b.x, dy = a.y - b.y, d2 = dx * dx + dy * dy + 0.01, d = Math.sqrt(d2), f = 2600 / d2;
+      const fx = f * dx / d, fy = f * dy / d;
+      a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
+    }
+    edges.forEach(([s, t]) => {
+      const a = S.nodes[s], b = S.nodes[t];
+      let dx = b.x - a.x, dy = b.y - a.y, d = Math.sqrt(dx * dx + dy * dy) || 1;
+      const f = (d - 105) * 0.012, fx = f * dx / d, fy = f * dy / d;
+      a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
+    });
+    S.nodes.forEach(nd => {
+      nd.vx += (W / 2 - nd.x) * 0.006; nd.vy += (H / 2 - nd.y) * 0.006;
+      nd.vx *= 0.80; nd.vy *= 0.80;
+      nd.x = Math.max(46, Math.min(W - 46, nd.x + nd.vx));
+      nd.y = Math.max(30, Math.min(H - 30, nd.y + nd.vy));
+    });
+  }
+
+  // 连线
+  S.links.forEach(l => {
+    const a = S.nodes[idx[l.source]], b = S.nodes[idx[l.target]];
+    if (!a || !b) return;
+    ctx.strokeStyle = "rgba(100,116,139,.38)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    ctx.fillStyle = "#94a3b8"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(l.relation || "", (a.x + b.x) / 2, (a.y + b.y) / 2 - 3);
+  });
+  // 节点
+  S.nodes.forEach(nd => {
+    const r = 8 + Math.min(9, (nd.value || 1) * 0.7);
+    ctx.beginPath(); ctx.arc(nd.x, nd.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = colorOf(nd.type); ctx.fill();
+    ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = "#1e293b"; ctx.font = "11.5px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(nd.label || nd.id, nd.x, nd.y + r + 13);
+  });
+  cv.onclick = ev => {
+    const rect = cv.getBoundingClientRect(), x = ev.clientX - rect.left, y = ev.clientY - rect.top;
+    let best = null, bd = 22;
+    S.nodes.forEach(nd => { const d = Math.hypot(nd.x - x, nd.y - y); if (d < bd) { bd = d; best = nd; } });
+    if (!best) return;
+    const ins = S.links.filter(l => l.target === best.id).length, outs = S.links.filter(l => l.source === best.id).length;
+    $("nodeDetail").innerHTML = [
+      ["节点", best.label], ["类型", best.type], ["权重", best.value],
+      ["入边 / 出边", ins + " / " + outs], ["page_id", best.page_id || (S.pageId || "—")],
+      ["source_hash", best.source_hash || "—"],
+      ["关系（出）", S.links.filter(l => l.source === best.id).map(l => l.relation + "→" + l.target).join("；") || "—"],
+      ["演示标注", "示例数据 / 模型未接入"],
+    ].map(([k, v]) => `<div><b>${esc(k)}：</b>${esc(fmt(v))}</div>`).join("");
+  };
+}
+
+/* ---------------- 步骤四：问答 ---------------- */
+$("btnAsk").onclick = () => { const q = $("qInput").value.trim(); if (q) ask(q); };
+$("qInput").addEventListener("keydown", e => { if (e.key === "Enter") $("btnAsk").click(); });
+async function ask(q) {
+  $("answerBox").textContent = "检索中…"; $("evList").innerHTML = "";
+  try {
+    const r = await api("/api/qa", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: q, page_id: S.pageId })
+    });
+    const box = $("answerBox");
+    box.textContent = r.text;
+    box.classList.toggle("refused", !!r.refused);
+    $("traceBox").textContent = (r.trace || []).join("\n") + "\n\n免责声明：" + r.disclaimer;
+    const evs = r.evidences || [];
+    $("evHint").textContent = r.refused
+      ? "已拒答（" + (r.refuse_reason || "") + "），无可用证据。仅供参考、非诊疗建议。"
+      : "共 " + evs.length + " 条证据，quote 已逐条回原文校验。";
+    $("evList").innerHTML = evs.length ? evs.map((e, i) =>
+      `<div class="ev-card"><div class="q">[${i + 1}] 「${esc(e.quote)}」</div>
+       <div class="loc">page_id: ${esc(e.page_id)} · line_id: ${esc(e.line_id)} · bbox: ${esc(fmt(e.bbox))}<br>
+       检索得分: ${esc(e.score)} · 通道: ${esc(e.channel)} · block_ref: ${esc(e.block_ref)}<br>
+       source_hash: ${esc(e.source_hash)}</div></div>`).join("")
+      : `<div class="empty">${r.refused ? "无依据，按约定拒答，不提供任何推断性内容。" : "暂无证据"}</div>`;
+  } catch (e) {
+    $("answerBox").textContent = "请求失败：" + e.message;
+    toast("问答失败：" + e.message);
+  }
+}
+
+init();
+</script>
+</body>
+</html>

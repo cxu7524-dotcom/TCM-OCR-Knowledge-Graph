@@ -1,5 +1,0 @@
-[0] 服务就绪（等了 0 秒）
-[1] /api/status → {'service': 'ok', 'time': '2026-10-15 20:38:19', 'docs_dir': 'C:\\Users\\覃敬涛\\Desktop\\研一项目\\测试数据\\源文档 ｜ C:\\Users\\覃敬涛\\Desktop\\研一项目\\导入文档', 'jobs_total': 0, 'sessions': 0, 'docs_count': 18, 'database': 'ok'} ｜ {'service': 'ok', 'time': '2026-10-15 20:38:19', 'docs_dir': 'C:\\Users\\覃敬涛\\Desktop\\研一项目\\测试数据\\源文档 ｜ C:\\Users\\覃敬涛\\Desktop\\研一项目\\导入文档', 'jobs_t
-[2] /api/fill/templates → 10 张 ｜ [{'name': '模板1-设备采购汇总表.xlsx', 'kind': 'xlsx', 'dir': '模板表格'}, {'name': '模板2-员工信息登记表.xlsx', 'kind': 'xlsx', 'dir': '模板表格'}, {'name': '模板3-会议任务跟踪表.xlsx', 'kind': 'xlsx', 'dir': '模板表格'}]
-[3] /api/docs → 18 份
-[4] 网页操作台 → HTTP 200 ｜ 51203 字节 ｜ 含识别按钮: True ｜ 含填写按钮: True

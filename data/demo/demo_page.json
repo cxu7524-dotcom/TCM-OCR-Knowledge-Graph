@@ -1,0 +1,70 @@
+{
+  "_说明": "合成示意数据，非真实古籍扫描页；OCR / 版面 / 抽取模型均未接入。禁止作为评测结果或诊疗依据。",
+  "page_id": "DEMO-001",
+  "width": 720,
+  "height": 1000,
+  "is_demo": true,
+  "model_loaded": false,
+  "blocks": [
+    {
+      "page_id": "DEMO-001", "bbox": [610, 70, 668, 300], "line_id": "L01",
+      "quote": "本草纲目 · 草部示意", "source_hash": "demo0000000001", "block_ref": "DEMO-001:L01",
+      "col_id": 0, "reading_order": 1, "text": "本草纲目 · 草部示意", "text_norm": "本草纲目 · 草部示意",
+      "kind": "title", "conf": 0.0
+    },
+    {
+      "page_id": "DEMO-001", "bbox": [520, 70, 578, 480], "line_id": "L02",
+      "quote": "甘草 味甘平 无毒", "source_hash": "demo0000000002", "block_ref": "DEMO-001:L02",
+      "col_id": 1, "reading_order": 2, "text": "甘草 味甘平 无毒", "text_norm": "甘草 味甘平 无毒",
+      "kind": "paragraph", "conf": 0.0
+    },
+    {
+      "page_id": "DEMO-001", "bbox": [430, 70, 488, 780], "line_id": "L03",
+      "quote": "主治五藏六府寒热邪气 坚筋骨 长肌肉", "source_hash": "demo0000000003", "block_ref": "DEMO-001:L03",
+      "col_id": 2, "reading_order": 3, "text": "主治五藏六府寒热邪气 坚筋骨 长肌肉", "text_norm": "主治五脏六腑寒热邪气 坚筋骨 长肌肉",
+      "kind": "paragraph", "conf": 0.0
+    },
+    {
+      "page_id": "DEMO-001", "bbox": [340, 70, 398, 520], "line_id": "L04",
+      "quote": "久服轻身延年 温中下气", "source_hash": "demo0000000004", "block_ref": "DEMO-001:L04",
+      "col_id": 3, "reading_order": 4, "text": "久服轻身延年 温中下气", "text_norm": "久服轻身延年 温中下气",
+      "kind": "paragraph", "conf": 0.0
+    },
+    {
+      "page_id": "DEMO-001", "bbox": [250, 70, 308, 400], "line_id": "L05",
+      "quote": "甘草 三两 炙", "source_hash": "demo0000000005", "block_ref": "DEMO-001:L05",
+      "col_id": 4, "reading_order": 5, "text": "甘草 三两 炙", "text_norm": "甘草 三两 炙",
+      "kind": "dose", "conf": 0.0
+    },
+    {
+      "page_id": "DEMO-001", "bbox": [160, 70, 218, 300], "line_id": "L06",
+      "quote": "桂枝汤方", "source_hash": "demo0000000006", "block_ref": "DEMO-001:L06",
+      "col_id": 5, "reading_order": 6, "text": "桂枝汤方", "text_norm": "桂枝汤方",
+      "kind": "title", "conf": 0.0
+    },
+    {
+      "page_id": "DEMO-001", "bbox": [70, 70, 128, 860], "line_id": "L07",
+      "quote": "桂枝三两 芍药三两 甘草二两 生姜三两 大枣十二枚", "source_hash": "demo0000000007", "block_ref": "DEMO-001:L07",
+      "col_id": 6, "reading_order": 7, "text": "桂枝三两 芍药三两 甘草二两 生姜三两 大枣十二枚", "text_norm": "桂枝三两 芍药三两 甘草二两 生姜三两 大枣十二枚",
+      "kind": "table_cell", "conf": 0.0
+    },
+    {
+      "page_id": "DEMO-001", "bbox": [610, 340, 668, 620], "line_id": "L08",
+      "quote": "甘草 忌海藻 菘菜", "source_hash": "demo0000000008", "block_ref": "DEMO-001:L08",
+      "col_id": 0, "reading_order": 8, "text": "甘草 忌海藻 菘菜", "text_norm": "甘草 忌海藻 菘菜",
+      "kind": "paragraph", "conf": 0.0
+    },
+    {
+      "page_id": "DEMO-001", "bbox": [520, 520, 578, 900], "line_id": "L09",
+      "quote": "茯苓 味甘平 主胸胁逆气 利小便", "source_hash": "demo0000000009", "block_ref": "DEMO-001:L09",
+      "col_id": 1, "reading_order": 9, "text": "茯苓 味甘平 主胸胁逆气 利小便", "text_norm": "茯苓 味甘平 主胸胁逆气 利小便",
+      "kind": "paragraph", "conf": 0.0
+    },
+    {
+      "page_id": "DEMO-001", "bbox": [430, 800, 488, 960], "line_id": "L10",
+      "quote": "当归 味甘温 主咳逆上气 补血", "source_hash": "demo0000000010", "block_ref": "DEMO-001:L10",
+      "col_id": 2, "reading_order": 10, "text": "当归 味甘温 主咳逆上气 补血", "text_norm": "当归 味甘温 主咳逆上气 补血",
+      "kind": "paragraph", "conf": 0.0
+    }
+  ]
+}

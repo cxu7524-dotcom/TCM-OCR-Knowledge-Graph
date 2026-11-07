@@ -1,172 +1,140 @@
-# A-23 智能文档助手
+# 中医古籍 OCR 与知识图谱智能问答原型
 
-把散落的非结构化文档读进来，抽出结构化字段存进数据库，再按模板表自动填好，**每条数据都能指回原文**。
+面向中医古籍与中药资源的 **OCR 识别 → 结构化抽取 → 知识图谱 → 可溯源问答** 四步链路原型。
 
-研一阶段对赛题「基于大语言模型的文档理解与多源数据融合系统」的复现与工程化实现，含可运行的本地 Web 操作台。
+> ### 【免责声明】仅供参考、非诊疗建议
+> 本系统为赛事研发原型，所有内容不构成诊断、用药或治疗建议，不得用于临床决策。
+> 当前阶段 **模型未接入、指标未实测**，界面与报告中的一切内容均为 `data/demo/` 示例数据。
 
-> 下文所有指标均为本机实测，不是官方评测结果。
+---
 
-## 三个模块
+## 1. 当前阶段：只搭框架
 
-| 模块 | 做什么 | 主要代码 |
-|---|---|---|
-| ① 文档智能操作 | 读 docx / xlsx / md / txt，按自然语言指令改写内容、调整格式、提取指定片段 | `agent/parse_intent.py` → `edit.py` / `format_ops.py` / `extract_ops.py` |
-| ② 信息提取与入库 | 抽实体、文档画像、字段，写入 MySQL 五张表，全部带原文位置 | `extract_ops.py` / `entity_ops.py` / `store.py` |
-| ③ 表格填写 | 多份文档 + 模板表结构 → 定位到「列 × 行」，逐格填值 | `matcher/` + `writer/` + `pipeline.py` |
+本阶段交付 **可运行、可演示、可复现的工程骨架与接口契约**，不训练模型、不追指标、不编造实测数字。
 
-设计上的两条底线：
+| 已打通 | 尚未做 |
+|---|---|
+| 四步端到端空跑链路（上传 → 识别与结构化 → 图谱 → 问答） | OCR 模型选型实测与精度优化 |
+| 统一数据契约与全链路溯源字段 | 异体字全量字表、真实规模图谱 |
+| SQLite + JSON 幂等入库 | 本地 LLM 部署与调参 |
+| 零依赖前端四步演示台 + 力导向图 | 古籍样本采集与人工标注 |
+| 评测脚本骨架与五项指标口径 | 任何指标数字（一律「待测」） |
 
-- **程序算、模型判**。数值计算、格式、行列定位交给确定性代码，模型只做「这堆证据对应哪个字段」这类判断。
-- **宁可留空，不猜**。找不到依据的格子留空并在报告里标出，错填比不填更难发现。
+**所有桩输出都在界面、接口响应和评测报告里显式标注「示例数据 / 模型未接入」。**
 
-## 界面
+## 2. 快速开始
 
-登录页（用户 / 客服 / 管理员三类角色）：
-
-![登录页](docs/screenshots/01-登录页.png)
-
-操作台：左侧文档库，右侧对话式指令，结果区给出改动前后对比与来源：
-
-![操作台](docs/screenshots/02-操作台.png)
-
-![功能表](docs/screenshots/03-功能表.png)
-
-AI 客服与数字人「小橘」（纯内联 SVG，语音走 edge-tts + 本地缓存）：
-
-![AI 客服](docs/screenshots/04-AI客服.png)
-
-![数字人](docs/screenshots/05-数字人小橘.png)
-
-七个功能点都能评价，反馈回流到客服端和管理端：
-
-![评价反馈](docs/screenshots/06-评价反馈.png)
-
-语音输入：浏览器识别不通时自动降级到本机离线识别，录音不出本机：
-
-![语音输入](docs/screenshots/07-语音输入.png)
-
-多人聊天室：用户在同一个群里交流用法、互相答疑，2.5 秒轮询增量取消息，
-在线名单点一下就能 @ 人，自己的消息 5 分钟内可撤回：
-
-![聊天室](docs/screenshots/08-聊天室.png)
-
-表格填写支持上传自己的模板（.xlsx / .xlsm / .docx）——上传后立刻出现在下拉框里并自动选中，
-也可以直接把文件拖进窗口。自己传的模板带「我上传的」标记、可以删除：
-
-![模板上传](docs/screenshots/09-模板上传.png)
-
-面板右上角「🗂 我上传的模板」是一张清单：自己传过哪些、多大、什么时候传的，都在这里，
-一条一个「删除」，删完下拉框立刻同步。系统自带的 5 张 Excel / 5 张 Word 不在清单里，也删不掉：
-
-![模板删除](docs/screenshots/10-模板删除.png)
-
-## 目录结构
-
-```
-研一项目/
-├── pipeline.py              总控：读文档 → 匹配 → 抽取 → 写表
-├── doc_reader/              ① 文档读取器（按格式分流、切块）
-├── template_reader/         ② 模板表读取器（表头 / 合并单元格 / 公式列）
-├── matcher/                 ③ 检索与抽取（retrieve / extract / run_all）
-├── writer/                  ④ 写入器（xlsx + word，保留原样式）
-├── agent/                   操作台
-│   ├── api_server.py        FastAPI 服务与全部接口
-│   ├── web/                 index.html / admin.html / staff.html / login.html
-│   ├── parse_intent.py      指令解析（阿里云百炼 · deepseek-v4.1-flash）
-│   ├── llm_config.py        模型配置与调用入口（地址/模型/密钥只在这里配）
-│   ├── edit.py format_ops.py extract_ops.py summary_ops.py entity_ops.py
-│   ├── store.py pool.py db.py quality.py auth.py support.py feedback.py room.py
-│   ├── asr.py               本机离线语音识别（faster-whisper）
-│   ├── digital_tts.py       数字人语音合成（edge-tts + 缓存）
-│   └── models/              语音模型（不进仓库，见「环境重建」）
-├── 测试数据/                源文档 18 份 + 模板表格 5 张 + 模板上传/（界面里传的模板落这里）
-├── 五表连测/                5 张模板连续跑测的结果与报告
-├── 泛化测试/                3 个换了场景的泛化验证
-├── 压测-大文档/             16 份 500KB 级文档的压力测试
-├── 收尾对照/                验收脚本与对照记录（模块 1/2/3 + 作品要求）
-├── 组会汇报-A23/            关于本项目的汇报材料
-└── docs/screenshots/        README 用图
-```
-
-## 环境要求
-
-- Python ≥ 3.10（本机在 3.13 上验证）
-- MySQL 8（5.7 亦可）
-- 开发环境为 Windows；Linux / macOS 未验证
-
-## 快速开始
+环境：Python 3.10+；**不需要数据库服务、不需要密钥、不需要 GPU、不联网即可推理**。
 
 ```bash
-# 1. 安装依赖
 pip install -r requirements.txt
-
-# 2. 配置数据库连接
-cp agent/db_config.example.json agent/db_config.json   # 然后填写用户名和口令
-
-# 3. 建库建表（幂等，可反复执行）
-python agent/db.py --init
-
-# 4. 启动操作台
-cd agent && python api_server.py        # 默认 http://127.0.0.1:8000
+python app/main.py                 # 或双击 启动操作台.bat
 ```
 
-页面地址：`http://127.0.0.1:8000/login`，登录后按角色跳转到 `/`（用户端）、`/staff`（客服端）、`/admin`（管理端）。内置演示账号定义在 `agent/auth.py` 顶部，仅供本地演示。
+- 页面地址：<http://127.0.0.1:8000/>
+- 接口文档：<http://127.0.0.1:8000/docs>
+- 健康检查：<http://127.0.0.1:8000/api/health>
+- 换端口：`python app/main.py --port 8100`（或设 `TCM_PORT=8100`）
+- 演示数据：`data/demo/`（点击第一步的「加载示例古籍页」即可走通全流程）
+- 评测重跑：`python eval/run_all.py`（报告输出到 `data/reports/`）
 
-可选参数：`--host` / `--port` / `--docs`（文档库目录，默认「源文档 + 导入文档」两个目录）。
+零依赖自检（不装 FastAPI 也能验契约与评测骨架）：
 
-## 同门协作 / 换台机器上线
+```bash
+python -m app.store --init
+python eval/run_all.py
+```
 
-**加入仓库**：仓库页面右上 **Settings → Collaborators → Add people**，填对方 GitHub 用户名，对方在邮件里点接受后即可 push。
+## 3. 四步链路与接口
 
-**clone 下来还不能直接跑**，仓库里故意没放这四样，各自补一次：
+| 步骤 | 前端 | 后端接口 | 负责模块 |
+|---|---|---|---|
+| ① 上传古籍页 | 步骤一 | `POST /api/pages`（`multipart` 上传，或表单 `demo=1` 走示例数据） | `ocr/` + `app/store.py` |
+| ② 显示 OCR 与结构化结果 | 步骤二 | `GET /api/pages/{id}/ocr` | `ocr/pipeline.py` + `extract/rules.py` |
+| ③ 图谱可视化 | 步骤三 | `GET /api/graph` | `graph/build.py` + `graph/export.py` |
+| ④ 可溯源问答 | 步骤四 | `POST /api/qa` | `qa/retrieve.py` → `qa/generate.py` |
 
-| 缺什么 | 为什么要自己补 | 怎么补 |
+辅助接口：`GET /api/health`（配置快照）、`GET /api/pages`（页面清单）、`GET /api/meta`（演示模式说明）、`GET /uploads/{name}`（已上传页预览）。
+
+问答行为约束：**没有原文证据必须拒答**，返回「原文未检索到依据」并带 `refused=true`，禁止模型自由发挥；生成前逐条校验 `Evidence.quote` 能在 `Block.text` 中命中，命中失败即转拒答。
+
+## 4. 目录结构
+
+```
+README.md / requirements.txt / 启动操作台.bat
+├── app/            main.py（FastAPI 入口）、config.py（唯一配置）、schemas.py（数据契约）
+│   ├── demo.py     示例数据统一装载器与演示态标记
+│   ├── store.py    SQLite + JSON 幂等入库
+│   └── web/index.html   四步演示台 + 常驻免责声明
+├── ocr/            layout / recognize / table / normalize / pipeline
+├── extract/        schema / rules / llm_local / evaluate
+├── graph/          build / query / export
+├── qa/             index / retrieve / generate / refuse / disclaimer
+├── data/
+│   ├── samples/    古籍页样本（占位 + 来源/脱敏说明）
+│   ├── annotation/ 人工标注 ground truth（占位 + 字段规范）
+│   ├── demo/       示例数据（保证零样本可演示）
+│   ├── uploads/    运行期上传件（不进仓库）
+│   ├── store/      本地库与 JSON 镜像（不进仓库）
+│   └── reports/    评测报告（不进仓库）
+├── eval/           metrics（指标口径）/ audit（反向溯源审计）/ run_all（一键重跑）
+└── docs/           赛题二原文.md / 改造说明.md / archive/ / 项目改造提示词.md
+```
+
+## 5. 数据契约与溯源
+
+字段定义集中在 `app/schemas.py`，**任何文本块、实体、三元组、答案证据都必须携带**：
+
+`page_id` · `bbox[x1,y1,x2,y2]` · `line_id` · `quote` · `source_hash`
+
+核心对象：`Block` / `Entity` / `Triple` / `Evidence` / `Answer` / `OCRResult` / `GraphData`。
+存储层沿用旧工程的「摘抄 + 坐标 + 批次幂等」设计：每条入库记录带原文摘抄与 bbox，`run_id` 由来源指纹确定性生成，重复跑不膨胀。
+
+## 6. 指标口径（**全部待测**）
+
+`eval/metrics.py` 只定义口径，不给数字；无标注数据时 `eval/run_all.py` 一律输出「待测」并列出缺什么。
+
+| 指标 | 口径 | 需要什么才能实测 |
 |---|---|---|
-| Python 依赖 | 依赖装在每个人自己的电脑上 | `pip install -r requirements.txt` |
-| MySQL 与连接配置 | 数据库不随代码走 | 装 MySQL 8 → 复制 `agent/db_config.example.json` 为 `agent/db_config.json` 填账号口令 → `python agent/db.py --init`（会自动建 `a23_agent` 库和全部表，幂等） |
-| 大模型密钥 | **密钥不共享**，各人有各自的额度 | 阿里云百炼控制台申请自己的 key，写进 `agent/llm_key.txt`（一行，已 gitignore）或设环境变量 `DASHSCOPE_API_KEY` |
-| 离线语音模型（可选） | 463 MB，太大不适合进仓库 | `python agent/download_asr_model.py`。只影响语音输入，其他功能不受影响 |
+| CER 字符错误率 | 编辑距离(识别文本, 人工转写) / 人工转写字数，按页加权 | `data/annotation/` 逐页转写 GT |
+| 字段级 P / R / F1 | 按 `(page_id, type, name, value)` 对齐预测与 GT，微平均 | 实体与关系人工标注 |
+| 表格结构还原准确率 | 行列结构 + 单元格内容同时正确才算对 | 方剂表 / 剂量表结构 GT |
+| 可溯源率 | 证据 `quote` 能回原文命中的条数 / 证据总条数 | 真实问答日志 |
+| 拒答率 | 无依据问题中正确拒答数 / 无依据问题总数 | 人工构造的无依据问题集 |
 
-补齐后双击 `启动操作台.bat` 即可（脚本会用 PATH 里的 python；没有 Python 会明确提示去装）。
+> 禁止把 `data/demo/` 的示例数据当评测结果；禁止填任何未经实测的百分比。
 
-**日常协作**：开工先 `git pull`，改完 `git add -A && git commit -m "改了什么" && git push`。两人尽量改不同文件，冲突会少很多。
+## 7. 本地化、安全与配置
 
-## 配置
+- **推理全本地、零密钥、零公网调用**：配置只允许指向 `127.0.0.1` / `localhost`，不读取任何 API Key。
+- 配置集中在 `app/config.py`，环境变量统一前缀 `TCM_`：
 
-| 配置项 | 位置 | 说明 |
-|---|---|---|
-| 数据库连接 | `agent/db_config.json` | 该文件已加入 `.gitignore`，请从 `db_config.example.json` 复制 |
-| 大模型 | `agent/llm_config.py`（或环境变量 `DASHSCOPE_API_KEY`） | 阿里云百炼 MaaS 的 OpenAI 兼容接口，默认模型 `deepseek-v4.1-flash`；全项目只在这一处配，改完可跑 `python agent/llm_config.py` 自检 |
+  | 变量 | 默认 | 说明 |
+  |---|---|---|
+  | `TCM_OCR_BACKEND` | `rapidocr` | 可选 `rapidocr` / `paddleocr` / `stub`；依赖缺失时自动降级为桩并标注 |
+  | `TCM_LLM_BACKEND` | `none` | `none`（规则+桩）/ `ollama` / `vllm`，后两者走本机 OpenAI 兼容 HTTP |
+  | `TCM_LLM_BASE_URL` | `http://127.0.0.1:11434/v1` | 本机 Ollama 默认地址 |
+  | `TCM_VECTOR_ENABLED` | `0` | 是否启用本地向量通道（占位实现，非语义向量） |
+  | `TCM_PORT` | `8000` | 服务端口 |
 
-## 环境重建
+- 切换本地 LLM 示例：`set TCM_LLM_BACKEND=ollama && set TCM_LLM_MODEL=qwen2.5:7b`，然后重启服务。
+- 每个页面常驻「仅供参考、非诊疗建议」免责声明；问答输出边界由 `qa/disclaimer.py` 统一收口。
 
-仓库里**故意不放**这两样东西，换机器时补跑两个脚本即可：
+## 8. 数据合规与保密义务
 
-| 缺什么 | 体积 | 怎么补 |
-|---|---|---|
-| `agent/models/faster-whisper-small/` | 463 MB | `python agent/download_asr_model.py` |
-| `agent/.wheels/`（离线安装包 26 个） | 88 MB | `python agent/install_asr_deps.py` |
+- `data/samples/` 中的**命题单位脱敏样本仅限赛事研发使用，不得外传**；真实扫描页、PDF 与人工标注文件已列入 `.gitignore`，不进仓库、不上传任何外部服务。
+- `data/demo/` 为**合成示意数据**，不含真实古籍影像、不含患者信息，可自由用于演示。
+- 参赛者须遵守赛事数据使用协议：不得复制、公开、转授样本；演示录屏与截图若含脱敏样本需自行复核。
+- 旧 A23 资产（含合同、投诉、采购等办公文档）已从主链路移除，索引见 `docs/archive/`，完整内容可通过基线 tag 恢复。
 
-`install_asr_deps.py` 是为「pip 直连不通」的环境准备的：先下载 wheel 到本地目录，再 `--no-index` 安装。`--check` 可只检查不安装。
+## 9. 回退到改造前
 
-## 实测指标
+```bash
+git tag                      # 应能看到 baseline-a23
+git show baseline-a23:<旧文件路径> > <恢复路径>
+git reset --hard baseline-a23  # 需要整体回退时（会丢弃框架提交，谨慎）
+```
 
-| 项目 | 结果 |
-|---|---|
-| 作品要求 | 17 / 17 |
-| 模块 1 功能覆盖 | 8 / 8 |
-| 模块 2 与标准答案对照 | 22 / 22 |
-| 模块 3 与标准答案对照 | 26 / 26 |
-| 填写准确率 | 16 份文档 → 5 张模板，每张表 ≥ 80%，每份文档 ≤ 90s |
-| 入库数据 | 9 份文档 / 266 条记录（137 实体 + 4 画像 + 75 字段），100% 可溯源 |
+## 10. 未完成项与下一步
 
-验收脚本都在 `收尾对照/`，可单独重跑。
-
-## 已知限制
-
-- 只处理 docx / xlsx / md / txt；扫描版 PDF 与图片未做 OCR。
-- 表头语义靠模型判断，跨块定位偶有失败，失败时留空并记录，不会硬填。
-- 客服会话用 1.6 秒轮询而非 WebSocket，多客服同时在线时消息延迟略高。
-- 聊天室是一个公共大群（2.5 秒轮询），没有分群 / 私聊 / 图片，单条上限 500 字、同一人 1 秒一条。
-- 语音识别降级到本机模型后，单句约 2 秒，比浏览器原生识别慢。
-- 上传模板只收 .xlsx / .xlsm / .docx（旧格式 .xls / .doc 需先另存），单文件 12MB 以内，重名会拒绝而不是覆盖。
+按优先级：① 接入本地 OCR 模型与竖排版面后处理 → ② 古籍样本采集、脱敏与人工标注 → ③ 本地 LLM 抽取/生成与证据强约束 → ④ 五项指标实测 → ⑤ 报告 / PPT / 演示视频。详见 `docs/改造说明.md`。

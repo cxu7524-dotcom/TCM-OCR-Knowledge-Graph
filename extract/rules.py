@@ -1,0 +1,176 @@
+# -*- coding: utf-8 -*-
+"""
+extract/rules.py —— ② 文本 → 结构化（词典 + 规则，先跑通）
+
+保留旧工程 `matcher/extract.py` / `evaluate.py` 的分层思路：抽取与计分分离，
+抽取只做确定性规则，不调用任何模型，结果可复现、可审计。
+
+输出两类对象（字段定义见 app/schemas.py）：
+  - Entity：药材 / 性味 / 归经 / 功效 / 主治 / 禁忌 / 方剂 / 剂量
+  - Triple：候选三元组（去重与冲突处理交给 graph/build.py）
+
+溯源约定：quote 一律取该块的**原文整行** `Block.text`，保证百分百能回原文命中；
+          归一后的匹配词只放在 value / name，不改写 quote。
+
+TODO（下一阶段）：
+  - 跨行主语归属目前是启发式（「上文最近药材」+「方名后紧跟组成」），
+    需由本地 LLM 抽取 + 人工标注共同校验；
+  - 增补剂量单位换算、炮制法、配伍关系（君臣佐使）、反面表述（"不可用"）识别；
+  - 词典与规则命中需输出 trace，便于 eval/audit.py 逐条审计。
+"""
+
+from __future__ import annotations
+
+import re
+from typing import Iterable, List, Optional, Tuple
+
+from app.schemas import Block, Entity, Triple
+
+from .schema import (
+    CONTRA_WORDS, DOSE_RE, EFFECT_WORDS, FORMULAS, HERBS,
+    NATURE_PATTERNS, ZHUZHI_RE,
+)
+
+_DOSE_R = re.compile(r"([一-龥]{1,6}?)\s*(" + DOSE_RE + r")")
+_ZHUZHI_R = re.compile(ZHUZHI_RE)
+
+
+def _entity(name: str, etype: str, b: Block, value: str = "") -> Entity:
+    """构造带完整溯源字段的实体。"""
+    return Entity(
+        page_id=b.page_id, bbox=list(b.bbox), line_id=b.line_id,
+        quote=b.text, source_hash=b.source_hash,
+        name=name, type=etype, value=value or name,
+        block_ref=b.block_ref, extractor="rules", is_demo=True,
+    )
+
+
+def _triple(head: str, relation: str, tail: str, b: Block) -> Triple:
+    """构造带完整溯源字段的三元组。"""
+    return Triple(
+        page_id=b.page_id, bbox=list(b.bbox), line_id=b.line_id,
+        quote=b.text, source_hash=b.source_hash,
+        head=head, relation=relation, tail=tail,
+        evidence_refs=[b.block_ref or b.line_id], is_demo=True,
+    )
+
+
+def extract_entities(blocks: Iterable[Block]) -> List[Entity]:
+    """规则抽取入口（桩：小词典 + 正则）。
+
+    输入：Block 列表；输出：Entity 列表（去重、字段完整、不抛异常）。
+    """
+    out: List[Entity] = []
+    seen = set()
+    try:
+        for b in blocks:
+            if not isinstance(b, Block):
+                continue
+            text = b.text_norm or b.text
+            if not text:
+                continue
+
+            def add(name: str, etype: str, value: str = "") -> None:
+                key = (b.page_id, b.line_id, etype, name, value)
+                if key not in seen:
+                    seen.add(key)
+                    out.append(_entity(name, etype, b, value))
+
+            # 禁忌行里的「海藻 / 菘菜」是忌口对象，不再当独立药材入图
+            contra_ctx = "忌" in text
+
+            for herb in sorted(HERBS, key=lambda s: (-len(s), s)):
+                if herb in text and not (contra_ctx and herb in CONTRA_WORDS):
+                    add(herb, "药材")
+            for formula in sorted(FORMULAS, key=lambda s: (-len(s), s)):
+                if formula in text:
+                    add(formula.rstrip("方"), "方剂", formula)
+            for pat in NATURE_PATTERNS:
+                m = re.search(pat, text)
+                if m:
+                    add(m.group(0), "性味")
+            for dose in _DOSE_R.findall(text):
+                add(dose[1], "剂量", dose[1])
+            for eff in sorted(EFFECT_WORDS, key=lambda s: (-len(s), s)):
+                if eff in text:
+                    add(eff, "功效")
+            m = _ZHUZHI_R.search(text)
+            if m:
+                add(m.group(1), "主治", m.group(1))
+            for word in sorted(CONTRA_WORDS, key=lambda s: (-len(s), s)):
+                if contra_ctx and word in text:
+                    add(word, "禁忌")
+    except Exception:
+        return out  # 桩不得抛异常，返回已抽到的部分
+    return out
+
+
+def candidate_triples(blocks: Iterable[Block],
+                      entities: Optional[Iterable[Entity]] = None) -> List[Triple]:
+    """从原文行生成候选三元组（规则桩）。
+
+    归属策略（启发式，已在模块说明中标注为 TODO）：
+      - 行内出现方名 → 记为「当前方」，其后含剂量的行视为该方组成；
+      - 行内首个药材记为「当前主语」，跨行的主治 / 功效 / 禁忌归到它；
+      - 药名紧邻剂量 → (药材, 剂量, 剂量值)。
+    输入：Block 列表（entities 参数保留给后续 LLM 抽取结果复用）
+    输出：Triple 列表，字段完整，不抛异常。
+    """
+    out: List[Triple] = []
+    current_formula = ""
+    current_herb = ""
+    try:
+        for b in blocks:
+            if not isinstance(b, Block):
+                continue
+            text = b.text_norm or b.text
+            if not text:
+                continue
+
+            formula_hit = next((f.rstrip("方") for f in sorted(FORMULAS, key=lambda s: (-len(s), s))
+                                if f in text), "")
+            if formula_hit:
+                current_formula = formula_hit
+
+            herbs = [h for h in sorted(HERBS, key=lambda s: (-len(s), s)) if h in text]
+            if herbs and not text.startswith("忌"):
+                current_herb = herbs[0]
+
+            # 方剂组成 + 剂量
+            for herb, dose in _DOSE_R.findall(text):
+                herb = herb.strip(" ·，,")
+                out.append(_triple(herb or "（未识别药名）", "剂量", dose.strip(), b))
+                if current_formula:
+                    out.append(_triple(current_formula, "组成", herb, b))
+
+            # 性味
+            for pat in NATURE_PATTERNS:
+                m = re.search(pat, text)
+                if m and current_herb:
+                    out.append(_triple(current_herb, "性味", m.group(0), b))
+                    break
+
+            # 主治 / 功效
+            m = _ZHUZHI_R.search(text)
+            if m and current_herb:
+                out.append(_triple(current_herb, "主治", m.group(1), b))
+            for eff in sorted(EFFECT_WORDS, key=lambda s: (-len(s), s)):
+                if eff in text and current_herb:
+                    out.append(_triple(current_herb, "功效", eff, b))
+                    break
+
+            # 禁忌：优先取本行主语（避免跨行猜测），行内无主语才回退到上文主语
+            if "忌" in text:
+                subject = next((h for h in herbs if h not in CONTRA_WORDS), current_herb)
+                for word in sorted(CONTRA_WORDS, key=lambda s: (-len(s), s)):
+                    if word in text and subject:
+                        out.append(_triple(subject, "禁忌", word, b))
+    except Exception:
+        return out
+    return out
+
+
+def extract_all(blocks: Iterable[Block]) -> Tuple[List[Entity], List[Triple]]:
+    """便捷入口：一次拿到实体与候选三元组。"""
+    items = list(blocks)
+    return extract_entities(items), candidate_triples(items)

@@ -1,7 +1,6 @@
 # ============================================================
-# A-23 智能文档助手 · .gitignore
-# 原则：源码、测试数据、文档、验收记录进仓库；
-#       大件（模型/安装包）、含口令的配置、运行产物一律不进。
+# 赛题二 · 中医古籍 OCR 与知识图谱问答原型
+# 原则：源码、契约、示例数据、文档进仓库；运行产物与任何凭据不进仓库。
 # ============================================================
 
 # ---------- Python 缓存 ----------
@@ -15,45 +14,45 @@ __pycache__/
 venv/
 env/
 
-# ---------- 体积大、可在本机重建（见 README「环境重建」）----------
-agent/models/
-agent/.wheels/
-*.whl
-测试数据/压测-大文档/源文档/
-压测-大文档/结果/大池-output.json
-
-# ---------- 含口令的本地配置：绝对不要提交 ----------
-agent/db_config.json
-agent/llm_key.txt
-secrets.local.json
-.env
-.env.*
-
-# ---------- 运行产物 ----------
-agent/输出/
-agent/digital/cache/
-测试数据/模板上传/
+# ---------- 运行产物：本地库、上传件、评测报告 ----------
+data/store/*.sqlite3
+data/store/*.sqlite3-*
+data/store/pages/*.json
+data/store/graph.json
+data/uploads/*
+!data/uploads/.gitkeep
+data/reports/*
+!data/reports/.gitkeep
 *.log
 *.db
 *.db-journal
-*.sqlite
-*.sqlite3
 
-# ---------- 备份与工具缓存 ----------
+# ---------- 本地凭据与私有配置：绝对不要提交 ----------
+secrets.local.json
+.env
+.env.*
+*.key
+本地密钥*
+模型权重/
+*.onnx
+*.bin
+*.safetensors
+
+# ---------- 样本合规：真实扫描页与人工标注不进仓库 ----------
+data/samples/*.png
+data/samples/*.jpg
+data/samples/*.jpeg
+data/samples/*.tif
+data/samples/*.pdf
+data/annotation/*.jsonl
+data/annotation/*.json
+!data/annotation/README.md
+
+# ---------- 备份与编辑器 ----------
 *.bak
-*.bak-*
 备份-*/
-.备份-*/
-组会汇报-A23/preview/
-组会汇报-A23/preview-5min/
-.slidep/
-
-# ---------- 编辑器 / 系统 ----------
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
 desktop.ini
-
-# ---------- 临时探针脚本 ----------
-_tmp*

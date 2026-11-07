@@ -1,7 +1,0 @@
-[
-  {"id": "A1", "text": "合同里那个金额看着不显眼，给弄粗一点", "expect_action": "格式调整", "expect_op": "set_bold", "expect_doc": "设备采购合同.docx"},
-  {"id": "A2", "text": "周报开头那几行太挤了，分开点", "expect_action": "排版", "expect_op": "set_spacing", "expect_doc": "项目周报-第12周.md"},
-  {"id": "A3", "text": "把纪要里开会时间那行挪到右边去", "expect_action": "排版", "expect_op": "set_align", "expect_doc": "项目推进会会议纪要.docx"},
-  {"id": "A4", "text": "员工表里每个人的工资和津贴都帮我列出来", "expect_action": "内容提取", "expect_op": "extract", "expect_doc": "员工信息表.xlsx"},
-  {"id": "A5", "text": "帮我把合同里乙方的电话加上", "expect_action": "不明确", "expect_op": "none", "expect_doc": "设备采购合同.docx"}
-]
