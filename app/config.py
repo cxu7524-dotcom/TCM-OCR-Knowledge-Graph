@@ -101,6 +101,13 @@ class OcrConfig:
     normalize_enabled: bool = _env_bool("OCR_NORMALIZE_ENABLED", True)
     # 字形纠错层：只做上下文可判定的纠错，可整体关闭（TCM_OCR_CORRECT=0）
     correct_enabled: bool = _env_bool("OCR_CORRECT", True)
+    # 竖排逐列检测（P1）：竖排页先切列再逐列识别；=0 时完全回到整页识别，便于 A/B
+    vertical_split: bool = _env_bool("OCR_VERTICAL_SPLIT", True)
+    col_min_w: int = _env_int("OCR_COL_MIN_W", 12)
+    col_gap_ratio: float = _env_float("OCR_COL_GAP_RATIO", 0.02)
+    rotate: int = _env_int("OCR_ROTATE", 90)     # 90=逆时针（实测有效），270=顺时针
+    # 识别模型路径：空=用包内简体 ch_PP-OCRv3_rec；指定则加载本地繁体模型（字典内嵌在 ONNX metadata）
+    rec_model: str = _env("OCR_REC_MODEL", "")
     demo_fallback: bool = _env_bool("OCR_DEMO_FALLBACK", True)
 
 

@@ -221,6 +221,22 @@ def analyze_layout(blocks: Iterable[Block], page_id: str = "",
     try:
         detail = detect_direction_detail(items)
         direct = direction or detail["direction"]
+
+        # 若上游（ocr/vertical.py）已给出列结构，直接消费，不重复聚类、不再合并碎片
+        given = {int(b.col_id or 0) for b in items}
+        if len(given) >= 3 and max(given) >= 2:
+            gc = group_columns(items)
+            items = assign_reading_order(items, direct)
+            lay = LayoutResult(
+                page_id=page_id,
+                cols=[{"col_id": g["col_id"], "x_range": g["x_range"],
+                       "block_count": g["block_count"]} for g in gc],
+                block_order=[b.block_ref or b.line_id for b in items],
+                direction=direct, engine="layout-rules", is_demo=is_demo, detail=detail,
+                note=f"采用上游列结构（{len(given)} 列），未重复聚类；{detail['reason']}",
+            )
+            return items, lay
+
         cols = project_columns(items)
         col_of = {}
         for c in cols:

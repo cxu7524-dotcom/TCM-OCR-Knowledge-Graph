@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-08 19:50:50",
+  "generated_at": "2026-11-08 22:10:03",
   "notice": "合成示意数据，用于工程自测，非命题单位样本、非官方评测结果",
   "disclaimer": "仅供参考、非诊疗建议",
   "gt_version": "514f99246f103a95",
@@ -29,8 +29,40 @@
     "ready": true
   },
   "predict_meta": {
-    "predictions_generated": false,
-    "reason": "--no-predict：只读已有预测文件"
+    "predictions_generated": true,
+    "pages": 24,
+    "ocr_blocks": 240,
+    "entities": 166,
+    "tables": 8,
+    "qa_cases": 67,
+    "engines": [
+      "rapidocr"
+    ],
+    "degraded_pages": 0,
+    "environment": {
+      "Python": "3.13.14",
+      "OCR 后端": "rapidocr-onnxruntime（本机 ONNX Runtime，CPU，模型随包分发，无公网调用）",
+      "LLM 后端": "none（本阶段不部署 / 不调用）",
+      "向量通道": "none（占位，未启用）",
+      "已装依赖": [
+        "rapidocr_onnxruntime",
+        "onnxruntime",
+        "PIL",
+        "numpy",
+        "cv2",
+        "fastapi",
+        "uvicorn"
+      ],
+      "未装依赖": [
+        "paddleocr"
+      ],
+      "合成影像": "Pillow 本地渲染 24 页（不进仓库，可复现）",
+      "低置信阈值": 0.35,
+      "检测阈值": "box_thresh=0.3, text_score=0.35",
+      "公网 / 密钥": "无（未读取任何 API Key，未访问任何公网推理服务）"
+    },
+    "generated_at": "2026-11-08 22:10:03",
+    "reason": ""
   },
   "prediction_counts": {
     "ocr": 240,
@@ -124,38 +156,38 @@
     "field_f1": {
       "key": "field_f1",
       "status": "实测",
-      "value": 0.6471,
+      "value": 0.5882,
       "judge": "未达标",
       "threshold": 0.8,
-      "P": 0.66,
-      "R": 0.6346,
-      "TP": 33,
-      "FP": 17,
-      "FN": 19,
+      "P": 0.6,
+      "R": 0.5769,
+      "TP": 30,
+      "FP": 20,
+      "FN": 22,
       "excluded": {
         "gt": 0,
         "pred": 0
       },
       "align_mode": "归一化对齐（正式）",
-      "detail": "TP=33 FP=17 FN=19；对齐键 (page_id,type,name,value)；归一化对齐（正式）"
+      "detail": "TP=30 FP=20 FN=22；对齐键 (page_id,type,name,value)；归一化对齐（正式）"
     },
     "field_f1_legacy": {
       "key": "field_f1",
       "status": "实测",
-      "value": 0.4314,
+      "value": 0.3725,
       "judge": "未达标",
       "threshold": 0.8,
-      "P": 0.44,
-      "R": 0.4231,
-      "TP": 22,
-      "FP": 28,
-      "FN": 30,
+      "P": 0.38,
+      "R": 0.3654,
+      "TP": 19,
+      "FP": 31,
+      "FN": 33,
       "excluded": {
         "gt": 0,
         "pred": 0
       },
       "align_mode": "原值对齐（修正前对照）",
-      "detail": "TP=22 FP=28 FN=30；对齐键 (page_id,type,name,value)；原值对齐（修正前对照）"
+      "detail": "TP=19 FP=31 FN=33；对齐键 (page_id,type,name,value)；原值对齐（修正前对照）"
     },
     "table_structure": {
       "key": "table_structure",

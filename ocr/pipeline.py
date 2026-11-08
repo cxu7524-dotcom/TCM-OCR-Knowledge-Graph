@@ -22,7 +22,45 @@ from app.demo import load_demo_ocr
 from app.schemas import OCRResult, source_hash_of
 
 from . import correct, layout, normalize, table
-from .recognize import _image_size, recognize
+from .recognize import RecognizeResult, _image_size, recognize
+
+
+def _text_score(blocks) -> float:
+    """无监督质量代理：Σ(字数 × 置信度)。不读 GT，只用于两路候选之间择优。"""
+    return sum(len(b.text or "") * float(b.conf or 0) for b in blocks)
+
+
+def _recognize_page(image_path: str, page_id: str, backend: Optional[str]) -> RecognizeResult:
+    """竖排页跑两路候选（逐列 / 整页），按无监督质量代理择优；横排页只跑整页。
+
+    为什么两路都跑：验证集上逐列对版式规整页有效（CER 0.53→0.40），但对表格页/窄列页
+    会因列被过滤而字数暴降（84 字 → 0 字）。只按 is_vertical_page 二选一会让后者劣化，
+    因此保留整页结果作为兜底，逐列**明显更优**才采用（>5%）。
+    """
+    base = recognize(image_path, page_id, backend)
+    if not CONFIG.ocr.vertical_split or not image_path:
+        return base
+    try:
+        from .vertical import imread_unicode, is_vertical_page, ocr_page
+        img = imread_unicode(image_path)
+        if img is None or not is_vertical_page(img):
+            return base
+        blocks, meta = ocr_page(image_path, page_id)
+        if not blocks:
+            base.notes.append("竖排逐列未识别出内容，采用整页结果")
+            return base
+        v_score, p_score = _text_score(blocks), _text_score(base.blocks)
+        if v_score > p_score * 1.05:
+            return RecognizeResult(
+                blocks=blocks, engine="rapidocr-vertical", model_loaded=True,
+                is_demo=False, width=meta["width"], height=meta["height"],
+                notes=meta["notes"] + [f"择优：逐列 {v_score:.0f} > 整页 {p_score:.0f}"],
+            )
+        base.notes.append(f"竖排候选未优于整页（{v_score:.0f} ≤ {p_score:.0f}），采用整页结果")
+        return base
+    except Exception as exc:
+        base.notes.append(f"竖排逐列降级为整页识别：{type(exc).__name__}")
+        return base
 
 
 def new_page_id(prefix: str = "P") -> str:
@@ -116,7 +154,7 @@ def run_ocr(image_path: str = "", page_id: Optional[str] = None,
     pid = page_id or new_page_id()
     notes: List[str] = []
     try:
-        rec = recognize(image_path, pid, backend=backend)
+        rec = _recognize_page(image_path, pid, backend)
         blocks = list(rec.blocks)
         notes.extend(rec.notes)
 

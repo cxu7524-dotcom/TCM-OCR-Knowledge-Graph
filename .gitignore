@@ -60,3 +60,11 @@ data/annotation/*.jsonl.tmp
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# ---------- 外部真实古籍评测集：不进仓库、不上传外部服务 ----------
+古籍评测集/
+模型权重/
+data/reports/bbox_check/
+data/reports/guji_*.json
+data/reports/_ab_*.json
+data/reports/_probe_*.json

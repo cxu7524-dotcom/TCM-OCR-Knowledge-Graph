@@ -10,7 +10,8 @@ cd /d "%~dp0"
 set PYTHONIOENCODING=utf-8
 set PYTHONUTF8=1
 
-set "PY=%USERPROFILE%\.workbuddy\binaries\python\envs\default\Scripts\python.exe"
+rem 优先用项目内虚拟环境 .venv（由 python -m venv .venv 创建）
+set "PY=%~dp0.venv\Scripts\python.exe"
 if exist "%PY%" goto have_py
 set "PY=python"
 where python >nul 2>&1 || goto no_python

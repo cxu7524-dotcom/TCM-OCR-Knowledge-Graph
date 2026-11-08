@@ -29,19 +29,30 @@ from app.config import CONFIG
 from app.demo import load_demo_ocr
 from app.schemas import Block, source_hash_of
 
-_ENGINE = None
+_ENGINES: dict = {}
 _ENGINE_LOCK = threading.Lock()
 
 
-def _engine():
-    """懒加载 + 进程内单例，避免每页重复初始化 ONNX Runtime。"""
-    global _ENGINE
-    if _ENGINE is None:
+def _engine(rec_model: str | None = None):
+    """懒加载 + 按识别模型缓存，避免重复初始化 ONNX Runtime。
+
+    `rec_model` 为空时用包内简体 ch_PP-OCRv3_rec；指定本地 ONNX 路径时加载该模型。
+    繁体模型（chinese_cht_PP-OCRv3_rec_mobile.onnx）的字典内嵌在 ONNX metadata
+    的 `character` 字段里，`session.get_character_list()` 可直接读取，无需额外 keys 文件。
+    """
+    from pathlib import Path as _P
+    raw = (rec_model if rec_model is not None else CONFIG.ocr.rec_model) or ""
+    raw = raw.strip()
+    if raw and not _P(raw).is_absolute():
+        raw = str(_P(__file__).resolve().parents[1] / raw)
+    key = raw
+    if key not in _ENGINES:
         with _ENGINE_LOCK:
-            if _ENGINE is None:
+            if key not in _ENGINES:
                 from rapidocr_onnxruntime import RapidOCR
-                _ENGINE = RapidOCR()
-    return _ENGINE
+                kwargs = {"rec_model_path": key} if key else {}
+                _ENGINES[key] = RapidOCR(**kwargs)
+    return _ENGINES[key]
 
 
 @dataclass
