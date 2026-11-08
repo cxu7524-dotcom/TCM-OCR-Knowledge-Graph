@@ -103,6 +103,16 @@ class OcrConfig:
     correct_enabled: bool = _env_bool("OCR_CORRECT", True)
     # 竖排逐列检测（P1）：竖排页先切列再逐列识别；=0 时完全回到整页识别，便于 A/B
     vertical_split: bool = _env_bool("OCR_VERTICAL_SPLIT", True)
+    # 两路候选的取舍策略（P2）：
+    #   auto     —— 默认，按 ocr/score.py 的复合无监督分择优
+    #   vertical —— 强制逐列（无逐列结果时回退整页），用于 A/B 对照
+    #   page     —— 强制整页，用于 A/B 对照
+    pick: str = _env("OCR_PICK", "auto")
+    # 择优余量：逐列分需超过整页分 × margin 才采用。
+    # 实测（v5 / 34 页 + 医家类 20 页）：margin=1.02 时逐列一页都选不上（等价整页，零劣化）；
+    # margin=1.00 时改判 3 页，验证集中位不变、均值略降，但医家类有一页从 0.302 劣化到 0.449。
+    # 结论：当前复合分不足以承担改判，默认保留 2% 余量，宁可不用也不劣化。
+    pick_margin: float = _env_float("OCR_PICK_MARGIN", 1.02)
     col_min_w: int = _env_int("OCR_COL_MIN_W", 12)
     col_gap_ratio: float = _env_float("OCR_COL_GAP_RATIO", 0.02)
     rotate: int = _env_int("OCR_ROTATE", 90)     # 90=逆时针（实测有效），270=顺时针

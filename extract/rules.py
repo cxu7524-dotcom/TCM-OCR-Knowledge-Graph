@@ -35,6 +35,27 @@ _DOSE_R = re.compile(r"([一-龥]{1,6}?)\s*(" + DOSE_RE + r")")
 _ZHUZHI_R = re.compile(ZHUZHI_RE)
 
 
+def _pick_main(text: str, words: Iterable[str]) -> str:
+    """在多个命中的词典词里挑「主」词，结果**完全确定**。
+
+    阶段五 P0 根因修复：原先用 `max(hits, key=len)`，等长命中时由 set 迭代顺序决定，
+    而 Python 的字符串哈希逐进程随机（PYTHONHASHSEED），同一份 OCR 输出会抽出不同实体，
+    字段 F1 在 0.5882 / 0.6471 之间随机跳动（与逐列切分无关，OCR 输出逐字节一致）。
+    现改为显式排序：**最长优先 → 文本中最先出现 → 字典序兜底**。
+    选「最先出现」的依据是古籍行文主次（先述者为主功效），不依赖任何 GT。
+    """
+    best = ""
+    best_key = None
+    for w in set(words):
+        pos = text.find(w)
+        if pos < 0:
+            continue
+        key = (-len(w), pos, w)
+        if best_key is None or key < best_key:
+            best, best_key = w, key
+    return best
+
+
 def _entity(name: str, etype: str, b: Block, value: str = "") -> Entity:
     """构造带完整溯源字段的实体。"""
     return Entity(
@@ -90,19 +111,20 @@ def extract_entities(blocks: Iterable[Block]) -> List[Entity]:
             nature_hits = [m.group(0) for pat in NATURE_PATTERNS
                            for m in [re.search(pat, text)] if m]
             if nature_hits:
-                longest = max(nature_hits, key=len)
+                longest = _pick_main(text, nature_hits)
                 seen_nature = set()
-                for h in sorted(set(nature_hits), key=lambda s: -len(s)):
+                for h in sorted(set(nature_hits),
+                                key=lambda s: (-len(s), text.find(s), s)):
                     if h not in longest or h == longest:
                         if h not in seen_nature:
                             seen_nature.add(h)
                             add(h, "性味")
             for dose in _DOSE_R.findall(text):
                 add(dose[1], "剂量", dose[1])
-            # 功效：GT 每行只标一个主功效，取最长命中，避免短词重复造成误报
-            eff_hits = [w for w in EFFECT_WORDS if w in text]
-            if eff_hits:
-                add(max(eff_hits, key=len), "功效")
+            # 功效：GT 每行只标一个主功效，取「最长 + 最先出现」（见 _pick_main）
+            eff = _pick_main(text, EFFECT_WORDS)
+            if eff:
+                add(eff, "功效")
             m = _ZHUZHI_R.search(text)
             if m:
                 add(m.group(1), "主治", m.group(1))
@@ -163,10 +185,9 @@ def candidate_triples(blocks: Iterable[Block],
             m = _ZHUZHI_R.search(text)
             if m and current_herb:
                 out.append(_triple(current_herb, "主治", m.group(1), b))
-            for eff in sorted(EFFECT_WORDS, key=lambda s: (-len(s), s)):
-                if eff in text and current_herb:
-                    out.append(_triple(current_herb, "功效", eff, b))
-                    break
+            eff = _pick_main(text, EFFECT_WORDS)
+            if eff and current_herb:
+                out.append(_triple(current_herb, "功效", eff, b))
 
             # 禁忌：优先取本行主语（避免跨行猜测），行内无主语才回退到上文主语
             if "忌" in text:

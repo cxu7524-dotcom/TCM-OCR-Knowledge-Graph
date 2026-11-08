@@ -55,6 +55,25 @@ def _engine(rec_model: str | None = None):
     return _ENGINES[key]
 
 
+def model_charset() -> set:
+    """当前识别模型的字符表（供 ocr/score.py 算「合法字符率」）。
+
+    rapidocr 的 `TextRecognizer` 把字典放在 `postprocess_op.character`
+    （首项是 'blank' 占位，末尾含空格），这里剔除占位符后返回 set。
+    取不到（未装依赖 / 未加载模型）时返回空集，调用方按「无信号」处理。
+    """
+    try:
+        engine = _engine()
+        rec = getattr(engine, "text_recognizer", None)
+        op = getattr(rec, "postprocess_op", None)
+        chars = getattr(op, "character", None)
+        if not chars:
+            return set()
+        return {c for c in chars if c and c not in {"blank", " "}}
+    except Exception:
+        return set()
+
+
 @dataclass
 class RecognizeResult:
     """识别适配层产出（pipeline 再补版面 / 归一化 / 表格）。"""

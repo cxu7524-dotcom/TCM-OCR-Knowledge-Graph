@@ -10,6 +10,9 @@ cd /d "%~dp0"
 set PYTHONIOENCODING=utf-8
 set PYTHONUTF8=1
 
+rem 识别模型：优先用本地 v5（16.6MB，繁简通用），没有则用包内简体模型
+if exist "模型权重\ch_PP-OCRv5_rec_mobile.onnx" set "TCM_OCR_REC_MODEL=模型权重\ch_PP-OCRv5_rec_mobile.onnx"
+
 rem 优先用项目内虚拟环境 .venv（由 python -m venv .venv 创建）
 set "PY=%~dp0.venv\Scripts\python.exe"
 if exist "%PY%" goto have_py

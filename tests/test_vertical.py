@@ -119,5 +119,83 @@ class TestCutPoints(unittest.TestCase):
         self.assertTrue(any(abs(p - 210) <= 8 for p in pts[1:-1]), pts)
 
 
+@unittest.skipUnless(_CV2_OK, "需要 opencv")
+class TestSplitSpread(unittest.TestCase):
+    """对开双页：书脊检测 + 右半页先读 + 单页不硬切。"""
+
+    def _spread(self, gutter=10, h=300, w=400):
+        """两半各 3 列，中间一条贯穿全页的暗带（装订阴影型中缝）。"""
+        img = make_page([(30, 40, 260, 25), (70, 40, 260, 25), (110, 40, 260, 25),
+                         (250, 40, 260, 25), (290, 40, 260, 25), (330, 40, 260, 25)],
+                        h=h, w=w)
+        gx = w // 2
+        cv2.rectangle(img, (gx - gutter // 2, 0), (gx + gutter // 2, h), (20, 20, 20), -1)
+        return img
+
+    def test_detect_spread_right_half_first(self):
+        halves = vertical.split_spread(self._spread())
+        self.assertEqual(len(halves), 2, halves)
+        self.assertGreater(halves[0][0], halves[1][1])      # 右半页的 x0 > 左半页的 x1
+        self.assertEqual(halves[1][0], 0)
+        self.assertEqual(halves[0][1], 400)
+
+    def test_portrait_single_page_not_split(self):
+        # 高/宽 = 300/180 > 1.2 → 竖长单页，必须整页返回，不许硬切
+        img = make_page([(20, 40, 260, 22), (50, 40, 260, 22), (80, 40, 260, 22),
+                         (110, 40, 260, 22), (140, 40, 260, 22)], h=300, w=180)
+        self.assertEqual(vertical.split_spread(img), [(0, 180)])
+
+    def test_no_gutter_returns_whole_page(self):
+        # 横宽但没有书脊信号 → 仍整页（宁可不切）
+        img = make_page([(20, 40, 260, 25), (50, 40, 260, 25), (80, 40, 260, 25),
+                         (110, 40, 260, 25), (140, 40, 260, 25), (170, 40, 260, 25)],
+                        h=300, w=400)
+        self.assertEqual(vertical.split_spread(img), [(0, 400)])
+
+    def test_empty_image(self):
+        self.assertEqual(vertical.split_spread(np.zeros((0, 0, 3), np.uint8)), [])
+
+
+@unittest.skipUnless(_CV2_OK, "需要 opencv")
+class TestWideColumnSplit(unittest.TestCase):
+    """跨列框抑制：宽度 > 1.8× 中位列宽的段要按内部次峰再切一刀。"""
+
+    def test_wide_column_split_into_two(self):
+        # 直接构造「两列被并进同一个框」的情形：66px 宽，中间 6px 暗谷，中位列宽 30
+        h, w = 300, 300
+        img = np.full((h, w, 3), 255, np.uint8)
+        clean = np.zeros((h, w), np.uint8)
+        for x0 in (100, 136):
+            for y in range(40, 260, 30):
+                cv2.rectangle(img, (x0, y), (x0 + 29, y + 16), (0, 0, 0), -1)
+            clean[40:260, x0:x0 + 30] = 255
+        col = {"bbox": [100, 40, 166, 260], "crop": img[40:260, 100:166].copy()}
+        pieces = vertical._split_wide_column(img, clean, col, med_w=30)
+        self.assertEqual(len(pieces), 2, pieces)
+        self.assertTrue(all(p.get("wide_split") for p in pieces))
+        # 切点应落在 6px 暗谷内（130~136），不必精确到像素
+        self.assertTrue(130 <= pieces[1]["bbox"][0] <= 136, pieces)
+
+    def test_normal_column_not_split(self):
+        h, w = 300, 300
+        img = np.full((h, w, 3), 255, np.uint8)
+        clean = np.zeros((h, w), np.uint8)
+        clean[40:260, 100:130] = 255
+        col = {"bbox": [100, 40, 130, 260], "crop": img[40:260, 100:130].copy()}
+        self.assertEqual(len(vertical._split_wide_column(img, clean, col, med_w=30)), 1)
+
+    def test_cross_column_rate_counts_spanning_boxes(self):
+        class B:                       # 极简 Block 替身，只需要 bbox / line_id / text
+            def __init__(self, bbox, text="x"):
+                self.bbox, self.line_id, self.text = bbox, "L", text
+
+        cols = [{"bbox": [0, 0, 50, 300]}, {"bbox": [60, 0, 110, 300]}]
+        blocks = [B([0, 0, 50, 300]), B([10, 0, 100, 300])]     # 第二个横跨两列
+        r = vertical.cross_column_rate(blocks, cols)
+        self.assertEqual(r["total"], 2)
+        self.assertEqual(r["cross"], 1)
+        self.assertEqual(r["rate"], 0.5)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

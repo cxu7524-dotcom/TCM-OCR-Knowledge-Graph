@@ -21,27 +21,30 @@ from app.config import CONFIG
 from app.demo import load_demo_ocr
 from app.schemas import OCRResult, source_hash_of
 
-from . import correct, layout, normalize, table
+from . import correct, layout, normalize, score, table
 from .recognize import RecognizeResult, _image_size, recognize
 
 
 def _text_score(blocks) -> float:
-    """无监督质量代理：Σ(字数 × 置信度)。不读 GT，只用于两路候选之间择优。"""
+    """旧口径：Σ(字数 × 置信度)。保留仅为日志对照，**不再用于择优**。
+
+    该分数天然偏向字多的整页（逐列漏一列就输），阶段四 34 页验证集逐列全输即由此而来。
+    """
     return sum(len(b.text or "") * float(b.conf or 0) for b in blocks)
 
 
 def _recognize_page(image_path: str, page_id: str, backend: Optional[str]) -> RecognizeResult:
-    """竖排页跑两路候选（逐列 / 整页），按无监督质量代理择优；横排页只跑整页。
+    """竖排页跑两路候选（逐列 / 整页），按**复合无监督分**择优；横排页只跑整页。
 
-    为什么两路都跑：验证集上逐列对版式规整页有效（CER 0.53→0.40），但对表格页/窄列页
-    会因列被过滤而字数暴降（84 字 → 0 字）。只按 is_vertical_page 二选一会让后者劣化，
-    因此保留整页结果作为兜底，逐列**明显更优**才采用（>5%）。
+    择优信号见 `ocr/score.py`（合法字符率 / 平均置信度 / 列数合理性 / 重复率惩罚），
+    不再用 Σ(字数×conf)——那个口径把逐列路径系统性压死。
     """
     base = recognize(image_path, page_id, backend)
-    if not CONFIG.ocr.vertical_split or not image_path:
+    pick = (CONFIG.ocr.pick or "auto").strip().lower()
+    if not CONFIG.ocr.vertical_split or not image_path or pick == "page":
         return base
     try:
-        from .vertical import imread_unicode, is_vertical_page, ocr_page
+        from .vertical import imread_unicode, is_vertical_page, ocr_page, page_layout
         img = imread_unicode(image_path)
         if img is None or not is_vertical_page(img):
             return base
@@ -49,14 +52,32 @@ def _recognize_page(image_path: str, page_id: str, backend: Optional[str]) -> Re
         if not blocks:
             base.notes.append("竖排逐列未识别出内容，采用整页结果")
             return base
-        v_score, p_score = _text_score(blocks), _text_score(base.blocks)
-        if v_score > p_score * 1.05:
+        if pick == "vertical":
             return RecognizeResult(
                 blocks=blocks, engine="rapidocr-vertical", model_loaded=True,
                 is_demo=False, width=meta["width"], height=meta["height"],
-                notes=meta["notes"] + [f"择优：逐列 {v_score:.0f} > 整页 {p_score:.0f}"],
+                notes=meta["notes"] + ["择优策略：强制逐列（TCM_OCR_PICK=vertical，A/B 对照用）"],
             )
-        base.notes.append(f"竖排候选未优于整页（{v_score:.0f} ≤ {p_score:.0f}），采用整页结果")
+        # 两路的「列数合理性」用同一份列结构评估，避免对整页路径不公平
+        n_cols_page = len(page_layout(image_path)["cols"]) or 1
+        charset = score.legal_charset()
+        # 置信度低于阈值的块在 run_ocr 里会被剔除，这里先剔一遍，保证两路候选可比
+        def _kept(bs):
+            return [b for b in bs if float(b.conf or 0) >= CONFIG.ocr.min_conf]
+        v = score.composite(_kept(blocks), int(meta.get("columns") or 0), charset)
+        p = score.composite(_kept(base.blocks), n_cols_page, charset)
+        base.notes.append(f"择优（整页）：{score.fmt(p)}")
+        meta["notes"].append(f"择优（逐列）：{score.fmt(v)}")
+        margin = float(CONFIG.ocr.pick_margin or 1.0)
+        if v["score"] > p["score"] * margin:
+            return RecognizeResult(
+                blocks=blocks, engine="rapidocr-vertical", model_loaded=True,
+                is_demo=False, width=meta["width"], height=meta["height"],
+                notes=meta["notes"] + [f"择优结果：逐列胜（{v['score']:.4f} > "
+                                       f"整页 {p['score']:.4f} × {margin:.2f}）"],
+            )
+        base.notes.append(f"择优结果：整页胜（逐列 {v['score']:.4f} ≤ "
+                          f"整页 {p['score']:.4f} × {margin:.2f}），采用整页结果")
         return base
     except Exception as exc:
         base.notes.append(f"竖排逐列降级为整页识别：{type(exc).__name__}")
