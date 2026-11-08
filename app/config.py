@@ -99,6 +99,8 @@ class OcrConfig:
     vertical_layout: bool = _env_bool("OCR_VERTICAL_LAYOUT", True)
     table_enabled: bool = _env_bool("OCR_TABLE_ENABLED", True)
     normalize_enabled: bool = _env_bool("OCR_NORMALIZE_ENABLED", True)
+    # 字形纠错层：只做上下文可判定的纠错，可整体关闭（TCM_OCR_CORRECT=0）
+    correct_enabled: bool = _env_bool("OCR_CORRECT", True)
     demo_fallback: bool = _env_bool("OCR_DEMO_FALLBACK", True)
 
 

@@ -21,7 +21,7 @@ from app.config import CONFIG
 from app.demo import load_demo_ocr
 from app.schemas import OCRResult, source_hash_of
 
-from . import layout, normalize, table
+from . import correct, layout, normalize, table
 from .recognize import _image_size, recognize
 
 
@@ -55,11 +55,36 @@ def _write_review_queue(page_id: str, image_path: str,
     return str(path)
 
 
-def _postprocess(blocks, page_id: str, notes: List[str], is_demo: bool):
-    """归一化 / 版面 / 表格三件套。"""
-    # 顺序要点：先做版面合并（会重建 Block），再归一化，避免 text_norm 被合并覆盖
+def _postprocess(blocks, page_id: str, notes: List[str], is_demo: bool,
+                 image_path: str = ""):
+    """版面 → 表格补格 → 字形纠错 → 归一化 → 表格还原。"""
+    # 顺序要点：
+    #  ① 版面合并会重建 Block，必须最先做；
+    #  ② 表格补格会新增 Block，必须在纠错之前，让补出来的文本也走同一套纠错规则；
+    #  ③ 归一化放最后，避免 text_norm 被后续合并覆盖。
     blocks, lay = layout.analyze_layout(blocks, page_id=page_id, is_demo=is_demo)
     notes.append(f"版面：{lay.direction}，{len(lay.cols)} 列；{lay.note}")
+
+    filled = []
+    if CONFIG.ocr.table_enabled:
+        try:
+            blocks, filled = table.fill_missing_cells(image_path, blocks, page_id)
+        except Exception as exc:
+            notes.append(f"表格补格降级（不影响识别结果）：{type(exc).__name__}")
+
+    if CONFIG.ocr.correct_enabled:
+        blocks, corrections = correct.correct_blocks(blocks)
+        if corrections:
+            path = correct.write_trace(corrections)
+            rules_hit: dict = {}
+            for c in corrections:
+                for r in c["rules"]:
+                    rules_hit[r["rule"]] = rules_hit.get(r["rule"], 0) + 1
+            notes.append(f"字形纠错：{len(corrections)} 块，规则命中 {rules_hit}，trace {path}")
+        else:
+            notes.append("字形纠错：本页无命中（规则表见 data/lexicon/ocr_confusions.json）")
+    else:
+        notes.append("字形纠错：已按配置关闭（TCM_OCR_CORRECT=0）")
 
     if CONFIG.ocr.normalize_enabled:
         blocks = normalize.normalize_blocks(blocks)
@@ -68,6 +93,12 @@ def _postprocess(blocks, page_id: str, notes: List[str], is_demo: bool):
                      f"转换 {st['converted_chars']}（版本 {st['lexicon_version']}）")
     else:
         notes.append("归一化：已按配置关闭")
+
+    if filled:
+        sample = filled[0]
+        got = sample.get("after") or sample.get("text") or ""
+        notes.append(f"表格补格：{len(filled)} 处二次识别"
+                     f"（例：{got}，rule={sample.get('rule', '')}）")
 
     tables = table.restore_tables(blocks, page_id) if CONFIG.ocr.table_enabled else []
     notes.append(f"表格：bbox 行列聚类还原 {len(tables)} 张方剂/剂量表")
@@ -103,7 +134,8 @@ def run_ocr(image_path: str = "", page_id: Optional[str] = None,
                 notes.append(f"低置信过滤：剔除 {len(low)} 块（阈值 {CONFIG.ocr.min_conf}），"
                              f"已写入人工复核队列 {q}")
 
-        blocks, lay, tables = _postprocess(blocks, pid, notes, is_demo=rec.is_demo)
+        blocks, lay, tables = _postprocess(blocks, pid, notes, is_demo=rec.is_demo,
+                                           image_path=image_path)
         return OCRResult(
             page_id=pid, image_path=image_path, width=width, height=height,
             blocks=blocks, tables=tables, layout=lay,

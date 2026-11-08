@@ -174,10 +174,14 @@ class Dataset:
         }
 
 
-def align_key(rec: Dict[str, Any]) -> Tuple[str, str, str, str]:
-    """字段对齐键 (page_id, type, name, value)，与 extract/evaluate.py 口径一致。"""
-    return (str(rec.get("page_id", "")), str(rec.get("type", "")),
-            str(rec.get("name", "")), str(rec.get("value", "")))
+def align_key(rec: Dict[str, Any], normalized: bool = True) -> Tuple[str, str, str, str]:
+    """字段对齐键 (page_id, type, name, value)，委托 `app.schemas.entity_align_key()`。
+
+    唯一口径：name / value 做「去空白标点 + 异体/繁简映射」的对称归一化；
+    `normalized=False` 仅用于报告「修正前」对照，不参与正式判定。
+    """
+    from app.schemas import entity_align_key
+    return entity_align_key(rec, normalized=normalized)
 
 
 def group_by_page(records: Iterable[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:

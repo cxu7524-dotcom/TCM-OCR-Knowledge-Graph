@@ -128,7 +128,12 @@ def run_all_predictions() -> Dict[str, Any]:
     _jsonl(FILES["entities"], ent_rows)
     _jsonl(FILES["tables"], table_rows)
 
-    # 问答跑批：有依据问题 + 无依据问题，统一在全库真实 OCR 文本块上检索
+    # 问答跑批：有依据问题在**指定页**检索（模拟用户上传某页后提问）；
+    # 无依据问题在全库检索（更严格，避免因只看单页而「轻松拒答」）。
+    blocks_by_page: Dict[str, List[Block]] = {}
+    for b in all_blocks:
+        blocks_by_page.setdefault(b.page_id, []).append(b)
+
     qa_rows: List[Dict[str, Any]] = []
     gold = load_jsonl(GT_DIR / "qa_log_gold.jsonl")
     no_ev = load_jsonl(GT_DIR / "qa_no_evidence.jsonl")
@@ -136,7 +141,9 @@ def run_all_predictions() -> Dict[str, Any]:
         q = str(item.get("question", "")).strip()
         if not q:
             continue
-        ans = qa_answer(q, all_blocks, is_demo=False)
+        want_page = str(item.get("page_id", "") or "")
+        pool = blocks_by_page.get(want_page) or all_blocks
+        ans = qa_answer(q, pool, is_demo=False)
         qa_rows.append({
             "question": q,
             "page_id": item.get("page_id", ""),

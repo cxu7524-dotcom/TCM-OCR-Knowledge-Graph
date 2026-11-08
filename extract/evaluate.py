@@ -25,12 +25,20 @@ from app.schemas import Entity
 AlignKey = Tuple[str, str, str, str]
 
 
-def align_key(e: Entity | Dict[str, Any], ignore_page: bool = False) -> AlignKey:
-    """实体对齐键。预测与 GT 用同一口径。"""
-    get = e.get if isinstance(e, dict) else lambda k, d=None: getattr(e, k, d)
-    page = "" if ignore_page else str(get("page_id", "") or "")
-    return (page, str(get("type", "") or ""), str(get("name", "") or ""),
-            str(get("value", "") or ""))
+def align_key(e: Entity | Dict[str, Any], ignore_page: bool = False,
+              normalized: bool = True) -> AlignKey:
+    """实体对齐键。**唯一实现委托给 app.schemas.entity_align_key()**，禁止另写一份。
+
+    归一化是对称的：GT 与预测走同一函数（去空白标点 + 异体/繁简映射），
+    GT 原文与 quote 不改写，只影响「是否判为同一字段」。
+    """
+    from app.schemas import entity_align_key
+    if isinstance(e, Entity):
+        e = e.to_dict()
+    rec = dict(e) if isinstance(e, dict) else {}
+    if ignore_page:
+        rec["page_id"] = ""
+    return entity_align_key(rec, normalized=normalized)
 
 
 def is_demo_record(records: Iterable[Any]) -> bool:

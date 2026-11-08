@@ -101,14 +101,24 @@ def _fmt(value) -> str:
 def _metric_rows(results: dict) -> str:
     lines = ["| 指标 | 实测值 | 参考阈值 | 达标情况 | 状态 | 输入文件 |",
              "|---|---|---|---|---|---|"]
+    legacy = results.get("field_f1_legacy", {})
     for spec in METRIC_SPECS:
         key = spec["key"]
         r = results.get(key, {})
         th = spec["threshold"]
+        value = _fmt(r.get("value"))
+        if key == "field_f1":
+            value = (f"**{_fmt(r.get('value'))}**（修正后）"
+                     f"<br>{_fmt(legacy.get('value'))}（修正前对照）")
         lines.append(
-            f"| {spec['name']} | {_fmt(r.get('value'))} | "
+            f"| {spec['name']} | {value} | "
             f"{'无' if th is None else f'≥ {th:.2f}'} | {r.get('judge', '待测')} | "
             f"{r.get('status', '待测')} | {'；'.join(spec['needs'])} |")
+    ar = results.get("answer_rate", {})
+    lines.append(
+        f"| 应答题正确作答率（与拒答率配对） | **{_fmt(ar.get('value'))}** | "
+        f"无（配对观察） | {ar.get('judge', '待测')} | {ar.get('status', '待测')} | "
+        f"`data/annotation/qa_log_gold.jsonl` + `data/reports/qa_log.jsonl` |")
     return "\n".join(lines)
 
 
@@ -197,7 +207,7 @@ def build_formal_report(ds: Dataset, results: dict, predict_meta: dict,
 - GT 版本哈希：`{ds.version}`（六类 GT 文件内容 sha256 前 16 位，见 `eval/dataset.py`）
 - GT 目录：`{ds.gt_dir}`
 - 数据来源：`SYN-2026-001` 合成示意集（`tools/make_synthetic_pages.py` 固定种子生成）
-- GT 性质：**机器生成 GT，人工抽检 N 页**（抽检比例与结果见 `data/annotation/标注指南.md`）
+- GT 性质：**机器生成 GT，人工抽检 0 页（待办）**；机器自检 24/24 页通过（见 `data/annotation/标注指南.md` 与 `数据集版本.md`）
 - 页面切分：训练 {check["train_pages"]} 页 / 测试 {check["test_pages"]} 页（按 page_id 哈希，种子 2026）
 - 计分范围：**{"仅测试页" if test_only else "全部页面"}**（测试页 {len(results.get("test_pages", []))} 个）
 - 预测文件条数：{json.dumps(pred_counts, ensure_ascii=False)}
@@ -215,6 +225,15 @@ def build_formal_report(ds: Dataset, results: dict, predict_meta: dict,
 ### 逐项计算明细（分子 / 分母可复核）
 
 {_detail_lines(results)}
+
+### 口径披露（必读）
+
+- **字段 F1 双列**：修正前 = 原值对齐（`name` / `value` 不做字形归一化）；修正后 = 唯一对齐归一化
+  （`app/schemas.py:entity_align_key()` → 去空白标点 + 异体/繁简映射，GT 与预测**对称**调用）。
+  差异仅来自「字形等价判定」，**不是模型能力提升**；GT 原文与 `quote` 一字未改。
+- **可溯源率口径局限**：{results.get("traceability", {}).get("caveat", "")}
+- **拒答率需配对解读**：该指标只统计无依据问题，会掩盖「应答题被误拒」；
+  与之配对的「应答题正确作答率」见主表末行（判定含未拒答、证据命中、页匹配三项）。
 
 ## 二、繁体 / 异体字单列统计（赛题 5 分，不混入总体 CER）
 
@@ -270,7 +289,10 @@ def build_formal_report(ds: Dataset, results: dict, predict_meta: dict,
 """ + "\n".join(
         f"- {s['name']}：{_fmt(results.get(s['key'], {}).get('value'))} "
         f"（{results.get(s['key'], {}).get('judge', '待测')}）"
-        for s in METRIC_SPECS) + f"""
+        for s in METRIC_SPECS) + "\n" + (
+        f"- 应答题正确作答率：{_fmt(results.get('answer_rate', {}).get('value'))}"
+        f"（{results.get('answer_rate', {}).get('judge', '待测')}，与拒答率配对）") + f"""
+
 
 - 命题单位样本：**未到位 / 待测**，本报告不含任何命题样本数字。
 - 免责声明：{CONFIG.disclaimer}；问答仅返回原文摘录，未做推断。

@@ -157,6 +157,109 @@ def restore_tables(blocks: Iterable[Block], page_id: str = "") -> List[TableStru
         return []
 
 
+def fill_missing_cells(image_path: str, blocks: Sequence[Block], page_id: str
+                       ) -> Tuple[List[Block], List[Dict[str, Any]]]:
+    """表格缺失单元格补识别（不依赖任何 GT 坐标）。
+
+    做法：用**已检测到的单元格**聚类出网格（行带 / 列带），对没有检测框的网格位置
+    crop 出图像区域、跳过检测直接走识别模型（`recognize_crop`），识别成功则补一个 Block。
+    只在判定为表格页时生效（平均每行块数 ≥1.8 且行列数均 ≥2）。
+    """
+    try:
+        return _fill_missing_cells(image_path, blocks, page_id)
+    except Exception:
+        # 补格失败只影响表格环节，绝不降级整页 OCR 结果
+        return list(blocks), []
+
+
+def _fill_missing_cells(image_path: str, blocks: Sequence[Block], page_id: str
+                        ) -> Tuple[List[Block], List[Dict[str, Any]]]:
+    items = [b for b in blocks if isinstance(b, Block)]
+    rows = cluster_rows(items)
+    if len(rows) < 2:
+        return list(blocks), []
+    flat = [b for r in rows for b in r]
+    cols = cluster_columns(flat)
+    if len(cols) < 2 or sum(len(r) for r in rows) / len(rows) < 1.8:
+        return list(blocks), []
+    try:
+        from PIL import Image
+        import numpy as np
+        from .recognize import recognize_crop
+    except ImportError:
+        return list(blocks), []
+
+    try:
+        im = Image.open(image_path).convert("RGB")
+    except (OSError, ValueError):
+        return list(blocks), []
+
+    widths = [max(1.0, _box(b)[2] - _box(b)[0]) for b in flat]
+    half = statistics.median(widths) / 2
+    row_bands = [(min(_box(b)[1] for b in r), max(_box(b)[3] for b in r)) for r in rows]
+    col_bands = [(c - half, c + half) for c in cols]
+    added: List[Block] = []
+    trace: List[Dict[str, Any]] = []
+
+    # 每列文本长度中位数：用于识别「只识别出半个词」的低质量单元格
+    col_med_len: Dict[int, float] = {}
+    for ci, (x1, x2) in enumerate(col_bands):
+        lens = [len(b.text) for b in flat
+                if x1 - 4 <= (_box(b)[0] + _box(b)[2]) / 2 <= x2 + 4]
+        col_med_len[ci] = statistics.median(lens) if lens else 0
+
+    for ri, (y1, y2) in enumerate(row_bands):
+        for ci, (x1, x2) in enumerate(col_bands):
+            occupant = None
+            for b in flat:
+                bx1, by1, bx2, by2 = _box(b)
+                cx, cy = (bx1 + bx2) / 2, (by1 + by2) / 2
+                if x1 - 4 <= cx <= x2 + 4 and y1 - 4 <= cy <= y2 + 4:
+                    occupant = b
+                    break
+            if occupant is not None:
+                # 已占用但文本明显偏短（如「芍藥」只识别出「藥」）→ 整格二次识别
+                med = col_med_len.get(ci, 0)
+                if med >= 2 and len(occupant.text) < med * 0.6:
+                    box = (max(0, int(x1)), max(0, int(y1)),
+                           min(im.width, int(x2)), min(im.height, int(y2)))
+                    if box[2] - box[0] >= 10 and box[3] - box[1] >= 10:
+                        crop = im.crop(box)
+                        arr = np.array(crop.resize((crop.width * 2, crop.height * 2),
+                                                   Image.LANCZOS))
+                        text, conf = recognize_crop(arr)
+                        if text and len(text) > len(occupant.text):
+                            trace.append({"page_id": page_id, "row": ri, "col": ci,
+                                          "before": occupant.text, "after": text,
+                                          "conf": conf, "rule": "短文本整格二次识别"})
+                            occupant.text = text
+                            occupant.quote = text
+                            occupant.source_hash = source_hash_of(
+                                "ocr-refill", page_id, occupant.line_id, text)
+                continue
+            box = (max(0, int(x1)), max(0, int(y1)),
+                   min(im.width, int(x2)), min(im.height, int(y2)))
+            if box[2] - box[0] < 10 or box[3] - box[1] < 10:
+                continue
+            crop = im.crop(box)
+            arr = np.array(crop.resize((crop.width * 2, crop.height * 2), Image.LANCZOS))
+            text, conf = recognize_crop(arr)
+            if not text:
+                continue
+            line_id = f"C{len(added) + 1:03d}"
+            added.append(Block(
+                page_id=page_id, bbox=[box[0], box[1], box[2], box[3]],
+                line_id=line_id, quote=text,
+                source_hash=source_hash_of("ocr-fill", page_id, line_id, text),
+                text=text, text_norm=text, kind="table_cell", conf=conf,
+                col_id=ci, reading_order=0, block_ref=f"{page_id}:{line_id}",
+            ))
+            trace.append({"page_id": page_id, "row": ri, "col": ci,
+                          "bbox": list(box), "text": text, "conf": conf,
+                          "rule": "表格补格（无检测框，跳过检测直接识别）"})
+    return list(blocks) + added, trace
+
+
 def structured_cells(table: TableStruct) -> List[Dict[str, Any]]:
     """给前端 / 报告用的结构化单元格：药味 / 剂量值 / 单位 / 炮制（按列位置）。"""
     out: List[Dict[str, Any]] = []

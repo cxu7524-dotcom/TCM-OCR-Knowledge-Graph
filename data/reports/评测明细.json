@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-07 18:54:15",
+  "generated_at": "2026-11-08 19:50:50",
   "notice": "合成示意数据，用于工程自测，非命题单位样本、非官方评测结果",
   "disclaimer": "仅供参考、非诊疗建议",
   "gt_version": "514f99246f103a95",
@@ -30,33 +30,11 @@
   },
   "predict_meta": {
     "predictions_generated": false,
-    "reason": "预测文件齐备，复用（--refresh 可强制重跑）",
-    "environment": {
-      "Python": "3.13.14",
-      "OCR 后端": "rapidocr-onnxruntime（本机 ONNX Runtime，CPU，模型随包分发，无公网调用）",
-      "LLM 后端": "none（本阶段不部署 / 不调用）",
-      "向量通道": "none（占位，未启用）",
-      "已装依赖": [
-        "rapidocr_onnxruntime",
-        "onnxruntime",
-        "PIL",
-        "numpy",
-        "cv2",
-        "fastapi",
-        "uvicorn"
-      ],
-      "未装依赖": [
-        "paddleocr"
-      ],
-      "合成影像": "Pillow 本地渲染 24 页（不进仓库，可复现）",
-      "低置信阈值": 0.35,
-      "检测阈值": "box_thresh=0.3, text_score=0.35",
-      "公网 / 密钥": "无（未读取任何 API Key，未访问任何公网推理服务）"
-    }
+    "reason": "--no-predict：只读已有预测文件"
   },
   "prediction_counts": {
     "ocr": 240,
-    "entities": 142,
+    "entities": 166,
     "tables": 8,
     "qa_log": 67
   },
@@ -64,52 +42,52 @@
     "cer": {
       "key": "cer",
       "status": "实测",
-      "value": 0.1911,
+      "value": 0.089,
       "judge": "无参考阈值",
       "threshold": null,
-      "detail": "总编辑距离 73 / GT 字数 382，覆盖 7 页",
+      "detail": "总编辑距离 34 / GT 字数 382，覆盖 7 页",
       "per_page": {
         "SYN-2026-001__p0004": {
           "gt_chars": 55,
           "pred_chars": 54,
-          "distance": 8,
-          "cer": 0.1455
+          "distance": 4,
+          "cer": 0.0727
         },
         "SYN-2026-001__p0007": {
           "gt_chars": 55,
           "pred_chars": 55,
-          "distance": 6,
-          "cer": 0.1091
+          "distance": 3,
+          "cer": 0.0545
         },
         "SYN-2026-001__p0008": {
           "gt_chars": 56,
           "pred_chars": 54,
-          "distance": 7,
-          "cer": 0.125
+          "distance": 4,
+          "cer": 0.0714
         },
         "SYN-2026-001__p0011": {
           "gt_chars": 49,
-          "pred_chars": 47,
-          "distance": 17,
-          "cer": 0.3469
+          "pred_chars": 48,
+          "distance": 7,
+          "cer": 0.1429
         },
         "SYN-2026-001__p0015": {
           "gt_chars": 49,
-          "pred_chars": 47,
-          "distance": 17,
-          "cer": 0.3469
+          "pred_chars": 48,
+          "distance": 7,
+          "cer": 0.1429
         },
         "SYN-2026-001__p0019": {
           "gt_chars": 59,
           "pred_chars": 57,
-          "distance": 9,
-          "cer": 0.1525
+          "distance": 5,
+          "cer": 0.0847
         },
         "SYN-2026-001__p0021": {
           "gt_chars": 59,
           "pred_chars": 58,
-          "distance": 9,
-          "cer": 0.1525
+          "distance": 4,
+          "cer": 0.0678
         }
       },
       "traditional_subset": {
@@ -122,7 +100,7 @@
           "SYN-2026-001__p0019",
           "SYN-2026-001__p0021"
         ],
-        "cer": 0.1911,
+        "cer": 0.089,
         "note": "繁体页单独统计，未混入总体 CER"
       },
       "variant_subset": {
@@ -133,7 +111,7 @@
           "SYN-2026-001__p0019",
           "SYN-2026-001__p0021"
         ],
-        "cer": 0.1373,
+        "cer": 0.0704,
         "note": "含异体字页单独统计，未混入总体 CER"
       },
       "excluded": {
@@ -146,19 +124,38 @@
     "field_f1": {
       "key": "field_f1",
       "status": "实测",
-      "value": 0.4375,
+      "value": 0.6471,
       "judge": "未达标",
       "threshold": 0.8,
-      "P": 0.4773,
-      "R": 0.4038,
-      "TP": 21,
-      "FP": 23,
-      "FN": 31,
+      "P": 0.66,
+      "R": 0.6346,
+      "TP": 33,
+      "FP": 17,
+      "FN": 19,
       "excluded": {
         "gt": 0,
         "pred": 0
       },
-      "detail": "TP=21 FP=23 FN=31，对齐键 (page_id,type,name,value)"
+      "align_mode": "归一化对齐（正式）",
+      "detail": "TP=33 FP=17 FN=19；对齐键 (page_id,type,name,value)；归一化对齐（正式）"
+    },
+    "field_f1_legacy": {
+      "key": "field_f1",
+      "status": "实测",
+      "value": 0.4314,
+      "judge": "未达标",
+      "threshold": 0.8,
+      "P": 0.44,
+      "R": 0.4231,
+      "TP": 22,
+      "FP": 28,
+      "FN": 30,
+      "excluded": {
+        "gt": 0,
+        "pred": 0
+      },
+      "align_mode": "原值对齐（修正前对照）",
+      "detail": "TP=22 FP=28 FN=30；对齐键 (page_id,type,name,value)；原值对齐（修正前对照）"
     },
     "table_structure": {
       "key": "table_structure",
@@ -168,8 +165,8 @@
       "threshold": 0.8,
       "shape_rate": 1.0,
       "cell_rate": 0.0,
-      "cell_level_accuracy": 0.5556,
-      "cell_correct": 20,
+      "cell_level_accuracy": 0.9444,
+      "cell_correct": 34,
       "cell_total": 36,
       "total_tables": 2,
       "matched_tables": 2,
@@ -192,7 +189,7 @@
         "gt": 0,
         "pred": 0
       },
-      "detail": "结构 2/2、整表单元格全对 0/2、联合 0/2；单元格级正确 20/36（0.5556）"
+      "detail": "结构 2/2、整表单元格全对 0/2、联合 0/2；单元格级正确 34/36（0.9444）"
     },
     "traceability": {
       "key": "traceability",
@@ -200,10 +197,11 @@
       "value": 1.0,
       "judge": "达标",
       "threshold": 0.9,
-      "hit": 106,
-      "total": 106,
-      "usable_answers": 32,
+      "hit": 29,
+      "total": 29,
+      "usable_answers": 29,
       "excluded": 0,
+      "caveat": "构造性口径：qa/generate.py 只输出通过 quote 校验的证据，未通过的证据已转拒答，因此本指标接近闭环自校验；它衡量「输出证据是否可回原文」，不等于「答案是否回答了问题」，须与「应答题正确作答率」配对解读",
       "detail": "quote 回原文 Block.text 命中才计数，校验口径与 qa/generate.py 一致"
     },
     "refusal": {
@@ -399,11 +397,222 @@
       },
       "detail": "正确拒答 35/35（误答 0、未跑批 0）"
     },
+    "answer_rate": {
+      "key": "answer_rate",
+      "threshold": null,
+      "judge": "配对观察",
+      "correct": 29,
+      "wrong": 3,
+      "missing": 0,
+      "total": 32,
+      "details": [
+        {
+          "question": "甘草的性味是什么？",
+          "result": "正确作答",
+          "evidence_count": 1,
+          "refused": false
+        },
+        {
+          "question": "茯苓的性味是什么？",
+          "result": "正确作答",
+          "evidence_count": 1,
+          "refused": false
+        },
+        {
+          "question": "当归的性味是什么？",
+          "result": "正确作答",
+          "evidence_count": 1,
+          "refused": false
+        },
+        {
+          "question": "桂枝的性味是什么？",
+          "result": "正确作答",
+          "evidence_count": 1,
+          "refused": false
+        },
+        {
+          "question": "芍药的性味是什么？",
+          "result": "正确作答",
+          "evidence_count": 1,
+          "refused": false
+        },
+        {
+          "question": "大枣的性味是什么？",
+          "result": "正确作答",
+          "evidence_count": 1,
+          "refused": false
+        },
+        {
+          "question": "生姜的性味是什么？",
+          "result": "正确作答",
+          "evidence_count": 1,
+          "refused": false
+        },
+        {
+          "question": "桔梗的性味是什么？",
+          "result": "正确作答",
+          "evidence_count": 1,
+          "refused": false
+        },
+        {
+          "question": "甘草的性味是什么？",
+          "result": "正确作答",
+          "evidence_count": 1,
+          "refused": false
+        },
+        {
+          "question": "桂枝汤由哪些药材组成？",
+          "result": "正确作答",
+          "evidence_count": 1,
+          "refused": false
+        },
+        {
+          "question": "茯苓的性味是什么？",
+          "result": "未正确作答",
+          "evidence_count": 0,
+          "refused": true
+        },
+        {
+          "question": "桂枝汤由哪些药材组成？",
+          "result": "正确作答",
+          "evidence_count": 1,
+          "refused": false
+        },
+        {
+          "question": "当归的性味是什么？",
+          "result": "未正确作答",
+          "evidence_count": 0,
+          "refused": true
+        },
+        {
+          "question": "桂枝汤由哪些药材组成？",
+          "result": "正确作答",
+          "evidence_count": 1,
+          "refused": false
+        },
+        {
+          "question": "桂枝的性味是什么？",
+          "result": "正确作答",
+          "evidence_count": 1,
+          "refused": false
+        },
+        {
+          "question": "桂枝汤由哪些药材组成？",
+          "result": "正确作答",
+          "evidence_count": 1,
+          "refused": false
+        },
+        {
+          "question": "芍药的性味是什么？",
+          "result": "正确作答",
+          "evidence_count": 1,
+          "refused": false
+        },
+        {
+          "question": "桂枝汤由哪些药材组成？",
+          "result": "正确作答",
+          "evidence_count": 1,
+          "refused": false
+        },
+        {
+          "question": "大枣的性味是什么？",
+          "result": "正确作答",
+          "evidence_count": 1,
+          "refused": false
+        },
+        {
+          "question": "桂枝汤由哪些药材组成？",
+          "result": "正确作答",
+          "evidence_count": 1,
+          "refused": false
+        },
+        {
+          "question": "生姜的性味是什么？",
+          "result": "正确作答",
+          "evidence_count": 1,
+          "refused": false
+        },
+        {
+          "question": "桂枝汤由哪些药材组成？",
+          "result": "正确作答",
+          "evidence_count": 1,
+          "refused": false
+        },
+        {
+          "question": "桔梗的性味是什么？",
+          "result": "未正确作答",
+          "evidence_count": 0,
+          "refused": true
+        },
+        {
+          "question": "桂枝汤由哪些药材组成？",
+          "result": "正确作答",
+          "evidence_count": 1,
+          "refused": false
+        },
+        {
+          "question": "甘草的性味是什么？",
+          "result": "正确作答",
+          "evidence_count": 1,
+          "refused": false
+        },
+        {
+          "question": "茯苓的性味是什么？",
+          "result": "正确作答",
+          "evidence_count": 1,
+          "refused": false
+        },
+        {
+          "question": "当归的性味是什么？",
+          "result": "正确作答",
+          "evidence_count": 1,
+          "refused": false
+        },
+        {
+          "question": "桂枝的性味是什么？",
+          "result": "正确作答",
+          "evidence_count": 1,
+          "refused": false
+        },
+        {
+          "question": "芍药的性味是什么？",
+          "result": "正确作答",
+          "evidence_count": 1,
+          "refused": false
+        },
+        {
+          "question": "大枣的性味是什么？",
+          "result": "正确作答",
+          "evidence_count": 1,
+          "refused": false
+        },
+        {
+          "question": "生姜的性味是什么？",
+          "result": "正确作答",
+          "evidence_count": 1,
+          "refused": false
+        },
+        {
+          "question": "桔梗的性味是什么？",
+          "result": "正确作答",
+          "evidence_count": 1,
+          "refused": false
+        }
+      ],
+      "excluded": {
+        "gt": 0,
+        "log": 0
+      },
+      "caveat": "与「无依据正确拒答率」配对：只看拒答率会掩盖「应答题被误拒」，本指标把误拒与串页计入未正确作答；无赛题给定阈值",
+      "status": "实测",
+      "value": 0.9062,
+      "detail": "正确作答 29/32（未正确 3、未跑批 0）"
+    },
     "variant_hit": {
       "status": "实测",
-      "value": 0.397,
-      "hit": 183,
-      "total": 461,
+      "value": 0.4752,
+      "hit": 259,
+      "total": 545,
       "note": "异体字归一化命中率，单列统计；繁简与异体合并口径"
     },
     "test_only": true,
@@ -418,13 +627,13 @@
     ]
   },
   "trace_audit": {
-    "total": 106,
-    "traced": 106,
+    "total": 29,
+    "traced": 29,
     "partial": 0,
     "miss": 0,
     "no_quote": 0,
-    "whole_quote_hit": 106,
-    "cases": 32,
+    "whole_quote_hit": 29,
+    "cases": 29,
     "audit_ratio": 1.0,
     "whole_hit_rate": 1.0,
     "cross_check": "逐片段完全可溯数与整串 quote 命中数的差异，反映片段切分与整串命中两种口径；compute_traceability 采用整串命中口径",

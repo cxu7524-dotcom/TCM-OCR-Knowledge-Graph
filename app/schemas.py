@@ -352,6 +352,40 @@ def norm_for_match(text: str) -> str:
     return (text or "").translate(table)
 
 
+def align_norm(text: Any) -> str:
+    """**唯一的**对齐归一化函数（GT 与预测必须对称调用，禁止各写一份）。
+
+    顺序：去空白与常见标点（norm_for_match）→ 异体字表映射 → 繁简映射。
+    只用于「判定两个字段是否等价」，不改写 GT 原文、不改写预测输出。
+    口径说明见 data/annotation/标注指南.md 第四节。
+    """
+    base = norm_for_match("" if text is None else str(text))
+    if not base:
+        return ""
+    try:
+        # 延迟导入：ocr.normalize 顶部依赖本模块，函数内导入避免循环
+        from ocr.normalize import normalize_text
+        return normalize_text(base)
+    except Exception:
+        return base
+
+
+def entity_align_key(rec: Any, normalized: bool = True) -> tuple:
+    """字段对齐键的**唯一实现**：`(page_id, type, name, value)`。
+
+    `eval/dataset.py:align_key()` 与 `extract/evaluate.py:align_key()` 都委托到这里，
+    避免口径漂移；`normalized=False` 只用于报告「修正前」对照。
+    """
+    get = rec.get if isinstance(rec, dict) else (lambda k, d=None: getattr(rec, k, d))
+    page = str(get("page_id", "") or "")
+    etype = str(get("type", "") or "")
+    name = str(get("name", "") or "")
+    value = str(get("value", "") or "")
+    if not normalized:
+        return (page, etype, name, value)
+    return (page, align_norm(etype), align_norm(name), align_norm(value))
+
+
 def quote_hits_blocks(quote: str, blocks: Iterable[Block], normalized: bool = True) -> bool:
     """证据摘抄是否能在任一原文块的文本中命中。命中判定不允许模型自由发挥。"""
     q = norm_for_match(quote) if normalized else (quote or "")

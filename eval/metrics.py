@@ -204,8 +204,13 @@ def compute_variant_hit(pred_ocr: List[Dict[str, Any]]) -> Dict[str, Any]:
 
 def compute_field_f1(gt_entities: List[Dict[str, Any]],
                      pred_entities: List[Dict[str, Any]],
-                     pages: Optional[List[str]] = None) -> Dict[str, Any]:
-    """字段级 P/R/F1：按 (page_id,type,name,value) 集合对齐，微平均。"""
+                     pages: Optional[List[str]] = None,
+                     normalized: bool = True) -> Dict[str, Any]:
+    """字段级 P/R/F1：按 (page_id,type,name,value) 集合对齐，微平均。
+
+    normalized=True 走唯一对齐归一化（去空白标点 + 异体/繁简映射，GT 与预测对称）；
+    normalized=False 仅用于报告「修正前」对照，不作为正式结论。
+    """
     gold, ex1 = clean_records(gt_entities)
     pred, ex2 = clean_records(pred_entities)
     if pages is not None:
@@ -216,14 +221,17 @@ def compute_field_f1(gt_entities: List[Dict[str, Any]],
         return _result("field_f1", None, reason="缺 GT 或预测实体（无有效样本）",
                        excluded={"gt": ex1, "pred": ex2},
                        gt_count=len(gold), pred_count=len(pred))
-    g, p = set(map(align_key, gold)), set(map(align_key, pred))
+    g = {align_key(r, normalized=normalized) for r in gold}
+    p = {align_key(r, normalized=normalized) for r in pred}
     tp, fp, fn = len(g & p), len(p - g), len(g - p)
     precision = tp / (tp + fp) if tp + fp else 0.0
     recall = tp / (tp + fn) if tp + fn else 0.0
     f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+    mode = "归一化对齐（正式）" if normalized else "原值对齐（修正前对照）"
     return _result("field_f1", round(f1, 4), P=round(precision, 4), R=round(recall, 4),
                    TP=tp, FP=fp, FN=fn, excluded={"gt": ex1, "pred": ex2},
-                   detail=f"TP={tp} FP={fp} FN={fn}，对齐键 (page_id,type,name,value)")
+                   align_mode=mode,
+                   detail=f"TP={tp} FP={fp} FN={fn}；对齐键 (page_id,type,name,value)；{mode}")
 
 
 def _table_shape(t: Dict[str, Any]) -> List[int]:
@@ -317,6 +325,10 @@ def compute_traceability(qa_logs: List[Dict[str, Any]],
                        excluded=ex, usable_answers=len(usable))
     return _result("traceability", round(hit / total, 4), hit=hit, total=total,
                    usable_answers=len(usable), excluded=ex,
+                   caveat=("构造性口径：qa/generate.py 只输出通过 quote 校验的证据，"
+                           "未通过的证据已转拒答，因此本指标接近闭环自校验；"
+                           "它衡量「输出证据是否可回原文」，不等于「答案是否回答了问题」，"
+                           "须与「应答题正确作答率」配对解读"),
                    detail="quote 回原文 Block.text 命中才计数，校验口径与 qa/generate.py 一致")
 
 
@@ -353,19 +365,78 @@ def compute_refusal(qa_no_evidence: List[Dict[str, Any]],
                    detail=f"正确拒答 {correct}/{denom}（误答 {wrong}、未跑批 {missing}）")
 
 
+def compute_answer_rate(qa_gold: List[Dict[str, Any]],
+                        qa_logs: List[Dict[str, Any]],
+                        blocks_by_page: Dict[str, List[Any]]) -> Dict[str, Any]:
+    """应答题正确作答率（与拒答率配对）。
+
+    判定「正确作答」需同时满足：
+      ① 未拒答；② 至少 1 条证据；③ 全部证据 quote 回原文命中；
+      ④ 若 GT 指定了 page_id，至少 1 条证据来自该页（防串页）。
+    未跑批计入分母，不美化。本指标**无赛题给定阈值**，只与拒答率配对观察。
+    """
+    gold, ex1 = clean_records(qa_gold, need_provenance=False)
+    logs, ex2 = clean_records(qa_logs, need_provenance=False)
+    # 复合键 (question, page_id)：同一问题会在多页出现（同一主题 3 页），单键会串页
+    by_key = {(str(r.get("question", "")).strip(), str(r.get("page_id", "") or "")): r
+              for r in logs if r.get("question")}
+    correct = wrong = missing = 0
+    details = []
+    for g in gold:
+        if g.get("expected_refused") is True:
+            continue
+        q = str(g.get("question", "")).strip()
+        if not q:
+            continue
+        rec = by_key.get((q, str(g.get("page_id", "") or "")))
+        if rec is None:
+            missing += 1
+            details.append({"question": q, "result": "未跑批"})
+            continue
+        evs = [e for e in (rec.get("evidences") or []) if isinstance(e, dict)]
+        ok = bool(evs) and not rec.get("refused")
+        if ok:
+            for e in evs:
+                pool = blocks_by_page.get(str(e.get("page_id", "")), [])
+                if not quote_hits_blocks(str(e.get("quote", "")), pool):
+                    ok = False
+                    break
+        want_page = str(g.get("page_id", "") or "")
+        if ok and want_page:
+            ok = any(str(e.get("page_id", "")) == want_page for e in evs)
+        correct += int(ok)
+        wrong += int(not ok)
+        details.append({"question": q, "result": "正确作答" if ok else "未正确作答",
+                        "evidence_count": len(evs), "refused": bool(rec.get("refused"))})
+    denom = correct + wrong + missing
+    base = {"key": "answer_rate", "threshold": None, "judge": "配对观察",
+            "correct": correct, "wrong": wrong, "missing": missing, "total": denom,
+            "details": details, "excluded": {"gt": ex1, "log": ex2},
+            "caveat": ("与「无依据正确拒答率」配对：只看拒答率会掩盖「应答题被误拒」，"
+                       "本指标把误拒与串页计入未正确作答；无赛题给定阈值")}
+    if denom == 0:
+        return {**base, "status": "待测", "value": None, "reason": "应答题集为空或未跑批"}
+    return {**base, "status": "实测", "value": round(correct / denom, 4),
+            "detail": f"正确作答 {correct}/{denom}（未正确 {wrong}、未跑批 {missing}）"}
+
+
 def compute_all(ds, predictions: Dict[str, List[Dict[str, Any]]],
                 blocks_by_page: Dict[str, List[Any]],
                 test_only: bool = True) -> Dict[str, Any]:
-    """五项一次性算出，返回可直接写入报告的字典。"""
+    """五项 + 应答题作答率一次性算出，返回可直接写入报告的字典。"""
     pages = ds.test_pages if test_only else None
     qa_logs = predictions.get("qa_log", [])
     return {
         "cer": compute_cer(ds.ocr_gt, predictions.get("ocr", []), pages),
-        "field_f1": compute_field_f1(ds.ent_gt, predictions.get("entities", []), pages),
+        "field_f1": compute_field_f1(ds.ent_gt, predictions.get("entities", []), pages,
+                                     normalized=True),
+        "field_f1_legacy": compute_field_f1(ds.ent_gt, predictions.get("entities", []),
+                                            pages, normalized=False),
         "table_structure": compute_table_structure(ds.table_gt,
                                                    predictions.get("tables", []), pages),
         "traceability": compute_traceability(qa_logs, blocks_by_page),
         "refusal": compute_refusal(ds.qa_no_evidence, qa_logs),
+        "answer_rate": compute_answer_rate(ds.qa_gold, qa_logs, blocks_by_page),
         "variant_hit": compute_variant_hit(predictions.get("ocr", [])),
         "test_only": test_only,
         "test_pages": list(pages or []),

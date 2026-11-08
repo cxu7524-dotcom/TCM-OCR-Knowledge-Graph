@@ -171,6 +171,26 @@ class PaddleOcrAdapter(RapidOcrAdapter):
         return "未实现 infer()；可选后端，接入前请勿用于评测。"
 
 
+def recognize_crop(image_array: Any, min_conf: float = 0.15) -> Tuple[str, float]:
+    """对单张裁剪图直接走识别模型（跳过检测），用于表格缺失单元格补识别。
+
+    输入：numpy 数组（PIL Image 转来即可）
+    输出：(text, conf)；识别为空或低于阈值返回 ("", 0.0)，不抛异常。
+    注意：该路径**不使用任何 GT 坐标**，网格位置由检测框聚类推断。
+    """
+    try:
+        engine = _engine()
+        res, _ = engine.text_recognizer([image_array])
+        if res:
+            text, score = res[0]
+            text, score = str(text).strip(), float(score)
+            if text and score >= min_conf:
+                return text, round(score, 4)
+    except Exception:
+        return "", 0.0
+    return "", 0.0
+
+
 def _box_to_bbox(box: Any) -> List[int]:
     """四点框 → [x1,y1,x2,y2] 外接矩形（坐标可直接回原图叠加）。"""
     try:
