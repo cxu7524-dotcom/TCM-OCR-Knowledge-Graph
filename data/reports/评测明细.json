@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-09 20:52:28",
+  "generated_at": "2026-11-09 21:09:47",
   "notice": "合成示意数据，用于工程自测，非命题单位样本、非官方评测结果",
   "disclaimer": "仅供参考、非诊疗建议",
   "gt_version": "514f99246f103a95",
@@ -61,7 +61,7 @@
       "检测阈值": "box_thresh=0.3, text_score=0.35",
       "公网 / 密钥": "无（未读取任何 API Key，未访问任何公网推理服务）"
     },
-    "generated_at": "2026-11-09 20:52:28",
+    "generated_at": "2026-11-09 21:09:47",
     "reason": ""
   },
   "prediction_counts": {
