@@ -113,6 +113,15 @@ class OcrConfig:
     # margin=1.00 时改判 3 页，验证集中位不变、均值略降，但医家类有一页从 0.302 劣化到 0.449。
     # 结论：当前复合分不足以承担改判，默认保留 2% 余量，宁可不用也不劣化。
     pick_margin: float = _env_float("OCR_PICK_MARGIN", 1.02)
+    # 阶段七 P0：版面方向判据（全部只用「检测框几何 / 图像墨迹」无监督特征，不读 GT / CER）
+    #   old —— 与阶段六完全一致：竖长条框占比 ≥0.30 且投影列数 ≥3
+    #   new —— 追加两条对 det 碎片鲁棒的信号：图像层规则竖列、密集页的投影列规则性
+    dir_rule: str = _env("OCR_DIR_RULE", "new")
+    dir_min_img_cols: int = _env_int("OCR_DIR_MIN_IMG_COLS", 5)
+    dir_min_img_aspect: float = _env_float("OCR_DIR_MIN_IMG_ASPECT", 3.0)
+    dir_min_boxes: int = _env_int("OCR_DIR_MIN_BOXES", 20)
+    dir_min_cols: int = _env_int("OCR_DIR_MIN_COLS", 8)
+    dir_max_gap_cv: float = _env_float("OCR_DIR_MAX_GAP_CV", 0.5)
     col_min_w: int = _env_int("OCR_COL_MIN_W", 12)
     col_gap_ratio: float = _env_float("OCR_COL_GAP_RATIO", 0.02)
     rotate: int = _env_int("OCR_ROTATE", 90)     # 90=逆时针（实测有效），270=顺时针

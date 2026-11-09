@@ -152,6 +152,15 @@ class TestSplitSpread(unittest.TestCase):
                         h=300, w=400)
         self.assertEqual(vertical.split_spread(img), [(0, 400)])
 
+    def test_spine_line_allows_illustration_half(self):
+        """阶段七 P2：中缝竖线证据强时，右半页只有 1 列（插图/目录）也要切。"""
+        img = make_page([(30, 40, 260, 25), (70, 40, 260, 25), (110, 40, 260, 25),
+                         (300, 40, 260, 25)], h=300, w=400)
+        cv2.rectangle(img, (198, 0), (201, 299), (20, 20, 20), -1)  # 贯穿全页的中缝竖线
+        halves = vertical.split_spread(img)
+        self.assertEqual(len(halves), 2, halves)
+        self.assertGreater(halves[0][0], halves[1][1])
+
     def test_empty_image(self):
         self.assertEqual(vertical.split_spread(np.zeros((0, 0, 3), np.uint8)), [])
 

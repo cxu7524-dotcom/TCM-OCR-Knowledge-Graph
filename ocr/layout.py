@@ -20,6 +20,7 @@ from __future__ import annotations
 import statistics
 from typing import Any, Dict, Iterable, List, Sequence, Tuple
 
+from app.config import CONFIG
 from app.schemas import Block, LayoutResult, source_hash_of
 
 VERTICAL_ASPECT = 1.5          # 竖长条框判定：h / w >= 1.5
@@ -83,6 +84,47 @@ def project_columns(blocks: Sequence[Block],
     return cols
 
 
+def _stable_columns(items: Sequence[Block],
+                    gap_ratio: float = COL_GAP_RATIO) -> List[Dict[str, Any]]:
+    """阶段七 P1 的**对照实现**：稳定的列聚类，返回与 `project_columns()` 相同结构。
+
+    注意：这是 A/B 用过的候选方案，实测在 4 页上把阅读顺序改坏（严格 CER 变差、
+    顺序无关 CER 不变），**主链路已回退到 `project_columns()`**；本函数保留供回归对照，
+    不在 `analyze_layout()` 中调用。
+
+    与旧实现的差别：旧实现把列中心更新为「成员均值」，密集页上会随扫描逐步向左漂移，
+    把相邻两列串成一列。这里用**最右成员的中心作固定锚**，并限制单列最大横向跨度，
+    避免链式合并；最后按列中心从右向左编号 col_id。
+    """
+    if not items:
+        return []
+    boxes = [_box(b) for b in items]
+    widths = [max(1.0, x2 - x1) for x1, _, x2, _ in boxes]
+    threshold = max(12.0, _median(widths, 40.0) * gap_ratio)
+    max_span = 1.5 * threshold
+    order = sorted(range(len(items)),
+                   key=lambda i: -((boxes[i][0] + boxes[i][2]) / 2))
+    cols: List[Dict[str, Any]] = []
+    for idx in order:
+        cx = (boxes[idx][0] + boxes[idx][2]) / 2
+        if cols and 0 <= (cols[-1]["anchor"] - cx) <= max_span:
+            cols[-1]["members"].append(idx)
+        else:
+            cols.append({"anchor": cx, "center": cx, "members": [idx]})
+    cols.sort(key=lambda c: -c["anchor"])
+    for i, c in enumerate(cols):
+        c["col_id"] = i
+        c["center"] = c["anchor"]
+        xs1 = [boxes[m][0] for m in c["members"]]
+        xs2 = [boxes[m][2] for m in c["members"]]
+        hs = [max(1.0, boxes[m][3] - boxes[m][1]) for m in c["members"]]
+        c["x1"], c["x2"] = min(xs1), max(xs2)
+        c["aspect_median"] = round(_median(hs, 40.0) /
+                                   max(1.0, _median([boxes[m][2] - boxes[m][0]
+                                                     for m in c["members"]], 40.0)), 3)
+    return cols
+
+
 def group_columns(blocks: Iterable[Block]) -> List[Dict[str, Any]]:
     """阶段一兼容接口：按 col_id 分组给出每列范围。"""
     groups: Dict[int, List[Block]] = {}
@@ -99,8 +141,78 @@ def group_columns(blocks: Iterable[Block]) -> List[Dict[str, Any]]:
     return out
 
 
-def detect_direction_detail(blocks: Sequence[Block]) -> Dict[str, Any]:
-    """可解释的方向判别：竖长条框占比 + 列数 + 页眉数。"""
+def _structure_signals(items: Sequence[Block]) -> Dict[str, Any]:
+    """阶段七新增：对 det 碎片鲁棒的无监督结构信号（只用 bbox，不读 GT / CER）。
+
+    - aspect_median：框高宽比**中位数**。碎片再多，中位数不会被「宽扁框占比」稀释。
+    - col_gap_cv  ：投影列中心间距的变异系数，越小越像等距竖列（古籍界行）。
+    - box_count / columns：密集页的规模。
+    """
+    if not items:
+        return {"aspect_median": 0.0, "col_gap_cv": 1.0,
+                "box_count": 0, "columns": 0, "text_len_cv": 1.0}
+    boxes = [_box(b) for b in items]
+    aspects = [max(1.0, y2 - y1) / max(1.0, x2 - x1) for x1, y1, x2, y2 in boxes]
+    cols = project_columns(items)
+    centers = [c["center"] for c in cols]           # 已从右向左排好
+    gaps = [centers[i] - centers[i + 1] for i in range(len(centers) - 1) if centers[i] > centers[i + 1]]
+    if gaps and statistics.mean(gaps) > 0:
+        gap_cv = statistics.pstdev(gaps) / statistics.mean(gaps)
+    else:
+        gap_cv = 1.0
+    lens = [len(b.text or "") for b in items]
+    len_cv = (statistics.pstdev(lens) / statistics.mean(lens)
+              if lens and statistics.mean(lens) > 0 else 1.0)
+    return {
+        "aspect_median": round(float(statistics.median(aspects)), 3),
+        "col_gap_cv": round(float(gap_cv), 3),
+        "box_count": len(items),
+        "columns": len(cols),
+        "text_len_cv": round(float(len_cv), 3),
+    }
+
+
+def _image_column_signal(image_path: str) -> Dict[str, Any]:
+    """阶段七新增：图像墨迹层的竖列证据（完全绕开 det 框）。
+
+    `ocr/vertical.py:page_layout()` 用二值化 + 垂直投影直接找物理竖列，
+    不受「det 把竖列切成 60~90 个水平碎片」影响。无图像路径时返回全 0。
+    """
+    out = {"img_columns": 0, "img_col_aspect_median": 0.0, "img_vertical": False}
+    if not image_path:
+        return out
+    try:
+        from .vertical import page_layout
+        cols = page_layout(image_path)["cols"]
+        if not cols:
+            return out
+        aspects = [max(1.0, c["bbox"][3] - c["bbox"][1]) /
+                   max(1.0, c["bbox"][2] - c["bbox"][0]) for c in cols]
+        med = float(statistics.median(aspects))
+        out.update({
+            "img_columns": len(cols),
+            "img_col_aspect_median": round(med, 3),
+            "img_vertical": (len(cols) >= CONFIG.ocr.dir_min_img_cols
+                             and med >= CONFIG.ocr.dir_min_img_aspect),
+        })
+    except Exception:
+        pass                                   # 图像不可读时按「无证据」处理，不抛异常
+    return out
+
+
+def detect_direction_detail(blocks: Sequence[Block],
+                            image_path: str = "") -> Dict[str, Any]:
+    """可解释的方向判别（阶段七 P0）。
+
+    `TCM_OCR_DIR_RULE=old` 时与阶段六**完全一致**：竖长条框占比 ≥0.30 且投影列数 ≥3。
+    `=new`（默认）时追加两条对 det 碎片鲁棒的无监督信号，任一命中即判竖排：
+
+      ① 图像墨迹层检出 ≥5 条规则竖列（列高宽比中位 ≥3）——物理证据，最强；
+      ② 密集页（≥20 框）投影出 ≥8 列且列间距变异系数 ≤0.5 —— 等距界行结构。
+
+    所有阈值来自 `app/config.py` 的 `TCM_OCR_DIR_*`，只依据检测框 / 图像几何，
+    **不读 GT、不读 CER、不读标注坐标**。返回字段保留阶段六全部键，追加新信号明细。
+    """
     items = [b for b in blocks if isinstance(b, Block)]
     if not items:
         return {"direction": "horizontal-ltr", "vertical_ratio": 0.0, "columns": 0,
@@ -115,7 +227,29 @@ def detect_direction_detail(blocks: Sequence[Block]) -> Dict[str, Any]:
             headers += 1
     ratio = vertical / len(items)
     cols = len(project_columns(items))
-    direction = "vertical-rtl" if (ratio >= 0.30 and cols >= 3) else "horizontal-ltr"
+    old_ok = (ratio >= 0.30 and cols >= 3)
+    rule = (CONFIG.ocr.dir_rule or "old").strip().lower()
+
+    struct = _structure_signals(items)
+    img = _image_column_signal(image_path) if rule == "new" else {
+        "img_columns": 0, "img_col_aspect_median": 0.0, "img_vertical": False}
+    dense_ok = (struct["box_count"] >= CONFIG.ocr.dir_min_boxes
+                and struct["columns"] >= CONFIG.ocr.dir_min_cols
+                and struct["col_gap_cv"] <= CONFIG.ocr.dir_max_gap_cv)
+    if rule == "new":
+        direction = "vertical-rtl" if (old_ok or img["img_vertical"] or dense_ok) else "horizontal-ltr"
+    else:
+        direction = "vertical-rtl" if old_ok else "horizontal-ltr"
+
+    hits = []
+    if old_ok:
+        hits.append("旧判据(竖长条框占比)")
+    if img["img_vertical"]:
+        hits.append(f"图像层竖列({img['img_columns']}列/高宽比{img['img_col_aspect_median']})")
+    if dense_ok:
+        hits.append(f"密集规则列({struct['columns']}列/gap_cv={struct['col_gap_cv']})")
+    reason = (f"竖长条框 {vertical}/{len(items)}（{ratio:.2%}），检测到 {cols} 列；"
+              f"rule={rule}，命中[{'、'.join(hits) or '无'}]→{direction}")
     return {
         "direction": direction,
         "vertical_ratio": round(ratio, 4),
@@ -125,9 +259,24 @@ def detect_direction_detail(blocks: Sequence[Block]) -> Dict[str, Any]:
         "headers": headers,
         "thresholds": {"vertical_aspect": VERTICAL_ASPECT,
                        "min_vertical_ratio": 0.30, "min_columns": 3,
-                       "header_aspect": HEADER_ASPECT},
-        "reason": (f"竖长条框 {vertical}/{len(items)}（{ratio:.2%}），检测到 {cols} 列；"
-                   f"占比≥0.30 且列数≥3 判为竖排从右向左，否则横排"),
+                       "header_aspect": HEADER_ASPECT,
+                       "dir_rule": rule,
+                       "min_img_cols": CONFIG.ocr.dir_min_img_cols,
+                       "min_img_aspect": CONFIG.ocr.dir_min_img_aspect,
+                       "min_boxes": CONFIG.ocr.dir_min_boxes,
+                       "min_cols": CONFIG.ocr.dir_min_cols,
+                       "max_gap_cv": CONFIG.ocr.dir_max_gap_cv},
+        # 阶段七追加字段（旧报告读不到也不影响，新报告可逐页复核）
+        "rule": rule,
+        "aspect_median": struct["aspect_median"],
+        "col_gap_cv": struct["col_gap_cv"],
+        "text_len_cv": struct["text_len_cv"],
+        "box_count": struct["box_count"],
+        "img_columns": img["img_columns"],
+        "img_col_aspect_median": img["img_col_aspect_median"],
+        "img_vertical": img["img_vertical"],
+        "dense_regular": dense_ok,
+        "reason": reason,
     }
 
 
@@ -210,16 +359,16 @@ def _merge_group(items: List[Block], boxes: List[Tuple[float, ...]],
 
 def analyze_layout(blocks: Iterable[Block], page_id: str = "",
                    direction: str | None = None, is_demo: bool = True,
-                   merge: bool = True) -> Tuple[List[Block], LayoutResult]:
-    """版面分析入口（阶段二）。
+                   merge: bool = True, image_path: str = "") -> Tuple[List[Block], LayoutResult]:
+    """版面分析入口（阶段二；阶段七增 `image_path` 与稳定列聚类）。
 
-    输入：OCR 识别出的 Block 列表（真实 bbox）
+    输入：OCR 识别出的 Block 列表（真实 bbox），可选图像路径（用于图像层竖列证据）
     输出：(处理后的 Block 列表, LayoutResult)
     异常：内部兜底，返回结构完整的结果，不抛异常。
     """
     items = [b for b in blocks if isinstance(b, Block)]
     try:
-        detail = detect_direction_detail(items)
+        detail = detect_direction_detail(items, image_path=image_path)
         direct = direction or detail["direction"]
 
         # 若上游（ocr/vertical.py）已给出列结构，直接消费，不重复聚类、不再合并碎片
@@ -237,6 +386,11 @@ def analyze_layout(blocks: Iterable[Block], page_id: str = "",
             )
             return items, lay
 
+        # 阶段七 P1 竖列重组：`project_columns()` 按列中心 x 从右向左分配 col_id，
+        # `merge_fragments()` 合并同列相邻碎片（quote 按 y 顺序拼接、bbox 取并集、conf 取最小），
+        # `assign_reading_order()` 在 vertical-rtl 分支按 (col_id, y, x) 排序。
+        # 曾试过「固定锚点不漂移」的 `_stable_columns()`，A/B 显示它在 4 页上把阅读顺序
+        # 明显改坏（严格 CER 变差而顺序无关 CER 不变），已回退；函数保留供回归对照。
         cols = project_columns(items)
         col_of = {}
         for c in cols:

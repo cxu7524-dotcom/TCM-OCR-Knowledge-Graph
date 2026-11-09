@@ -50,10 +50,20 @@ VALIDATION_BOOKS = {"兵鏡", "杜甫-杜工部集", "兵法集要", "晏子春�
 
 
 def load_manual_cols() -> Dict[str, int]:
-    """人工数列数（抽样页）。文件不存在时返回空 dict，列数准确率记「待测」。"""
+    """人工数列数（抽样页）。文件不存在时返回空 dict，列数准确率记「待测」。
+
+    阶段七 P4 修掉一个测量 bug：键若只是裸文件名 `page_10.png`，在「医家类/<书名>/page_N.png」
+    子目录布局下会和通用古籍集的同名页**串页**——阶段六的 2/6 就是这么来的。
+    因此只接受带书名的键（或带 / 的相对路径），裸文件名一律忽略。
+    """
+    import re as _re
     try:
         data = json.loads(MANUAL_COLS.read_text(encoding="utf-8"))
-        return {k: int(v) for k, v in (data.get("columns") or {}).items()}
+        out = {}
+        for k, v in (data.get("columns") or {}).items():
+            if "/" in k or not _re.fullmatch(r"page_\d+\.(?:png|jpg)", str(k), _re.I):
+                out[k] = int(v)
+        return out
     except (OSError, json.JSONDecodeError, ValueError, AttributeError):
         return {}
 

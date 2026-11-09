@@ -242,8 +242,9 @@ def split_spread(img: np.ndarray) -> List[Tuple[int, int]]:
     raw, clean, _ = _profiles(img)
     total_mass = float(clean.sum()) or 1.0
     for score, a, b, why in sorted(_gutter_candidates(img), key=lambda t: -t[0]):
-        # 竖线型候选本身就是一条细线（2~8px），宽度下限按证据类型区分
-        min_w = 2 if why == "中缝竖线" else max(8, int(0.02 * w))
+        # 竖线型候选本身就是一条细线（1~8px），宽度下限按证据类型区分。
+        # 实测有页的中缝线只有 1px 宽（合併 page_12），下限设 2 会把它整条丢掉。
+        min_w = 1 if why == "中缝竖线" else max(8, int(0.02 * w))
         if b - a < min_w or a < 10 or b > w - 10:
             continue
         if abs(a - (w - b)) > 0.2 * w:            # 两半宽度差过大 → 不像对开页
@@ -253,7 +254,12 @@ def split_spread(img: np.ndarray) -> List[Tuple[int, int]]:
         if why != "中缝竖线":
             if min(float(clean[:a].sum()), float(clean[b:].sum())) / total_mass < 0.15:
                 continue
-        if len(split_columns(img[:, :a])) < 3 or len(split_columns(img[:, b:])) < 3:
+        # 阶段七 P2：中缝竖线是「左右两个独立版框」的直接物理证据，
+        # 此时放宽列数安全阀到「每半 ≥1 列」——医书对开页的右半常是目录/插图，
+        # 只能切出 1~2 列（阶段六 3/6 误判即由此而来）。其他证据仍要求 ≥3 列。
+        min_half_cols = 1 if why == "中缝竖线" else 3
+        if (len(split_columns(img[:, :a])) < min_half_cols
+                or len(split_columns(img[:, b:])) < min_half_cols):
             continue
         # 右半页先读（古籍从右往左翻）
         return [(b, w), (0, a)]

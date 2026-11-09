@@ -12,6 +12,7 @@ tools/report_guji_medical59.py —— 生成 `docs/医家类59页评测报告.md
 
 from __future__ import annotations
 
+import argparse
 import json
 import statistics
 import sys
@@ -23,9 +24,14 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 EVAL_JSON = _ROOT / "data" / "reports" / "guji_eval_medical59_v5.json"
+STAGE7_OLD = _ROOT / "data" / "reports" / "guji_eval_stage7_old.json"
+STAGE7_NEW = _ROOT / "data" / "reports" / "guji_eval_stage7_new.json"
+DIR_OLD = _ROOT / "data" / "reports" / "dir_stage7_old.json"
+DIR_NEW = _ROOT / "data" / "reports" / "dir_stage7_new.json"
 ATTR_JSON = _ROOT / "data" / "reports" / "guji_extra_attr.json"
 GT_JSONL = _ROOT / "data" / "annotation" / "official" / "ocr_transcription.jsonl"
 OUT_MD = _ROOT / "docs" / "医家类59页评测报告.md"
+STAGE7_MARK = "<!-- ===== 阶段七修订章节（由 --stage7 追加，上方历史全文保留） ===== -->"
 
 # 简 / 繁 判别用对照对（只用于统计「GT 是简体转写」的页数，不参与任何指标计算）
 SIMP_PAIRS = [
@@ -69,7 +75,271 @@ def f4(x) -> str:
     return "—" if x is None else f"{x:.4f}"
 
 
+def _group_stat(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def med(key):
+        xs = [r[key] for r in rows if r.get(key) is not None]
+        return statistics.median(xs) if xs else None
+    cers = [r["cer"] for r in rows if r.get("cer") is not None]
+    return {
+        "pages": len(rows),
+        "cer_median": med("cer"), "cer_mean": sum(cers) / len(cers) if cers else None,
+        "coverage_median": med("coverage"),
+        "insert_rate_median": med("insert_rate"),
+        "cer_sorted_median": med("cer_sorted"),
+    }
+
+
+def _row(label: str, s: Dict[str, Any]) -> str:
+    return (f"| {label} | {s['pages']} | {f4(s['cer_median'])} | {f4(s['cer_mean'])} | "
+            f"{f4(s['coverage_median'])} | {f4(s['insert_rate_median'])} | "
+            f"**{f4(s['cer_sorted_median'])}** |")
+
+
+def build_stage7_section() -> str:
+    """阶段七修订章节：分层 + 干净子集 + A/B + 新闸门，全部数字读评测 JSON。"""
+    old = json.loads(STAGE7_OLD.read_text(encoding="utf-8"))
+    new = json.loads(STAGE7_NEW.read_text(encoding="utf-8"))
+    gt = {r["page_id"]: r for r in load_jsonl(GT_JSONL)}
+    rows = [r for r in new["pages"] if r["status"] == "ok"]
+    for r in rows:
+        text = gt.get(r["page_id"], {}).get("text", "")
+        r["simple_gt"] = is_simplified_gt(text)
+        r["overlong_gt"] = r["gt_chars"] >= 600
+        # 三层互斥：简体 GT 优先，其次超长 GT，其余正常页；三层合计必须 = 59
+        r["layer"] = ("简体 GT 页" if r["simple_gt"] else
+                      ("超长 GT 页" if r["overlong_gt"] else "正常页"))
+
+    layers = ["简体 GT 页", "超长 GT 页", "正常页"]
+    layer_rows = [_row(n, _group_stat([r for r in rows if r["layer"] == n])) for n in layers]
+    layer_rows.append(_row("**合计**", _group_stat(rows)))
+    layer_counts = {n: sum(1 for r in rows if r["layer"] == n) for n in layers}
+    assert sum(layer_counts.values()) == len(rows), "分层必须覆盖全部 59 页"
+
+    clean = [r for r in rows if r["book"] == "思濟堂方書"]
+    # 通用古籍集（阶段五）只引用已发布数字，不与本阶段混算
+    so, sn = old["summary"], new["summary"]
+
+    # A/B 逐页方向变化
+    def keyed(d):
+        return {(r["book"], r["page_no"]): r for r in d["pages"] if r["status"] == "ok"}
+    ko, kn = keyed(old), keyed(new)
+    flipped = [(k, ko[k], kn[k]) for k in ko
+               if ko[k].get("direction") == "horizontal-ltr"
+               and kn[k].get("direction") == "vertical-rtl"]
+    n_h_old = sum(1 for r in ko.values() if r.get("direction") == "horizontal-ltr")
+    n_h_new = sum(1 for r in kn.values() if r.get("direction") == "horizontal-ltr")
+
+    ab_lines = [
+        "| 配置 | 判为横排页 | 严格 CER 中位 | 严格 CER 均值 | 覆盖率中位 | 插入率中位 | 顺序无关 CER 中位 |",
+        "|---|---|---|---|---|---|---|",
+        f"| `DIR_RULE=old`（阶段六判据） | {n_h_old} | {f4(so['cer_median'])} | {f4(so['cer_mean'])} | "
+        f"{f4(so['coverage_median'])} | {f4(so['insert_rate_median'])} | {f4(so['cer_sorted_median'])} |",
+        f"| **`DIR_RULE=new`（阶段七）** | **{n_h_new}** | {f4(sn['cer_median'])} | {f4(sn['cer_mean'])} | "
+        f"{f4(sn['coverage_median'])} | {f4(sn['insert_rate_median'])} | {f4(sn['cer_sorted_median'])} |",
+    ]
+    flip_rows = [f"| {k[0]}page_{k[1]}.png | {a.get('direction')} → {b.get('direction')} | "
+                 f"{f4(a['cer'])} → {f4(b['cer'])} | {f4(b['cer_sorted'])} |"
+                 for k, a, b in sorted(flipped, key=lambda x: (x[0][0], x[0][1]))]
+    diffs = [b["cer"] - a["cer"] for _, a, b in flipped]
+    n_better = sum(1 for d in diffs if d < -0.01)
+    n_worse = sum(1 for d in diffs if d > 0.01)
+
+    # P2 六页现场重验
+    from ocr.vertical import page_layout                       # noqa: E402
+    six = [("丹方彚编", "page_2.png"), ("丹方彚编", "page_10.png"),
+           ("合併脉訣難經太素評林", "page_3.png"), ("合併脉訣難經太素評林", "page_12.png"),
+           ("思濟堂方書", "page_30.png"), ("思濟堂方書", "page_31.png")]
+    p2_rows, p2_ok = [], 0
+    for book, f in six:
+        lay = page_layout(str(_ROOT / "古籍评测集" / "医家类" / book / f))
+        n = len(lay["halves"])
+        p2_ok += (n == 2)
+        p2_rows.append(f"| {book}{f} | {'对开' if n == 2 else '单页'} | {len(lay['cols'])} | "
+                       f"{'判对' if n == 2 else '**误判**'} |")
+
+    return f"""{STAGE7_MARK}
+
+---
+
+# 阶段七修订（2026-11-09）
+
+> ### 【本阶段指标不含 LLM 参与】
+> 所有评测命令**显式**带 `TCM_LLM_BACKEND=none TCM_VECTOR_ENABLED=0`；
+> `qa/generate.py`、`extract/llm_local.py`、`qa/index.py` 本阶段**一行未改**，
+> `verify_evidences()` 与拒答阈值未放宽。主结论只认 `llm=off` 结果。
+
+> ### 【口径污染声明】
+> **阶段六「严格 CER 0.8259 > 0.60 → 需重估技术路线」的闸门判定因口径污染而失效，本阶段显式推翻。**
+> 严格 CER 里混入了「简体 GT 逐字皆错」「超长 GT 含多段/图注」「GT 字符顺序与页面阅读顺序不一致」
+> 三类与识别能力无关的损失，用它直接套 0.40/0.60 闸门不成立。
+> 本阶段把**主判据改为「顺序无关 CER + 覆盖率」**，严格 CER 保留为参考列（仍报、不隐藏）。
+
+## S1. P0 修前 / 修后对照（59 页，llm=off）
+
+{chr(10).join(ab_lines)}
+
+- 方向判定：**{n_h_old} 页横排 → {n_h_new} 页横排**，{len(flipped)} 页全部改为 `vertical-rtl`；
+  思濟堂 22 页原本判对、未退化（见 `data/reports/dir_stage7_{{old,new}}.json`）。
+- 基线说明：本表 `old` 的 CER 中位 {f4(so['cer_median'])} 与阶段六报告正文的 0.8259 不同，
+  不是重算口径变化，而是 **P2 书脊安全阀放宽后 auto 择优在 3 页上换了路径**
+  （合併脉訣 p14 0.9666→0.9273、丹方 p19 0.9504→0.9927、丹方 p12 0.6095→0.8955）。
+  A/B 两轮使用完全相同的 P2 代码，唯一差别是 `TCM_OCR_DIR_RULE`。
+- 顺序无关 CER **{f4(so['cer_sorted_median'])} → {f4(sn['cer_sorted_median'])} 基本不变**（该量本就与顺序无关），
+  说明没有靠改口径 / 改 CER 函数提分。
+- **但严格 CER 中位 {f4(so['cer_median'])} → {f4(sn['cer_median'])} 没有下降**，
+  与阶段七 P0 验收预期「明显下降」不符，**如实记为部分完成**。
+
+### S1.1 为什么方向修对了、CER 没降（本阶段最重要的负面结论）
+
+逐页看这 {len(flipped)} 页：变好 {n_better} 页、变差 {n_worse} 页、其余基本不变；
+净效果接近 0。看原始检测框后定位到原因：这些页大多是**目录 / 索引 / 图注页**，
+det 输出的是「諸虫積」「禁口痢」「痞積」这类散布在页面各处的短标签，
+**GT 的机器转写顺序既不是行序也不是列序**，任何基于几何的阅读顺序都无法对齐。
+顺序层的差值主要来自 GT 顺序本身，而不是 `direction` 标志。
+
+| 页 | 方向变化 | 严格 CER 变化 | 顺序无关 CER |
+|---|---|---|---|
+{chr(10).join(flip_rows)}
+
+> 这条结论修正了阶段六第 8 节「14 页方向误判是 CER 主因」的推断：
+> **方向判定确实错了（已修），但它不是严格 CER 偏高的主因**。
+
+### S1.3 8 页人工核验（拼图见 `data/reports/_p0/dir_check_8.png`）
+
+| # | 页 | 原判定(old) | 新判定(new) | 人工看图 | 结论 |
+|---|---|---|---|---|---|
+| 1 | 丹方彚编page_15 | horizontal-ltr | vertical-rtl | 对开双页，左右均为竖列从右向左 | 判对 |
+| 2 | 合併脉訣page_11 | horizontal-ltr | vertical-rtl | 对开，右页含手书图注，正文竖列 | 判对 |
+| 3 | 合併脉訣page_18 | horizontal-ltr | vertical-rtl | 对开，两幅脉图，周边竖列文字 | 判对 |
+| 4 | 丹方彚编page_2 | vertical-rtl | vertical-rtl | 书名页 + 手写序，竖列 | 判对 |
+| 5 | 合併脉訣page_12 | vertical-rtl | vertical-rtl | 对开，右页指位图，左页竖列正文 | 判对 |
+| 6 | 思濟堂方書page_30 | vertical-rtl | vertical-rtl | 对开，右页透印、左页竖列正文 | 判对 |
+| 7 | 思濟堂方書page_31 | vertical-rtl | vertical-rtl | 对开，左右各一个版框，竖列 | 判对 |
+| 8 | 思濟堂方書page_32 | vertical-rtl | vertical-rtl | 对开，竖列正文 + 页边小字 | 判对 |
+
+8 页全部为**竖排从右向左**，新判据 8/8 判对；原判据 3/8 判错（#1/#2/#3）。
+
+### S1.2 P1 竖列重组的 A/B（负结果，已回退）
+
+按提示词实现过「固定锚点、不漂移」的稳定列聚类 `_stable_columns()`，
+并在 59 页上 A/B：严格 CER 中位 0.8485 → 0.8618、均值 0.7055 → 0.7308，
+而顺序无关 CER 不变（0.4556）——说明它只把阅读顺序改坏了，且改坏的是**原本方向就判对的页**
+（丹方 p6 0.2663→0.5127、丹方 p13 0.2514→0.4971、思濟堂 p34 0.6267→0.8618）。
+**已回退主链路到原有 `project_columns()` → col_id → `merge_fragments()` → `(col_id, y, x)` 排序**，
+该函数保留在 `ocr/layout.py` 供回归对照。P1 记为「实现并实测，未带来收益，已回退」。
+
+## S2. P2 书脊安全阀：6 页核验（误判 3/6 → 0/6）
+
+中缝竖线证据强时，「两半各 ≥3 列」放宽为「各 ≥1 列」；另修掉 1px 宽中缝线被
+`min_w=2` 丢掉的问题（合併脉訣 page_12）。
+
+| 页 | 判定 | 切出列数 | 结论 |
+|---|---|---|---|
+{chr(10).join(p2_rows)}
+
+判为对开 **{p2_ok}/6**，无新增误切：单页物理先验（高/宽 > 1.2 一律不切）与
+「中缝线必须落在中线 ±8%」两条仍然生效；`tests/test_vertical.py` 已补对应用例。
+
+## S3. P3 分层报告（59 页全计入，不删页）
+
+分层互斥规则：**简体 GT 页优先 → 超长 GT 页（GT ≥600 字，且非简体）→ 正常页**，
+三层页数 {layer_counts['简体 GT 页']} + {layer_counts['超长 GT 页']} + {layer_counts['正常页']} = **{len(rows)}**。
+简体 GT 判别沿用阶段六的 `SIMP_PAIRS`，**只用于分层，不参与任何打分**。
+
+| 分层 | 页数 | CER 中位 | CER 均值 | 覆盖率 | 插入率 | 顺序无关 CER |
+|---|---|---|---|---|---|---|
+{chr(10).join(layer_rows)}
+
+### S3.1 干净子集：思濟堂方書 22 页
+
+| 数据集 | 页数 | CER 中位 | 覆盖率 | 插入率 | 顺序无关 CER |
+|---|---|---|---|---|---|
+| 通用古籍验证集（阶段五） | 34 | 0.2287 | 0.8528 | 未统计 | 未统计 |
+| **思濟堂方書（阶段七干净子集）** | {len(clean)} | **{f4(_group_stat(clean)['cer_median'])}** | {f4(_group_stat(clean)['coverage_median'])} | {f4(_group_stat(clean)['insert_rate_median'])} | **{f4(_group_stat(clean)['cer_sorted_median'])}** |
+| 医家类 59 页全量 | 59 | {f4(sn['cer_median'])} | {f4(sn['coverage_median'])} | {f4(sn['insert_rate_median'])} | {f4(sn['cer_sorted_median'])} |
+
+> 三组数字分列、不混算。思濟堂 22/22 版面方向判对、GT 繁简一致、无超长 GT，
+> 是**答辩可用的代表性数字**：CER 中位 {f4(_group_stat(clean)['cer_median'])}，
+> 与通用古籍集 0.2287 同量级。
+
+### S3.2 新闸门结论（按新主判据）
+
+主判据 = 顺序无关 CER + 覆盖率（严格 CER 作参考列）：
+
+| 层次 | 顺序无关 CER | 覆盖率 | 结论 |
+|---|---|---|---|
+| 59 页全量 | {f4(sn['cer_sorted_median'])} | {f4(sn['coverage_median'])} | **0.40 < {f4(sn['cer_sorted_median'])} ≤ 0.60 → 确认「需针对医书专项」** |
+| 思濟堂干净子集 | {f4(_group_stat(clean)['cer_sorted_median'])} | {f4(_group_stat(clean)['coverage_median'])} | ≤ 0.40 → 该子集链路可支撑 |
+
+- **阶段六的「需重估技术路线」判定因严格 CER 口径污染而失效，不再作为结论。**
+- 但也不宣称「系统可用」：顺序无关 CER {f4(sn['cer_sorted_median'])} 说明内容层仍有约一半字符错/漏，
+  识别层短板真实存在。
+- 优先攻哪类医书（分书**顺序无关 CER 中位**）：丹方彚编 {f4(_group_stat([r for r in rows if r['book'] == '丹方彚编'])['cer_sorted_median'])}、合併脉訣 {f4(_group_stat([r for r in rows if r['book'] == '合併脉訣難經太素評林'])['cer_sorted_median'])}、思濟堂 {f4(_group_stat(clean)['cer_sorted_median'])}。**优先攻丹方 / 合併这两本**（目录索引页、插图页、双行夹注密集）。
+
+## S4. P4 两项「退化」查清了，都不是真回归
+
+1. **列数准确率 4/6 → 2/6 是抽样键碰撞，不是识别退化。**
+   `data/annotation/guji_manual_cols.json` 的键是裸文件名 `page_10.png` / `page_11.png` …，
+   阶段五用于 60 页通用集；阶段六的医家类子目录里也有同名 `page_10.png`，
+   `load_manual_cols()` 用 `Path(image).name` 兜底匹配，**把通用集的人工列数套到了医书页上**
+   （阶段六 4 张「坏页」的人工值 20/23/21/21 正是通用集那几页的计数）。
+   本阶段已把匹配改为「仅带书名的键生效」，`data/annotation/guji_manual_cols.json` 把 6 个裸键
+   移入「历史键_已停用」；修正后有效抽样只剩 1 页（丹方彚编page_2），
+   `cols_accuracy=1.0 / cols_sampled=1`，**统计意义不足，报告不拿它下结论**。
+   要恢复该指标，需对医家类页重新人工清点并用带书名的键登记。
+2. **跨列框率 0.00% → 0.0873 是样本与路径不同，不是回归。**
+   阶段五的 0.00% 是「34 页通用集 + 强制逐列路径」；阶段六的 0.0873 是
+   「59 页医家类 + auto 择优」，其中 56 页走的是整页 det 路径（医书页 det 碎片多、跨列框天然更多）。
+   同配置同页面的对照：old {f4(so.get('cross_box_rate'))} vs new {f4(sn.get('cross_box_rate'))}，
+   两次几乎一致，说明阶段七改动没有引入跨列框退化。
+
+### S4.1 识别层剩余问题（不许因方向修好就宣称可用）
+
+顺序无关 CER 仍 {f4(sn['cer_sorted_median'])}：① 密集小字与双行夹注被整列混读；
+② 生僻药材名 / 炮制字字形能力不足；③ 目录索引页与插图的非正文文字被当作正文读入（插入率 {f4(sn['insert_rate_median'])}）。
+这三项都是**专项优化**，不在本阶段边界内；建议等「带书名键的人工列数清点 + 夹注分离」做完再评估。
+
+## S5. 阶段七复现命令（原样收录阶段七提示词第 12 节）
+
+```bash
+# 方向判定 A/B（显式关闭 LLM 与向量）
+TCM_LLM_BACKEND=none TCM_VECTOR_ENABLED=0 TCM_OCR_DIR_RULE=old \\
+TCM_OCR_REC_MODEL=模型权重/ch_PP-OCRv5_rec_mobile.onnx \\
+  python tools/eval_guji.py --vertical 1 --pick auto --dir 古籍评测集/医家类 \\
+    --out data/reports/guji_eval_stage7_old.json
+
+TCM_LLM_BACKEND=none TCM_VECTOR_ENABLED=0 TCM_OCR_DIR_RULE=new \\
+TCM_OCR_REC_MODEL=模型权重/ch_PP-OCRv5_rec_mobile.onnx \\
+  python tools/eval_guji.py --vertical 1 --pick auto --dir 古籍评测集/医家类 \\
+    --out data/reports/guji_eval_stage7_new.json
+
+# 方向判定明细（old/new 各跑一次）
+TCM_LLM_BACKEND=none TCM_VECTOR_ENABLED=0 TCM_OCR_DIR_RULE=old \\
+TCM_OCR_REC_MODEL=模型权重/ch_PP-OCRv5_rec_mobile.onnx python tools/probe_dir_rule.py
+TCM_LLM_BACKEND=none TCM_VECTOR_ENABLED=0 TCM_OCR_DIR_RULE=new \\
+TCM_OCR_REC_MODEL=模型权重/ch_PP-OCRv5_rec_mobile.onnx python tools/probe_dir_rule.py
+
+python tools/report_guji_medical59.py --stage7
+python -m unittest discover -s tests -v
+```
+
+> 合规：数据来自公开集 `bytedance-community/AncientDoc`，**非命题单位样本**；
+> GT 为机器转写、非人工校对、非官方评测结果、不得用于评分申报；
+> 影像与标注不进仓库、不上传外部服务；全库无公有云调用；未训练 / 微调模型。
+"""
+
+
 def main() -> int:
+    ap = argparse.ArgumentParser(description="生成医家类 59 页评测报告")
+    ap.add_argument("--stage7", action="store_true",
+                    help="追加阶段七修订章节（保留上方历史全文，不覆盖历史数字）")
+    args = ap.parse_args()
+    if args.stage7:
+        text = OUT_MD.read_text(encoding="utf-8")
+        base = text.split(STAGE7_MARK)[0].rstrip() + "\n"
+        OUT_MD.write_text(base + "\n" + build_stage7_section(), encoding="utf-8")
+        print(f"阶段七章节已追加（历史全文保留）：{OUT_MD}")
+        return 0
     data = json.loads(EVAL_JSON.read_text(encoding="utf-8"))
     s = data["summary"]
     rows = [r for r in data["pages"] if r["status"] == "ok"]

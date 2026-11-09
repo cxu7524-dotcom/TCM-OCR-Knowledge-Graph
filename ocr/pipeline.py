@@ -121,7 +121,8 @@ def _postprocess(blocks, page_id: str, notes: List[str], is_demo: bool,
     #  ① 版面合并会重建 Block，必须最先做；
     #  ② 表格补格会新增 Block，必须在纠错之前，让补出来的文本也走同一套纠错规则；
     #  ③ 归一化放最后，避免 text_norm 被后续合并覆盖。
-    blocks, lay = layout.analyze_layout(blocks, page_id=page_id, is_demo=is_demo)
+    blocks, lay = layout.analyze_layout(blocks, page_id=page_id, is_demo=is_demo,
+                                        image_path=image_path)
     notes.append(f"版面：{lay.direction}，{len(lay.cols)} 列；{lay.note}")
 
     filled = []
