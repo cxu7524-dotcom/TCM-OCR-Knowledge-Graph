@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-ocr/pipeline.py —— ① 图像 → 带 bbox 的 OCRResult（阶段二：真实链路）
+ocr/pipeline.py —— ① 图像 → 带 bbox 的 OCRResult（真实链路）
 
 链路：图像 → 本地 ONNX OCR 推理 → 低置信过滤 + 人工复核队列 → 版面列聚类 / 阅读顺序
       → 繁简异体归一化 → 方剂表 bbox 行列还原 → OCRResult

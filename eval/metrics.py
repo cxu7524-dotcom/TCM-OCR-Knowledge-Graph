@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-eval/metrics.py —— 五项指标口径与真实计算（阶段二）
+eval/metrics.py —— 五项指标口径与真实计算
 
 计算原则：
   1. 所有 compute_* 都**显式排除 is_demo=True 与缺溯源字段的记录**；
@@ -473,9 +473,9 @@ def compute_traceability_for_audit(answer: Any, blocks: List[Any]) -> Dict[str, 
 
 
 def report_metrics() -> Dict[str, Any]:
-    """骨架报告用的口径表（阶段二正式报告以 compute_all 结果为准）。"""
+    """骨架报告用的口径表（正式报告以 compute_all 结果为准）。"""
     return {
-        "phase": "阶段二：本地 OCR 接入与首轮实测（正式结果见 正式评测报告.md）",
+        "phase": "阶段九：真实古籍页链路修复后的合成集实测（正式结果见 正式评测报告.md）",
         "policy": "禁止编造实测数字；示例数据不得当评测结果",
         "ground_truth_available": has_ground_truth(),
         "metrics": [{"key": s["key"], "name": s["name"], "status": "待测",

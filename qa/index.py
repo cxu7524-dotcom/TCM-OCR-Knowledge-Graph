@@ -52,7 +52,7 @@ class VectorIndex:
     docs: Dict[str, List[float]] = field(default_factory=dict)
     texts: Dict[str, str] = field(default_factory=dict)
     built: bool = False
-    note: str = "占位实现（哈希 bigram，非语义向量）/ 模型未接入"
+    note: str = "占位实现（哈希 bigram，非语义向量）；本阶段未接入 embedding 模型"
 
     def available(self) -> bool:
         return bool(CONFIG.vector.enabled) and self.built

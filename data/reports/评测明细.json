@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-09 19:54:34",
+  "generated_at": "2026-11-09 20:52:28",
   "notice": "合成示意数据，用于工程自测，非命题单位样本、非官方评测结果",
   "disclaimer": "仅供参考、非诊疗建议",
   "gt_version": "514f99246f103a95",
@@ -32,7 +32,7 @@
     "predictions_generated": true,
     "pages": 24,
     "ocr_blocks": 248,
-    "entities": 174,
+    "entities": 177,
     "tables": 8,
     "qa_cases": 67,
     "engines": [
@@ -61,12 +61,12 @@
       "检测阈值": "box_thresh=0.3, text_score=0.35",
       "公网 / 密钥": "无（未读取任何 API Key，未访问任何公网推理服务）"
     },
-    "generated_at": "2026-11-09 19:54:34",
+    "generated_at": "2026-11-09 20:52:28",
     "reason": ""
   },
   "prediction_counts": {
     "ocr": 248,
-    "entities": 174,
+    "entities": 177,
     "tables": 8,
     "qa_log": 67
   },
@@ -74,52 +74,52 @@
     "cer": {
       "key": "cer",
       "status": "实测",
-      "value": 0.0942,
+      "value": 0.0445,
       "judge": "无参考阈值",
       "threshold": null,
-      "detail": "总编辑距离 36 / GT 字数 382，覆盖 7 页",
+      "detail": "总编辑距离 17 / GT 字数 382，覆盖 7 页",
       "per_page": {
         "SYN-2026-001__p0004": {
           "gt_chars": 55,
-          "pred_chars": 54,
-          "distance": 4,
-          "cer": 0.0727
+          "pred_chars": 55,
+          "distance": 0,
+          "cer": 0.0
         },
         "SYN-2026-001__p0007": {
           "gt_chars": 55,
           "pred_chars": 55,
-          "distance": 3,
-          "cer": 0.0545
+          "distance": 0,
+          "cer": 0.0
         },
         "SYN-2026-001__p0008": {
           "gt_chars": 56,
-          "pred_chars": 54,
-          "distance": 4,
-          "cer": 0.0714
+          "pred_chars": 56,
+          "distance": 0,
+          "cer": 0.0
         },
         "SYN-2026-001__p0011": {
           "gt_chars": 49,
           "pred_chars": 49,
-          "distance": 8,
-          "cer": 0.1633
+          "distance": 6,
+          "cer": 0.1224
         },
         "SYN-2026-001__p0015": {
           "gt_chars": 49,
           "pred_chars": 49,
-          "distance": 8,
-          "cer": 0.1633
+          "distance": 6,
+          "cer": 0.1224
         },
         "SYN-2026-001__p0019": {
           "gt_chars": 59,
-          "pred_chars": 57,
-          "distance": 5,
-          "cer": 0.0847
+          "pred_chars": 59,
+          "distance": 2,
+          "cer": 0.0339
         },
         "SYN-2026-001__p0021": {
           "gt_chars": 59,
           "pred_chars": 58,
-          "distance": 4,
-          "cer": 0.0678
+          "distance": 3,
+          "cer": 0.0508
         }
       },
       "traditional_subset": {
@@ -132,7 +132,7 @@
           "SYN-2026-001__p0019",
           "SYN-2026-001__p0021"
         ],
-        "cer": 0.0942,
+        "cer": 0.0445,
         "note": "繁体页单独统计，未混入总体 CER"
       },
       "variant_subset": {
@@ -143,7 +143,7 @@
           "SYN-2026-001__p0019",
           "SYN-2026-001__p0021"
         ],
-        "cer": 0.0704,
+        "cer": 0.0176,
         "note": "含异体字页单独统计，未混入总体 CER"
       },
       "excluded": {
@@ -156,38 +156,38 @@
     "field_f1": {
       "key": "field_f1",
       "status": "实测",
-      "value": 0.7879,
-      "judge": "未达标",
+      "value": 0.8283,
+      "judge": "达标",
       "threshold": 0.8,
-      "P": 0.8298,
-      "R": 0.75,
-      "TP": 39,
-      "FP": 8,
-      "FN": 13,
+      "P": 0.8723,
+      "R": 0.7885,
+      "TP": 41,
+      "FP": 6,
+      "FN": 11,
       "excluded": {
         "gt": 0,
         "pred": 0
       },
       "align_mode": "归一化对齐（正式）",
-      "detail": "TP=39 FP=8 FN=13；对齐键 (page_id,type,name,value)；归一化对齐（正式）"
+      "detail": "TP=41 FP=6 FN=11；对齐键 (page_id,type,name,value)；归一化对齐（正式）"
     },
     "field_f1_legacy": {
       "key": "field_f1",
       "status": "实测",
-      "value": 0.4848,
+      "value": 0.5657,
       "judge": "未达标",
       "threshold": 0.8,
-      "P": 0.5106,
-      "R": 0.4615,
-      "TP": 24,
-      "FP": 23,
-      "FN": 28,
+      "P": 0.5957,
+      "R": 0.5385,
+      "TP": 28,
+      "FP": 19,
+      "FN": 24,
       "excluded": {
         "gt": 0,
         "pred": 0
       },
       "align_mode": "原值对齐（修正前对照）",
-      "detail": "TP=24 FP=23 FN=28；对齐键 (page_id,type,name,value)；原值对齐（修正前对照）"
+      "detail": "TP=28 FP=19 FN=24；对齐键 (page_id,type,name,value)；原值对齐（修正前对照）"
     },
     "table_structure": {
       "key": "table_structure",
@@ -642,9 +642,9 @@
     },
     "variant_hit": {
       "status": "实测",
-      "value": 0.4752,
-      "hit": 259,
-      "total": 545,
+      "value": 0.5273,
+      "hit": 319,
+      "total": 605,
       "note": "异体字归一化命中率，单列统计；繁简与异体合并口径"
     },
     "test_only": true,

@@ -170,7 +170,7 @@ class OCRResult(_Record):
     tables: List[TableStruct] = field(default_factory=list)
     layout: LayoutResult = field(default_factory=LayoutResult)
     engine: str = "stub"           # rapidocr | paddleocr | stub
-    model_loaded: bool = False     # False = 模型未接入
+    model_loaded: bool = False     # False = 未加载模型（示例数据 / 依赖降级）
     is_demo: bool = True           # True = 示例数据
     source_hash: str = ""
     notes: List[str] = field(default_factory=list)

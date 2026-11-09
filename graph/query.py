@@ -31,7 +31,7 @@ def _pack(kind: str, term: str, matches: List[Triple]) -> Dict[str, Any]:
             for t in matches
         ],
         "is_demo": True,
-        "note": "示例数据 / 模型未接入",
+        "note": "示例数据 · 非命题单位样本",
     }
 
 

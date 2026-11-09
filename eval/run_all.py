@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-eval/run_all.py —— 一键重跑正式评测（阶段二）
+eval/run_all.py —— 一键重跑正式评测
 
 跑法（项目根目录）：
     python eval/run_all.py                  # 缺预测则自动生成，然后算分
@@ -140,7 +140,7 @@ def _self_check_section() -> str:
     except Exception as exc:
         return f"链路自检未执行：{type(exc).__name__}（不影响正式指标）"
     lines = [
-        "> 本节全部来自 `data/demo/` **示例数据 / 模型未接入**，仅用于验证四步链路与拒答逻辑，",
+        "> 本节全部来自 `data/demo/` **示例数据（非命题单位样本）**，仅用于验证四步链路与拒答逻辑，",
         "> **不是评测结果、不计入上方任何指标**。",
         "",
         "| 问题 | 期望 | 实际 | 证据数 | quote 全部回原文命中 |",
@@ -196,7 +196,7 @@ def build_formal_report(ds: Dataset, results: dict, predict_meta: dict,
     varsub = results.get("cer", {}).get("variant_subset", {})
 
     env_lines = "\n".join(f"- {k}：{v}" for k, v in env.items()) or "- 未登记（预测未生成）"
-    return f"""# 赛题二 · 正式评测报告（阶段二首轮实测）
+    return f"""# 赛题二 · 正式评测报告（合成集实测）
 
 > ### 【免责声明】仅供参考、非诊疗建议
 > ### 【数据声明】{SYNTHETIC_NOTICE}

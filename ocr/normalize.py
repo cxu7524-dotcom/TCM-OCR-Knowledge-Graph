@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-ocr/normalize.py —— 繁简 / 异体 / 通假归一化（阶段二）
+ocr/normalize.py —— 繁简 / 异体 / 通假归一化
 
 字表单一来源：`data/lexicon/异体字表.json`（含来源与置信等级）。
   - 繁简 + 异体：自动归一化，写入 Block.text_norm；

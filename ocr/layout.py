@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-ocr/layout.py —— 版面分析（阶段二）：竖排列聚类、阅读顺序、方向可解释判别
+ocr/layout.py —— 版面分析：竖排列聚类、阅读顺序、方向可解释判别
 
 本模块只使用 **OCR 检测框的真实 bbox**，不读取任何 GT / 标注坐标，因此可用于真实样本。
 
@@ -360,7 +360,7 @@ def _merge_group(items: List[Block], boxes: List[Tuple[float, ...]],
 def analyze_layout(blocks: Iterable[Block], page_id: str = "",
                    direction: str | None = None, is_demo: bool = True,
                    merge: bool = True, image_path: str = "") -> Tuple[List[Block], LayoutResult]:
-    """版面分析入口（阶段二；阶段七增 `image_path` 与稳定列聚类）。
+    """版面分析入口（阶段七增 `image_path` 与稳定列聚类）。
 
     输入：OCR 识别出的 Block 列表（真实 bbox），可选图像路径（用于图像层竖列证据）
     输出：(处理后的 Block 列表, LayoutResult)

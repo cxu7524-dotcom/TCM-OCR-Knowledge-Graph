@@ -86,35 +86,46 @@ def infer_node_type(name: str, entities: Iterable[Entity]) -> str:
 
 def build_graph(triples: Iterable[Triple],
                 entities: Iterable[Entity] | None = None) -> GraphData:
-    """构图入口：三元组 → nodes / edges（前端可直接渲染）。"""
+    """构图入口：三元组 → nodes / edges（前端可直接渲染）。
+
+    is_demo 一律从三元组 / 实体**透传**，本函数不自己造标记：
+    示例页 True、真实页 False，前端据此显示不同标签。
+    """
     entities = list(entities or [])
     triples = [t for t in triples if isinstance(t, Triple)]
     nodes: Dict[str, GraphNode] = {}
     edges: List[GraphEdge] = []
+    entity_demo: Dict[str, bool] = {}
+    for e in entities:
+        if isinstance(e, Entity):
+            entity_demo.setdefault(e.name, bool(e.is_demo))
 
     for t in triples:
         for name in (t.head, t.tail):
             if name not in nodes:
                 nodes[name] = GraphNode(
                     id=name, label=name, type=infer_node_type(name, entities),
-                    page_id=t.page_id, source_hash=t.source_hash, is_demo=t.is_demo,
+                    page_id=t.page_id, source_hash=t.source_hash,
+                    is_demo=bool(t.is_demo and entity_demo.get(name, t.is_demo)),
                 )
             nodes[name].weight += 1
         edges.append(GraphEdge(
             source=t.head, target=t.tail, relation=t.relation,
             evidence_refs=list(t.evidence_refs), page_id=t.page_id,
-            source_hash=t.source_hash, is_demo=t.is_demo,
+            source_hash=t.source_hash, is_demo=bool(t.is_demo),
         ))
 
     relations: Dict[str, int] = defaultdict(int)
     for e in edges:
         relations[e.relation] += 1
+    demo = all(n.is_demo for n in nodes.values()) if nodes else True
     return GraphData(
-        nodes=list(nodes.values()), edges=edges, is_demo=True,
+        nodes=list(nodes.values()), edges=edges, is_demo=demo,
         stats={
             "node_count": len(nodes), "edge_count": len(edges),
             "relations": dict(relations),
             "conflicts": find_conflicts(triples),
-            "note": "示例数据 / 模型未接入；规模不是评测指标",
+            "note": ("示例数据（非命题单位样本），规模不是评测指标" if demo
+                     else "本地 OCR 真实识别页抽出的图，规模不是评测指标；准确率需人工核验"),
         },
     )

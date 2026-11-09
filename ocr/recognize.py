@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-ocr/recognize.py —— OCR 推理适配层（阶段二：本地模型真接入）
+ocr/recognize.py —— OCR 推理适配层（本地模型真接入）
 
 后端：
   rapidocr  默认。rapidocr-onnxruntime（包内自带 ONNX 权重，纯 CPU、全程离线）。
@@ -33,6 +33,28 @@ _ENGINES: dict = {}
 _ENGINE_LOCK = threading.Lock()
 
 
+def resolve_rec_model() -> tuple:
+    """返回 (实际可用的模型绝对路径, 显示名, 说明)。
+
+    三级回退在 app/config.py 里完成（env → 自动探测 v5 → 包内 v3），这里只做
+    「文件到底存不存在」的最终确认：配置指向的文件若已被删除，必须显式回退到
+    包内 v3，而不是让 RapidOCR 在初始化时抛异常。
+    """
+    from pathlib import Path as _P
+    root = _P(__file__).resolve().parents[1]
+    raw = (CONFIG.ocr.rec_model or "").strip()
+    if raw:
+        path = _P(raw) if _P(raw).is_absolute() else root / raw
+        if path.is_file():
+            return str(path), path.name, f"来源={CONFIG.ocr.rec_model_source}"
+    return "", "ch_PP-OCRv3_rec（包内简体）", "回退：未找到本地 v5 权重"
+
+
+def rec_model_name() -> str:
+    """当前实际生效的识别模型名（供 /api/health 与前端配置条显示）。"""
+    return resolve_rec_model()[1]
+
+
 def _engine(rec_model: str | None = None):
     """懒加载 + 按识别模型缓存，避免重复初始化 ONNX Runtime。
 
@@ -45,6 +67,8 @@ def _engine(rec_model: str | None = None):
     raw = raw.strip()
     if raw and not _P(raw).is_absolute():
         raw = str(_P(__file__).resolve().parents[1] / raw)
+    if raw and not _P(raw).is_file():
+        raw = ""          # 配置指向的权重不存在 → 显式回退包内 v3，不抛异常
     key = raw
     if key not in _ENGINES:
         with _ENGINE_LOCK:
@@ -162,10 +186,16 @@ class RapidOcrAdapter(BaseAdapter):
         """图像 → Block 列表，补齐溯源五元组，model_loaded=True / is_demo=False。"""
         raw = self.infer(image_path)
         width, height = _image_size(image_path)
+        _path, _name, _src = resolve_rec_model()
         notes = [
             "推理后端：rapidocr-onnxruntime（本机 ONNX Runtime，CPU，模型随包分发，无公网调用）",
+            f"识别模型：{_name}（{_src}）",
             f"检测文本块 {len(raw)} 个",
         ]
+        if not _path:
+            notes.append("未找到本地 v5 权重，已回退包内简体 ch_PP-OCRv3_rec：CER 会明显变差；"
+                         "如需最佳效果请把 ch_PP-OCRv5_rec_mobile.onnx 放到 模型权重/ 或用 "
+                         "TCM_OCR_REC_MODEL 指定路径")
         if not raw:
             notes.append("模型未返回任何文本块：本页不产出识别结果（不以示例文本冒充）")
 
@@ -245,7 +275,7 @@ _ADAPTERS = {c.name: c for c in (RapidOcrAdapter, PaddleOcrAdapter, StubOcrAdapt
 
 
 def get_adapter(backend: str | None = None) -> Tuple[BaseAdapter, List[str]]:
-    """选择后端。阶段二修复：包已安装时不再强制降级为 stub。"""
+    """选择后端。包已安装时不再强制降级为 stub。"""
     want = (backend or CONFIG.ocr.backend or "rapidocr").lower()
     notes: List[str] = []
     adapter: BaseAdapter = _ADAPTERS.get(want, StubOcrAdapter)()
@@ -256,7 +286,7 @@ def get_adapter(backend: str | None = None) -> Tuple[BaseAdapter, List[str]]:
     elif adapter.name != "stub" and not adapter.available():
         notes.append(f"后端 {adapter.name} 依赖未安装（可选依赖，见 requirements.txt）")
         if CONFIG.ocr.auto_fallback:
-            notes.append("已按 auto_fallback 降级为 stub：示例数据 / 模型未接入")
+            notes.append("已按 auto_fallback 降级为 stub：本次不产出识别结果，只回放示例数据")
             adapter = StubOcrAdapter()
     elif adapter.name == "rapidocr":
         notes.append("本地 OCR 依赖可用，执行真实推理（engine=rapidocr, model_loaded=True）")

@@ -112,6 +112,7 @@ CREATE TABLE IF NOT EXISTS entities (
     quote         TEXT,
     source_hash   TEXT,
     extractor     TEXT,
+    is_demo       INTEGER DEFAULT 1,
     run_id        TEXT,
     fingerprint   TEXT NOT NULL UNIQUE
 );
@@ -128,6 +129,7 @@ CREATE TABLE IF NOT EXISTS triples (
     line_id       TEXT,
     quote         TEXT,
     source_hash   TEXT,
+    is_demo       INTEGER DEFAULT 1,
     run_id        TEXT,
     fingerprint   TEXT NOT NULL UNIQUE
 );
@@ -147,11 +149,25 @@ CREATE TABLE IF NOT EXISTS qa_logs (
 """
 
 
+def _ensure_column(conn: sqlite3.Connection, table: str, column: str, ddl: str) -> None:
+    """轻量迁移：列不存在就 ALTER TABLE 补上，**不重建表、不丢已有数据**。"""
+    try:
+        cols = {r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+    except sqlite3.Error:
+        return
+    if cols and column not in cols:
+        try:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+        except sqlite3.Error:
+            pass
+
+
 def init_db() -> str:
     """幂等建表 / 建索引，可反复调用。返回库文件路径。
 
     轻量迁移：若检测到旧版 schema（唯一键含 run_id），重建三张明细表。
     这些表只存运行期演示数据，重建不会丢真实标注或样本（二者不进 SQLite）。
+    阶段九新增 is_demo 列：用 ALTER TABLE 补齐，不重建（保留已入库的页面）。
     """
     PATHS.ensure_dirs()
     conn = connect()
@@ -167,6 +183,9 @@ def init_db() -> str:
             conn.executescript(DDL)
             conn.execute("INSERT OR REPLACE INTO schema_meta(key,value) VALUES('version',?)",
                          (SCHEMA_VERSION,))
+        # 列级迁移（幂等）：旧库补 is_demo，保留数据
+        _ensure_column(conn, "entities", "is_demo", "INTEGER DEFAULT 1")
+        _ensure_column(conn, "triples", "is_demo", "INTEGER DEFAULT 1")
         conn.commit()
     finally:
         conn.close()
@@ -230,21 +249,21 @@ def save_page(
             fp = source_hash_of("entity", ocr.page_id, e.name, e.type, e.value, e.quote)
             cur = conn.execute(
                 "INSERT OR IGNORE INTO entities"
-                "(page_id,name,etype,value,block_ref,bbox,line_id,quote,source_hash,extractor,run_id,fingerprint)"
-                " VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                "(page_id,name,etype,value,block_ref,bbox,line_id,quote,source_hash,extractor,is_demo,run_id,fingerprint)"
+                " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (ocr.page_id, e.name, e.type, e.value, e.block_ref, _bbox_json(e.bbox),
-                 e.line_id, e.quote, e.source_hash, e.extractor, rid, fp))
+                 e.line_id, e.quote, e.source_hash, e.extractor, int(e.is_demo), rid, fp))
             stat["entities"] += cur.rowcount
 
         for t in triples:
             fp = source_hash_of("triple", ocr.page_id, t.head, t.relation, t.tail)
             cur = conn.execute(
                 "INSERT OR IGNORE INTO triples"
-                "(page_id,head,relation,tail,evidence_refs,bbox,line_id,quote,source_hash,run_id,fingerprint)"
-                " VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                "(page_id,head,relation,tail,evidence_refs,bbox,line_id,quote,source_hash,is_demo,run_id,fingerprint)"
+                " VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
                 (ocr.page_id, t.head, t.relation, t.tail,
                  json.dumps(t.evidence_refs, ensure_ascii=False), _bbox_json(t.bbox),
-                 t.line_id, t.quote, t.source_hash, rid, fp))
+                 t.line_id, t.quote, t.source_hash, int(t.is_demo), rid, fp))
             stat["triples"] += cur.rowcount
 
         conn.commit()
@@ -258,7 +277,7 @@ def save_page(
         "triples": [t.to_dict() for t in triples],
         "run_id": rid,
         "is_demo": ocr.is_demo,
-        "note": CONFIG.demo_badge,
+        "note": CONFIG.demo_badge if ocr.is_demo else "本地 OCR 真实识别（非命题单位样本）",
     }
     (PATHS.store_dir / "pages").mkdir(parents=True, exist_ok=True)
     (PATHS.store_dir / "pages" / f"{ocr.page_id}.json").write_text(
@@ -353,10 +372,85 @@ def get_triples(page_id: Optional[str] = None) -> List[Triple]:
                 d["bbox"] = json.loads(d.get("bbox") or "[0,0,0,0]")
             except json.JSONDecodeError:
                 d["evidence_refs"], d["bbox"] = [], [0, 0, 0, 0]
+            d["is_demo"] = bool(d.get("is_demo", 1))
             out.append(Triple.from_dict(d))
         return out
     finally:
         conn.close()
+
+
+def get_entities(page_id: str) -> List[Entity]:
+    """从 SQLite 还原 Entity（JSON 快照缺失时的兜底；快照优先，见 get_page）。"""
+    init_db()
+    conn = connect()
+    try:
+        rows = conn.execute("SELECT * FROM entities WHERE page_id=? ORDER BY id",
+                            (page_id,)).fetchall()
+        out: List[Entity] = []
+        for r in rows:
+            d = dict(r)
+            try:
+                d["bbox"] = json.loads(d.get("bbox") or "[0,0,0,0]")
+            except json.JSONDecodeError:
+                d["bbox"] = [0, 0, 0, 0]
+            d["page_id"] = page_id
+            d["type"] = d.pop("etype", d.get("type", ""))
+            d["is_demo"] = bool(d.get("is_demo", 1))
+            out.append(Entity.from_dict(d))
+        return out
+    finally:
+        conn.close()
+
+
+def delete_page(page_id: str) -> Dict[str, Any]:
+    """删除一页及其全部派生数据（SQLite 四表 + JSON 快照 + 上传图片）。
+
+    只删本系统命名的上传文件（`P<时间戳>-<hash>.<ext>`），不碰任何其他文件。
+    返回删除统计；页面不存在时 `deleted=False`。
+    """
+    init_db()
+    stat: Dict[str, Any] = {"page_id": page_id, "deleted": False,
+                            "db": {}, "snapshot": False, "image": ""}
+    conn = connect()
+    try:
+        row = conn.execute("SELECT image_path FROM pages WHERE page_id=?", (page_id,)).fetchone()
+        if row is None:
+            return stat
+        image_path = row[0] or ""
+        for table in ("blocks", "entities", "triples"):
+            cur = conn.execute(f"DELETE FROM {table} WHERE page_id=?", (page_id,))
+            stat["db"][table] = cur.rowcount
+        conn.execute("DELETE FROM pages WHERE page_id=?", (page_id,))
+        conn.commit()
+        stat["deleted"] = True
+    finally:
+        conn.close()
+
+    snap = PATHS.store_dir / "pages" / f"{page_id}.json"
+    if snap.exists():
+        try:
+            snap.unlink()
+            stat["snapshot"] = True
+        except OSError:
+            pass
+
+    # 只删 data/uploads/ 内、由本系统命名的文件
+    name = Path(image_path).name if image_path else ""
+    if name and _is_managed_upload(name):
+        target = (PATHS.uploads_dir / name).resolve()
+        try:
+            if target.is_file() and PATHS.uploads_dir.resolve() in target.parents:
+                target.unlink()
+                stat["image"] = name
+        except OSError:
+            pass
+    return stat
+
+
+def _is_managed_upload(name: str) -> bool:
+    """本系统命名的上传文件：P<14 位时间戳>-<6 位 hash>.<ext>。"""
+    import re
+    return bool(re.fullmatch(r"P\d{14}-[0-9a-f]{6}\.(png|jpg|jpeg|bmp|webp|tif|tiff)", name))
 
 
 def stats() -> Dict[str, Any]:

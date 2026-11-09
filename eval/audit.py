@@ -122,7 +122,7 @@ def _summarize(items: List[AuditItem], is_demo: bool = True) -> AuditReport:
 
 
 def audit_qa_logs(records: List[Dict], blocks_by_page: Dict[str, List[Block]]) -> Dict:
-    """阶段二：从**真实问答日志**做反向溯源审计，并与 compute_traceability 交叉核对。
+    """从**真实问答日志**做反向溯源审计，并与 compute_traceability 交叉核对。
 
     只统计 is_demo=False 的非拒答答案；逐片段回原文核对，输出
     完全 / 部分 / 未溯 三态与「整串 quote 命中数」，供报告交叉验证。
@@ -185,7 +185,7 @@ def self_check(blocks: List[Block], queries: List[str]) -> Dict:
             "is_demo": True,
         })
     return {
-        "note": "示例数据 / 模型未接入；以下为链路自检明细，不是评测指标",
+        "note": "示例数据 · 非命题单位样本；以下为链路自检明细，不是评测指标",
         "status": "待测",
         "cases": reports,
     }

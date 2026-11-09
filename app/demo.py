@@ -2,7 +2,7 @@
 """
 app/demo.py —— 示例数据统一装载器（演示态的唯一入口）
 
-所有「示例数据 / 模型未接入」的桩输出都从这里取，保证：
+所有示例数据桩输出都从这里取，保证：
   1. 界面、接口、报告里的演示标注文案一致；
   2. 示例数据本身带完整溯源字段，不会绕过 app/schemas.py 的契约；
   3. 即使 data/demo/ 下的文件被误删，也能返回内置最小示例，服务不崩、不抛异常。
@@ -21,10 +21,10 @@ from .schemas import Block, OCRResult, source_hash_of
 DEMO_PAGE_FILE = CONFIG.paths.demo_dir / "demo_page.json"
 DEMO_QUESTION_FILE = CONFIG.paths.demo_dir / "demo_questions.json"
 
-DEMO_NOTE = "示例数据 / 模型未接入"
+DEMO_NOTE = "示例数据 · 非命题单位样本"
 DEMO_LONG_NOTE = (
-    "本页为合成示意数据，非真实古籍扫描页；OCR 与版面模型均未接入，"
-    "识别结果、实体与三元组用于打通端到端链路，不得作为评测或诊疗依据。"
+    "本页为合成示意数据，非真实古籍扫描页；识别结果、实体与三元组只用于打通端到端链路，"
+    "不得作为评测或诊疗依据。真实古籍页请用「上传图片」走本地 OCR 推理。"
 )
 
 # 兜底最小示例：文件缺失时也不会让链路断掉

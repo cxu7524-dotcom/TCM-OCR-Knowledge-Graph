@@ -51,6 +51,30 @@ def _env_float(key: str, default: float) -> float:
         return default
 
 
+# 识别模型自动探测候选（按优先级）。路径相对 PROJECT_ROOT，模型权重不进仓库。
+REC_MODEL_CANDIDATES = ("模型权重/ch_PP-OCRv5_rec_mobile.onnx",)
+# 包内自带的后备模型（rapidocr-onnxruntime 分发，简体 ch_PP-OCRv3_rec）
+BUNDLED_REC_MODEL = "ch_PP-OCRv3_rec（rapidocr 包内简体）"
+
+
+def _resolve_rec_model() -> tuple:
+    """识别模型三级回退：环境变量 → 本地 v5 探测 → 包内 v3。
+
+    返回 (模型路径, 来源标记)。模型路径为空表示用 rapidocr 包内简体 v3。
+    只做路径探测，不加载模型、不下载任何权重。
+    """
+    env = (os.environ.get("TCM_OCR_REC_MODEL", "") or "").strip()
+    if env:
+        return env, "env"
+    for rel in REC_MODEL_CANDIDATES:
+        if (PROJECT_ROOT / rel).is_file():
+            return rel, "auto"
+    return "", "bundled"
+
+
+_REC_MODEL_PATH, _REC_MODEL_SOURCE = _resolve_rec_model()
+
+
 @dataclass(frozen=True)
 class PathConfig:
     """目录与文件位置。所有目录在首次运行时由 app/store.py 幂等创建。"""
@@ -89,7 +113,7 @@ class OcrConfig:
 
     backend: str = _env("OCR_BACKEND", "rapidocr")
     lang: str = _env("OCR_LANG", "ch")
-    # 低置信过滤阈值。阶段二实测：默认 0.50 会把表格页 score≈0.37~0.47 的
+    # 低置信过滤阈值。早期实测：默认 0.50 会把表格页 score≈0.37~0.47 的
     # 真实单元格全部剔除，导致结构还原失真；调整为 0.35 并在报告中登记该差异。
     min_conf: float = _env_float("OCR_MIN_CONF", 0.35)
     # 检测阶段阈值（下调以提升方剂表小单元格召回，均为本地推理参数）
@@ -125,9 +149,20 @@ class OcrConfig:
     col_min_w: int = _env_int("OCR_COL_MIN_W", 12)
     col_gap_ratio: float = _env_float("OCR_COL_GAP_RATIO", 0.02)
     rotate: int = _env_int("OCR_ROTATE", 90)     # 90=逆时针（实测有效），270=顺时针
-    # 识别模型路径：空=用包内简体 ch_PP-OCRv3_rec；指定则加载本地繁体模型（字典内嵌在 ONNX metadata）
-    rec_model: str = _env("OCR_REC_MODEL", "")
+    # 识别模型路径：三级回退（见 _resolve_rec_model）——
+    #   ① TCM_OCR_REC_MODEL 显式指定；② 自动探测 模型权重/ch_PP-OCRv5_rec_mobile.onnx；
+    #   ③ 都没有则用包内简体 ch_PP-OCRv3_rec（CER 明显更差，会在 notes / health 里标注）。
+    rec_model: str = _REC_MODEL_PATH
+    rec_model_source: str = _REC_MODEL_SOURCE
     demo_fallback: bool = _env_bool("OCR_DEMO_FALLBACK", True)
+
+    # ---- 抽取层开关（阶段九新增；阈值集中在这里，不散落在规则里）----
+    # 剂量抽取是否要求药名命中词典：0=放宽（默认，真实古籍页才抽得到），1=回到阶段八行为
+    extract_dose_strict: bool = _env_bool("EXTRACT_DOSE_STRICT", False)
+    # 错字容忍：与词典项编辑距离 ≤1 的片段在低置信块上尝试匹配（默认开）
+    extract_fuzzy: bool = _env_bool("EXTRACT_FUZZY", True)
+    # 错字容忍触发的置信度上限：只对「OCR 自己都不确定」的块做模糊匹配，避免误报
+    extract_fuzzy_max_conf: float = _env_float("EXTRACT_FUZZY_MAX_CONF", 0.90)
 
 
 @dataclass(frozen=True)
@@ -207,13 +242,21 @@ class Config:
     server: ServerConfig = ServerConfig()
     demo_mode: bool = _env_bool("DEMO_MODE", True)
     disclaimer: str = "仅供参考、非诊疗建议"
-    demo_badge: str = "示例数据 / 模型未接入"
+    # 示例数据标注：只描述数据性质；OCR 默认真跑，标签由 app/main.py 按实际状态生成
+    demo_badge: str = "示例数据 · 非命题单位样本"
 
     def summary(self) -> dict:
         """给 /api/health 与界面用的配置快照（不含任何密钥）。"""
+        from pathlib import Path as _Path
+        rec = (self.ocr.rec_model or "").strip()
+        rec_name = _Path(rec).name if rec else BUNDLED_REC_MODEL
         return {
             "ocr_backend": self.ocr.backend,
             "ocr_auto_fallback": self.ocr.auto_fallback,
+            "ocr_rec_model": rec_name,
+            "ocr_rec_model_source": self.ocr.rec_model_source,
+            "extract_dose_strict": self.ocr.extract_dose_strict,
+            "extract_fuzzy": self.ocr.extract_fuzzy,
             "llm_backend": self.llm.backend,
             "llm_enabled": self.llm.enabled,
             "llm_base_url": self.llm.base_url if self.llm.enabled else "",

@@ -126,6 +126,20 @@
   .bbox .vtext { writing-mode: vertical-rl; font-family: "KaiTi", "STKaiti", serif; font-size: 11px; line-height: 1.25; color: #3f3324; padding: 2px; height: 100%; overflow: hidden; }
   .bbox .tag { position: absolute; right: 0; bottom: 0; font-size: 9px; background: rgba(47,111,237,.85); color: #fff; padding: 0 3px; border-radius: 2px; }
   .bbox.sel .tag { background: var(--seal); }
+  /* 真实页预览：原图打底 + 半透明 bbox 叠加；示例页无原图时退回纯文字框 */
+  .page-canvas img.base { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; user-select: none; }
+  .page-canvas.overlay .bbox { background: rgba(47,111,237,.10); border-color: rgba(47,111,237,.7); }
+  .page-canvas.overlay .bbox:hover, .page-canvas.overlay .bbox.sel { background: rgba(180,83,9,.22); border-color: var(--seal); }
+  .page-canvas.overlay .bbox .vtext { display: none; }
+  .page-canvas.overlay .bbox .tag { right: auto; left: 0; }
+  .page-canvas.overlay .bbox:hover .vtext { display: block; background: rgba(255,255,255,.92); }
+  .page-list { max-height: 260px; overflow: auto; }
+  .page-item { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 6px; font-size: 12px; cursor: pointer; background: #fff; }
+  .page-item:hover { border-color: var(--seal); }
+  .page-item.cur { border-color: var(--seal); background: #fdf6ee; }
+  .page-item .pid { font-family: ui-monospace, Menlo, monospace; font-size: 11.5px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .page-item .del { border: 0; background: transparent; color: var(--danger, #dc2626); cursor: pointer; font-size: 11.5px; }
+  .page-item .del:hover { text-decoration: underline; }
   .block-list { max-height: 300px; overflow: auto; }
   .block-item { border: 1px solid var(--line-soft); border-radius: 8px; padding: 8px 10px; margin-bottom: 7px; font-size: 12px; cursor: pointer; }
   .block-item:hover, .block-item.sel { border-color: var(--ink); background: #f0f7f4; }
@@ -176,7 +190,7 @@
   </div>
   <div class="hdr-right">
     <span class="chip" id="cfgChip">配置读取中…</span>
-    <span class="chip warn" id="demoChip">示例数据 / 模型未接入</span>
+    <span class="chip warn" id="demoChip">示例数据 · 非命题单位样本</span>
     <span class="chip ok"><span class="dot on" id="healthDot"></span><span id="healthText">服务状态检查中</span></span>
   </div>
 </header>
@@ -213,18 +227,21 @@
         </div>
         <h3>本阶段边界</h3>
         <ul class="note-list">
-          <li>阶段二已接入本地 OCR；五项实测指标由 <code>eval/run_all.py</code> 产出，未达标项如实标注。</li>
+          <li>OCR 走本机 ONNX 模型真实推理（默认自动加载 <code>ch_PP-OCRv5_rec_mobile.onnx</code>，缺失时回退包内简体 v3 并在识别说明里标注）。</li>
           <li>推理全本地、零密钥、零公网调用；不需要数据库服务与 GPU；本地 LLM 仍为 <code>none</code>。</li>
           <li>合成示意数据用于工程自测，非命题单位样本、非官方评测结果；命题单位脱敏样本未到位、不得外传。</li>
         </ul>
       </div>
       <div class="card">
         <h2>当前页面状态</h2>
-        <p class="hint" id="s1hint">尚未加载任何页面。点击左侧「加载示例古籍页」开始。</p>
+        <p class="hint" id="s1hint">尚未加载任何页面。点击左侧「加载示例古籍页」或上传一张扫描页开始。</p>
         <dl class="kv" id="pageInfo"></dl>
         <div id="pageNotes"></div>
+        <h3>已入库页面 <span class="badge gray" id="pageCount">0</span></h3>
+        <p class="hint" style="margin:4px 0 8px">数据来自 <code>GET /api/pages</code>：可切回历史页查看其 OCR / 图谱 / 问答，也可删除（删除会二次确认）。</p>
+        <div class="page-list" id="pageList"><div class="empty">读取中…</div></div>
         <h3>免责与演示标注</h3>
-        <p class="hint" style="margin:0">所有页面常驻「仅供参考、非诊疗建议」；接口与报告中的桩输出均标注「示例数据 / 模型未接入」。示例数据不得作为评测结果。</p>
+        <p class="hint" style="margin:0">所有页面常驻「仅供参考、非诊疗建议」；示例页标注「示例数据 · 非命题单位样本」，真实页标注「本地 OCR 真实识别 · 模型名」。两类数据在界面上不混用。</p>
       </div>
     </div>
   </section>
@@ -235,20 +252,20 @@
       <div class="row" style="justify-content:space-between">
         <div><h2>步骤二 · OCR 与结构化结果</h2>
           <p class="hint" style="margin:0" id="s2hint">左侧为带 bbox 的文本块预览，右侧为实体与三元组。点击文本块可查看溯源字段。</p></div>
-        <div class="row"><span class="badge" id="s2badge">示例数据 / 模型未接入</span><button class="btn sm" id="btnNext2">下一步：图谱可视化</button></div>
+        <div class="row"><span class="badge" id="s2badge">示例数据 · 非命题单位样本</span><button class="btn sm" id="btnNext2">下一步：图谱可视化</button></div>
       </div>
     </div>
     <div class="grid two">
       <div class="card">
-        <h2>古籍页预览（合成示意）</h2>
-        <p class="hint" id="s2sub">竖排从右向左；蓝框为示例 bbox，点击可定位文本块。此页为合成示意数据，非真实古籍扫描页。</p>
+        <h2 id="s2title">古籍页预览</h2>
+        <p class="hint" id="s2sub">真实页显示原图 + bbox 叠加（框与字应对齐）；示例页无原图，退回重排文字框。点击框可定位右侧文本块。</p>
         <div class="page-wrap"><div class="page-canvas" id="pageCanvas"><div class="empty" style="padding:60px 0">请先在步骤一加载示例数据</div></div></div>
         <h3>文本块明细</h3>
         <div class="block-list" id="blockList"></div>
       </div>
       <div class="card">
         <h2>结构化抽取</h2>
-        <p class="hint">实体与三元组由 <code>extract/rules.py</code> 的确定性规则从示例文本产出；每个对象都带 page_id / bbox / line_id / quote / source_hash。</p>
+        <p class="hint">实体与三元组由 <code>extract/rules.py</code> 的确定性规则产出（词典 + 模式，未接入 LLM）；每个对象都带 page_id / bbox / line_id / quote / source_hash，<code>is_demo</code> 从页面透传。</p>
         <h3>实体 <span class="badge gray" id="entCount">0</span></h3>
         <div class="scroll"><table><thead><tr><th>名称</th><th>类型</th><th>值</th><th>出处</th></tr></thead><tbody id="entBody"></tbody></table></div>
         <h3>三元组 <span class="badge gray" id="triCount">0</span></h3>
@@ -265,7 +282,7 @@
       <div class="row" style="justify-content:space-between">
         <div><h2>步骤三 · 知识图谱可视化</h2>
           <p class="hint" style="margin:0" id="graphHint">原生 Canvas 力导向图，零 CDN、零外部依赖；点击节点查看出处。</p></div>
-        <div class="row"><span class="badge" id="graphBadge">示例数据 / 模型未接入</span><button class="btn sm" id="btnReloadGraph">重新载入</button><button class="btn sm" id="btnNext3">下一步：可溯源问答</button></div>
+        <div class="row"><span class="badge" id="graphBadge">示例数据 · 非命题单位样本</span><button class="btn sm" id="btnReloadGraph">重新载入</button><button class="btn sm" id="btnNext3">下一步：可溯源问答</button></div>
       </div>
     </div>
     <div class="grid two" style="margin-top:16px">
@@ -280,7 +297,7 @@
         <h3>关系类型</h3>
         <div id="relList" class="row"></div>
         <h3>说明</h3>
-        <p class="hint" style="margin:0">原型阶段图谱用文件 + SQLite + 前端原生力导向图实现，不引入 Neo4j / Elasticsearch 等服务端组件。当前节点与边全部来自示例数据，<b>规模不是评测指标</b>。</p>
+        <p class="hint" style="margin:0">原型阶段图谱用文件 + SQLite + 前端原生力导向图实现，不引入 Neo4j / Elasticsearch 等服务端组件。节点与边来自<b>当前页</b>的抽取结果，规模不是评测指标。</p>
       </div>
     </div>
   </section>
@@ -307,7 +324,7 @@
 
 <footer>
   <b>仅供参考、非诊疗建议</b>：本系统为赛事研发原型，不构成诊断、用药或治疗建议；问答仅返回原文摘录，未做推断。<br>
-  当前阶段：<b>阶段二 · 本地 OCR 已接入</b>，五项指标（CER / 字段 F1 / 表格结构还原 / 可溯源率 / 拒答率）由 <code>python eval/run_all.py</code> 产出真实数值，见 <code>data/reports/正式评测报告.md</code>；<b>合成集结果不是官方评测结论</b>。<br>
+  当前阶段：<b>阶段九 · 真实古籍页四步链路跑通</b>（本地 ONNX OCR 真实推理 + 词典/规则抽取，未接入 LLM），五项指标（CER / 字段 F1 / 表格结构还原 / 可溯源率 / 拒答率）由 <code>python eval/run_all.py</code> 产出真实数值，见 <code>data/reports/正式评测报告.md</code>；<b>合成集结果不是官方评测结论</b>。<br>
   数据合规：命题单位脱敏样本仅限赛事研发使用，不得外传；真实扫描页与人工标注不进仓库、不上传任何外部服务。
 </footer>
 <div class="toast" id="toast"></div>
@@ -322,9 +339,24 @@ const fmt = v => v == null ? "—" : (typeof v === "object" ? JSON.stringify(v) 
 function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove("show"), 3200); }
 async function api(path, opts) {
   const r = await fetch(path, opts);
-  if (!r.ok) { let d = ""; try { d = (await r.json()).detail || ""; } catch (e) {} throw new Error(d || ("HTTP " + r.status)); }
+  if (!r.ok) {
+    let d = ""; try { d = (await r.json()).detail || ""; } catch (e) {}
+    const err = new Error(d || ("HTTP " + r.status)); err.status = r.status; throw err;
+  }
   return r.json();
 }
+/* 按状态码给可读提示：上传失败不再只弹一句 e.message */
+function errText(e) {
+  const s = e.status, m = e.message || "";
+  if (s === 400) return "文件/请求不合法（400）：" + m;
+  if (s === 413) return "文件过大（413）：" + m;
+  if (s === 404) return "页面不存在（404）：" + m;
+  if (s === 503) return "OCR 不可用（503）：" + m;
+  if (s === 500) return "服务端异常（500）：" + m;
+  return "请求失败：" + m;
+}
+const BADGE_DEMO = "示例数据 · 非命题单位样本";
+const badgeOf = r => (r && r.badge) || BADGE_DEMO;
 
 /* ---------------- 步骤切换 ---------------- */
 function goto(step) {
@@ -351,12 +383,14 @@ async function init() {
     const [h, m] = await Promise.all([api("/api/health"), api("/api/meta")]);
     S.meta = m;
     $("bannerText").textContent = m.banner;
-    $("demoChip").textContent = h.badge || m.badge;
+    $("demoChip").textContent = badgeOf(h);
     $("demoChip").className = "chip " + (h.is_demo ? "warn" : "ok");
-    $("cfgChip").textContent = "OCR:" + h.config.ocr_backend + " · LLM:" + h.config.llm_backend + " · " + h.config.server;
+    const rec = (h.modules && h.modules.ocr && h.modules.ocr.rec_model_name) || m.rec_model_name || "—";
+    $("cfgChip").textContent = "OCR:" + h.config.ocr_backend + " · " + rec + " · LLM:" + h.config.llm_backend + " · " + (location.host || h.config.server);
     $("healthText").textContent = "服务正常";
     $("healthDot").classList.add("on");
     renderChips(m.questions || []);
+    loadPages();
   } catch (e) {
     $("healthText").textContent = "服务未就绪";
     $("cfgChip").textContent = "无法读取配置";
@@ -376,13 +410,14 @@ async function ingest(fd, label) {
     const r = await api("/api/pages", { method: "POST", body: fd });
     S.pageId = r.page_id; S.ingest = r;
     $("s1hint").textContent = "已加载页面，可进入步骤二查看 OCR 与结构化结果。";
-    $("demoChip").textContent = r.badge || "示例数据 / 模型未接入";
+    $("demoChip").textContent = badgeOf(r);
     $("demoChip").className = "chip " + (r.is_demo ? "warn" : "ok");
     $("pageInfo").innerHTML = [
-      ["page_id", r.page_id], ["识别后端", r.engine + (r.model_loaded ? "（本地模型）" : "（模型未接入）")],
+      ["page_id", r.page_id],
+      ["识别后端", r.engine + "（" + (r.rec_model || "—") + "）"],
       ["文本块", r.blocks], ["实体", r.entities], ["三元组", r.triples],
       ["图谱节点 / 边", r.graph_nodes + " / " + r.graph_edges],
-      ["数据状态", r.is_demo ? "示例数据" : "真实 OCR 识别 · 合成示意页"],
+      ["数据状态", r.is_demo ? "示例数据（非命题单位样本）" : "真实 OCR 识别"],
       ["演示标注", r.badge], ["免责声明", r.disclaimer], ["入库批次", r.ingest && r.ingest.run_id],
     ].map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(fmt(v))}</dd>`).join("");
     $("pageNotes").innerHTML = "<h3>识别说明</h3><ul class='note-list'>" +
@@ -390,7 +425,13 @@ async function ingest(fd, label) {
     $("btnNext1").disabled = false;
     document.querySelectorAll(".step-btn")[0].classList.add("done");
     toast(label + "成功：" + r.page_id);
-  } catch (e) { $("s1hint").textContent = "处理失败：" + e.message; toast("处理失败：" + e.message); }
+    loadPages();
+  } catch (e) {
+    const msg = errText(e);
+    $("s1hint").textContent = msg;
+    $("pageNotes").innerHTML = "<h3>处理失败</h3><ul class='note-list'><li>" + esc(msg) + "</li></ul>";
+    toast(msg);
+  }
 }
 $("btnDemo").onclick = () => { const fd = new FormData(); fd.append("demo", "1"); ingest(fd, "加载示例数据"); };
 let picked = null;
@@ -409,17 +450,68 @@ drop.ondrop = e => {
   if (e.dataTransfer.files.length) { picked = e.dataTransfer.files[0]; $("btnUpload").disabled = false; toast("已选择：" + picked.name); }
 };
 
+/* ---------------- 已入库页面：列表 / 切换 / 删除 ---------------- */
+async function loadPages() {
+  try {
+    const r = await api("/api/pages");
+    const ps = r.pages || [];
+    $("pageCount").textContent = ps.length;
+    if (!ps.length) { $("pageList").innerHTML = "<div class='empty'>暂无入库页面</div>"; return; }
+    $("pageList").innerHTML = ps.map(p => `
+      <div class="page-item ${p.page_id === S.pageId ? "cur" : ""}" data-pid="${esc(p.page_id)}">
+        <span class="badge ${p.is_demo ? "gray" : "ok"}">${p.is_demo ? "示例" : "真实"}</span>
+        <span class="pid" title="${esc(p.image_path || "")}">${esc(p.page_id)}</span>
+        <button class="del" data-del="${esc(p.page_id)}" title="删除该页及其 OCR / 实体 / 三元组 / 图片">删除</button>
+      </div>`).join("");
+    $("pageList").querySelectorAll(".page-item").forEach(el => el.onclick = ev => {
+      if (ev.target.classList.contains("del")) return;
+      switchPage(el.dataset.pid);
+    });
+    $("pageList").querySelectorAll(".del").forEach(btn => btn.onclick = ev => {
+      ev.stopPropagation(); deletePage(btn.dataset.del);
+    });
+  } catch (e) { $("pageList").innerHTML = "<div class='empty'>页面列表读取失败：" + esc(e.message) + "</div>"; }
+}
+function switchPage(pid) {
+  if (!pid || pid === S.pageId) return;
+  S.pageId = pid; S.pendingHighlight = null;
+  $("s1hint").textContent = "已切换到历史页 " + pid + "，可查看其 OCR / 图谱 / 问答。";
+  loadPages();
+  const active = document.querySelector(".panel.active");
+  if (active && active.id === "panel2") loadOcr();
+  if (active && active.id === "panel3") loadGraph();
+  toast("已切换到 " + pid);
+}
+async function deletePage(pid) {
+  if (!confirm("删除页面 " + pid + " 及其 OCR 文本块 / 实体 / 三元组 / 上传图片？\n此操作不可撤销。")) return;
+  if (!confirm("再次确认：确实要删除 " + pid + " 吗？")) return;
+  try {
+    const r = await api("/api/pages/" + encodeURIComponent(pid), { method: "DELETE" });
+    if (S.pageId === pid) {
+      S.pageId = null; S.ocr = null; S.graph = null;
+      $("pageInfo").innerHTML = ""; $("pageNotes").innerHTML = "";
+      $("s1hint").textContent = "当前页已删除，请重新上传或加载示例。";
+    }
+    $("pageCount").textContent = (r.pages || []).length;
+    loadPages();
+    toast("已删除 " + pid + "（图片：" + (r.image || "无") + "）");
+  } catch (e) { toast(errText(e)); }
+}
+
 /* ---------------- 步骤二：OCR 与结构化 ---------------- */
 async function loadOcr() {
   if (!S.pageId) { toast("请先在步骤一加载示例数据"); return; }
   try {
     const r = await api("/api/pages/" + encodeURIComponent(S.pageId) + "/ocr");
     S.ocr = r;
-    $("s2badge").textContent = r.badge || "示例数据 / 模型未接入";
-    $("demoChip").textContent = r.badge || "示例数据 / 模型未接入";
+    $("s2badge").textContent = badgeOf(r);
+    $("demoChip").textContent = badgeOf(r);
     $("demoChip").className = "chip " + (r.is_demo ? "warn" : "ok");
-    $("s2hint").textContent = "识别后端：" + r.engine + "（" + (r.model_loaded ? "模型已接入" : "模型未接入") + "）；共 " +
-      (r.blocks || []).length + " 个文本块。所有坐标与摘抄均可回原文核对。";
+    $("s2hint").textContent = "识别后端：" + r.engine + "（模型 " + (r.rec_model || "—") + "）；共 " +
+      (r.blocks || []).length + " 个文本块，已按 reading_order 排序。所有坐标与摘抄均可回原文核对。";
+    $("s2sub").textContent = r.is_demo
+      ? "示例数据无原图，此处为重排文字框（bbox 来自示例标注）。"
+      : "原图 + bbox 叠加：框为 OCR 检测框，悬停显示识别文本，点击可定位右侧文本块。";
     renderPreview(r.page || {}, r.blocks || []);
     renderBlocks(r.blocks || []);
     renderEntities(r.entities || [], r.triples || []);
@@ -435,14 +527,28 @@ async function loadOcr() {
     }
   } catch (e) { $("s2hint").textContent = "读取失败：" + e.message; toast("读取失败：" + e.message); }
 }
+/* 真实页原图地址：只认本系统命名的上传文件（P<时间戳>-<hash>.<ext>），示例页没有原图 */
+function imageUrlOf(page) {
+  const raw = (page && page.image_path) || "";
+  const name = String(raw).split(/[\\/]/).pop() || "";
+  return /^P\d{14}-[0-9a-f]{6}\.(png|jpg|jpeg|bmp|webp|tif|tiff)$/i.test(name) ? "/uploads/" + name : "";
+}
 function renderPreview(page, blocks) {
   const c = $("pageCanvas"), W = page.width || 720, H = page.height || 1000;
-  if (!blocks.length) { c.innerHTML = "<div class='empty'>无文本块</div>"; return; }
-  c.innerHTML = blocks.map((b, i) => {
+  const url = imageUrlOf(page);
+  c.style.aspectRatio = W + " / " + H;
+  if (!blocks.length && !url) { c.className = "page-canvas"; c.innerHTML = "<div class='empty'>无文本块</div>"; return; }
+  c.className = "page-canvas" + (url ? " overlay" : "");
+  const boxes = blocks.map((b, i) => {
     const [x1, y1, x2, y2] = b.bbox || [0, 0, 0, 0];
     const st = `left:${(x1 / W * 100).toFixed(2)}%;top:${(y1 / H * 100).toFixed(2)}%;width:${((x2 - x1) / W * 100).toFixed(2)}%;height:${((y2 - y1) / H * 100).toFixed(2)}%`;
-    return `<div class="bbox" data-i="${i}" style="${st}" title="${esc(b.text)}"><div class="vtext">${esc(b.text)}</div><span class="tag">${esc(b.line_id)}</span></div>`;
+    return `<div class="bbox" data-i="${i}" style="${st}" title="${esc(b.line_id + " · " + b.text)}"><div class="vtext">${esc(b.text)}</div><span class="tag">${esc(b.line_id)}</span></div>`;
   }).join("");
+  c.innerHTML = (url ? `<img class="base" src="${url}" alt="上传的古籍页原图">` : "") + boxes;
+  const img = c.querySelector("img.base");
+  if (img) img.onerror = () => {   // 图片取不到时退回纯文字框，不显示破图
+    c.className = "page-canvas"; if (img) img.remove();
+  };
   c.querySelectorAll(".bbox").forEach(el => el.onclick = () => selectBlock(+el.dataset.i));
 }
 function renderBlocks(blocks) {
@@ -478,17 +584,19 @@ const COLORS = { "药材": "#2f6fed", "方剂": "#b45309", "剂量": "#7c3aed", 
 const colorOf = t => COLORS[t] || "#64748b";
 async function loadGraph() {
   try {
-    const r = await api("/api/graph");
+    const q = S.pageId ? ("?page_id=" + encodeURIComponent(S.pageId)) : "";
+    const r = await api("/api/graph" + q);
     S.graph = r; S.nodes = (r.nodes || []).map(n => Object.assign({}, n));
     S.links = (r.links || []).filter(l => S.nodes.some(n => n.id === l.source) && S.nodes.some(n => n.id === l.target));
-    $("graphBadge").textContent = r.badge || "示例数据 / 模型未接入";
-    $("demoChip").textContent = r.badge || "示例数据 / 模型未接入";
+    $("graphBadge").textContent = badgeOf(r);
+    $("demoChip").textContent = badgeOf(r);
     const st = r.stats || {};
     $("graphHint").textContent = "共 " + S.nodes.length + " 个节点 / " + S.links.length + " 条边；" +
-      (st.note || "示例数据 / 模型未接入");
+      (st.note || "规模不是评测指标");
     $("graphStats").innerHTML = "<b>节点数：</b>" + S.nodes.length + "　<b>边数：</b>" + S.links.length +
-      "<br><b>演示标注：</b>" + esc(r.badge || "示例数据 / 模型未接入") +
-      "<br><b>规模说明：</b>节点与边全部来自示例数据，不是评测指标。";
+      "<br><b>页面：</b>" + esc(r.page_id || S.pageId || "—") +
+      "<br><b>演示标注：</b>" + esc(badgeOf(r)) +
+      "<br><b>规模说明：</b>节点与边来自当前页的抽取结果，不是评测指标。";
     const rels = st.relations || {};
     $("relList").innerHTML = Object.keys(rels).length ? Object.entries(rels).map(([k, v]) =>
       `<span class="badge gray">${esc(k)} × ${esc(v)}</span>`).join("") : "<span class='badge gray'>暂无关系</span>";
@@ -561,7 +669,7 @@ function drawGraph() {
       ["入边 / 出边", ins + " / " + outs], ["page_id", best.page_id || (S.pageId || "—")],
       ["source_hash", best.source_hash || "—"],
       ["关系（出）", S.links.filter(l => l.source === best.id).map(l => l.relation + "→" + l.target).join("；") || "—"],
-      ["演示标注", "示例数据 / 模型未接入"],
+      ["演示标注", badgeOf(S.graph)],
     ].map(([k, v]) => `<div><b>${esc(k)}：</b>${esc(fmt(v))}</div>`).join("");
   };
 }
