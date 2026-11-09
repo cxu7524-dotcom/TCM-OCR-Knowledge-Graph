@@ -29,6 +29,11 @@ ROW_GAP_RATIO = 0.8
 DOSE_RE = re.compile(r"([一二三四五六七八九十百\d]+)\s*(两|兩|钱|錢|分|枚|升|合|斤|片|勺|盏|盞)")
 SPLIT_RE = re.compile(r"[\s,，;；、]+")
 
+# 炮制字闭集纠错：木刻 / 低分辨率下与常见字混淆。
+# 依据：实测 p0009 炮制格「擘」被识别为「擎」（conf 0.34），同列「切/炙/去皮」均正确。
+# 只对长度 ≤3 的短单元格生效，避免误伤药名与主治；每次纠错写 trace 可回溯。
+PROCESS_FIX = {"擎": "擘", "璧": "擘", "擘": "擘"}
+
 
 def parse_dose_cell(text: str) -> List[List[str]]:
     """阶段一兼容接口：把「桂枝三两 芍药三两」连写拆成 [药名, 剂量, 备注] 行。"""
@@ -172,6 +177,53 @@ def fill_missing_cells(image_path: str, blocks: Sequence[Block], page_id: str
         return list(blocks), []
 
 
+def _recognize_cell(im, box, pads: Tuple[int, ...] = (0, 4, 8),
+                    scales: Tuple[int, ...] = (2, 3, 4)) -> Tuple[str, float]:
+    """单格识别：裁切边界对结果极其敏感，按「原边界 → 外扩 4px → 外扩 8px」依次尝试。
+
+    实测依据（p0009 炮制格）：crop (580,692,644,730) 能识别出字（conf 0.34），
+    边界改为 (578,690,646,732) 则直接返回空 —— 差 2px 就从出字变空。
+    因此固定边界不可靠，改为多边界 × 多缩放取置信度最高的非空结果。
+    """
+    try:
+        from PIL import Image
+        import numpy as np
+        from .recognize import recognize_crop
+    except ImportError:
+        return "", 0.0
+    best_text, best_conf = "", 0.0
+    for p in pads:
+        b = (max(0, int(box[0]) - p), max(0, int(box[1]) - p),
+             min(im.width, int(box[2]) + p), min(im.height, int(box[3]) + p))
+        if b[2] - b[0] < 8 or b[3] - b[1] < 8:
+            continue
+        crop = im.crop(b)
+        for s in scales:
+            try:
+                arr = np.array(crop.resize((crop.width * s, crop.height * s), Image.LANCZOS))
+            except (ValueError, OSError):
+                continue
+            text, conf = recognize_crop(arr)
+            if text and conf > best_conf:
+                best_text, best_conf = text, conf
+        if best_text:          # 该边界已出字，不再外扩，避免把邻格字卷进来
+            break
+    return best_text, best_conf
+
+
+def _fix_process(text: str, ci: int, trace: List[Dict[str, Any]], page_id: str,
+                 ri: int) -> str:
+    """炮制列字形纠错：只对第 3 列（ci==2）且长度 ≤3 的短格生效。"""
+    if ci != 2 or not text or len(text) > 3:
+        return text
+    fixed = PROCESS_FIX.get(text)
+    if fixed and fixed != text:
+        trace.append({"page_id": page_id, "row": ri, "col": ci,
+                      "before": text, "after": fixed, "rule": "炮制字形纠错（闭集）"})
+        return fixed
+    return text
+
+
 def _fill_missing_cells(image_path: str, blocks: Sequence[Block], page_id: str
                         ) -> Tuple[List[Block], List[Dict[str, Any]]]:
     items = [b for b in blocks if isinstance(b, Block)]
@@ -224,10 +276,8 @@ def _fill_missing_cells(image_path: str, blocks: Sequence[Block], page_id: str
                     box = (max(0, int(x1)), max(0, int(y1)),
                            min(im.width, int(x2)), min(im.height, int(y2)))
                     if box[2] - box[0] >= 10 and box[3] - box[1] >= 10:
-                        crop = im.crop(box)
-                        arr = np.array(crop.resize((crop.width * 2, crop.height * 2),
-                                                   Image.LANCZOS))
-                        text, conf = recognize_crop(arr)
+                        text, conf = _recognize_cell(im, box)
+                        text = _fix_process(text, ci, trace, page_id, ri)
                         if text and len(text) > len(occupant.text):
                             trace.append({"page_id": page_id, "row": ri, "col": ci,
                                           "before": occupant.text, "after": text,
@@ -242,8 +292,8 @@ def _fill_missing_cells(image_path: str, blocks: Sequence[Block], page_id: str
             if box[2] - box[0] < 10 or box[3] - box[1] < 10:
                 continue
             crop = im.crop(box)
-            arr = np.array(crop.resize((crop.width * 2, crop.height * 2), Image.LANCZOS))
-            text, conf = recognize_crop(arr)
+            text, conf = _recognize_cell(im, box)
+            text = _fix_process(text, ci, trace, page_id, ri)
             if not text:
                 continue
             line_id = f"C{len(added) + 1:03d}"

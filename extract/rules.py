@@ -22,17 +22,63 @@ TODO（下一阶段）：
 from __future__ import annotations
 
 import re
+import statistics
 from typing import Iterable, List, Optional, Tuple
 
 from app.schemas import Block, Entity, Triple
 
 from .schema import (
     CONTRA_WORDS, DOSE_RE, EFFECT_WORDS, FORMULAS, HERBS,
-    NATURE_PATTERNS, ZHUZHI_RE,
+    MERIDIAN_WORDS, NATURE_PATTERNS, ZHUZHI_RE,
 )
 
 _DOSE_R = re.compile(r"([一-龥]{1,6}?)\s*(" + DOSE_RE + r")")
 _ZHUZHI_R = re.compile(ZHUZHI_RE)
+
+# 表格表头：不参与实体抽取（否则「劑量」会被当成剂量值、「藥名」被当成药材）
+TABLE_HEADERS = {"藥名", "药名", "劑量", "剂量", "炮製", "炮制", "主治", "功效"}
+
+
+def _table_dose_blocks(blocks: List[Block]) -> Optional[set]:
+    """判定「三列表格页」并返回其剂量列的块 id 集合；不是表格页返回 None。
+
+    为什么需要：表格页的药名/剂量/炮制是**分开的检测框**，
+    `_DOSE_R` 要求「药名紧邻剂量」连写，分开的单元格根本匹配不到；
+    而正文里的「一合」又会被误抽成剂量。实测合成表格页因此产生
+    9 个剂量 FP + 6 个剂量 FN。
+
+    判据（纯几何，不读 GT）：按 x 中心聚类后恰好 3 列、每列 ≥3 块，
+    取 x 升序的中间列为剂量列。列间距阈值取框宽中位数的 0.8 倍。
+    """
+    # 先剔除页眉/页脚（宽高比 ≥4 的长条），否则页眉的 x 中心会落进剂量列、
+    # 把列聚类污染成 4 列，导致整个判据失效。
+    items = []
+    for b in blocks:
+        if not isinstance(b, Block) or not b.text:
+            continue
+        w = max(1.0, b.bbox[2] - b.bbox[0])
+        h = max(1.0, b.bbox[3] - b.bbox[1])
+        if w / h >= 4.0:
+            continue
+        items.append(b)
+    if len(items) < 9:
+        return None
+    widths = [max(1.0, b.bbox[2] - b.bbox[0]) for b in items]
+    gap = max(40.0, statistics.median(widths) * 0.8)
+    xs = sorted((b.bbox[0] + b.bbox[2]) / 2 for b in items)
+    groups: List[List[float]] = [[xs[0]]]
+    for x in xs[1:]:
+        if x - groups[-1][-1] <= gap:
+            groups[-1].append(x)
+        else:
+            groups.append([x])
+    if len(groups) != 3 or min(len(g) for g in groups) < 3:
+        return None
+    centers = [sum(g) / len(g) for g in groups]
+    mid = centers[1]
+    tol = gap / 2
+    return {id(b) for b in items
+            if abs((b.bbox[0] + b.bbox[2]) / 2 - mid) <= tol}
 
 
 def _pick_main(text: str, words: Iterable[str]) -> str:
@@ -82,6 +128,18 @@ def extract_entities(blocks: Iterable[Block]) -> List[Entity]:
     输入：Block 列表；输出：Entity 列表（去重、字段完整、不抛异常）。
     """
     out: List[Entity] = []
+    blocks = list(blocks)
+    # 预计算：每页若判定为三列表格，记录其剂量列的块 id（见 _table_dose_blocks）
+    dose_cols: dict = {}
+    _by_page: dict = {}
+    for _b in blocks:
+        if isinstance(_b, Block):
+            _by_page.setdefault(_b.page_id, []).append(_b)
+    for _pid, _bs in _by_page.items():
+        _s = _table_dose_blocks(_bs)
+        if _s:
+            dose_cols[_pid] = _s
+
     seen = set()
     try:
         for b in blocks:
@@ -119,8 +177,17 @@ def extract_entities(blocks: Iterable[Block]) -> List[Entity]:
                         if h not in seen_nature:
                             seen_nature.add(h)
                             add(h, "性味")
-            for dose in _DOSE_R.findall(text):
-                add(dose[1], "剂量", dose[1])
+            # 剂量：表格页按列位置直取（单元格是分开的检测框，正则匹配不到），
+            # 正文页才跑正则，且要求药名在词典内 —— 否则「一合」这类会被误抽成剂量。
+            if b.page_id in dose_cols:
+                # 表头「劑量」本身不是剂量值，排除
+                if id(b) in dose_cols[b.page_id] and text not in TABLE_HEADERS:
+                    add(text, "剂量", text)
+            else:
+                for herb_txt, dose_val in _DOSE_R.findall(text):
+                    # 只认词典内的药名：否则「温服一合」「一合」这类会被误抽成剂量
+                    if herb_txt.strip() in HERBS:
+                        add(dose_val, "剂量", dose_val)
             # 功效：GT 每行只标一个主功效，取「最长 + 最先出现」（见 _pick_main）
             eff = _pick_main(text, EFFECT_WORDS)
             if eff:
@@ -131,6 +198,10 @@ def extract_entities(blocks: Iterable[Block]) -> List[Entity]:
             for word in sorted(CONTRA_WORDS, key=lambda s: (-len(s), s)):
                 if contra_ctx and word in text:
                     add(word, "禁忌")
+            # 归经：古籍常见「归某经」，合成集 GT 只标笼统的「脏腑」
+            for word in sorted(MERIDIAN_WORDS, key=lambda s: (-len(s), s)):
+                if word in text:
+                    add(word, "归经")
     except Exception:
         return out  # 桩不得抛异常，返回已抽到的部分
     return out

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-08 23:08:03",
+  "generated_at": "2026-11-09 19:54:34",
   "notice": "合成示意数据，用于工程自测，非命题单位样本、非官方评测结果",
   "disclaimer": "仅供参考、非诊疗建议",
   "gt_version": "514f99246f103a95",
@@ -31,8 +31,8 @@
   "predict_meta": {
     "predictions_generated": true,
     "pages": 24,
-    "ocr_blocks": 240,
-    "entities": 166,
+    "ocr_blocks": 248,
+    "entities": 174,
     "tables": 8,
     "qa_cases": 67,
     "engines": [
@@ -61,12 +61,12 @@
       "检测阈值": "box_thresh=0.3, text_score=0.35",
       "公网 / 密钥": "无（未读取任何 API Key，未访问任何公网推理服务）"
     },
-    "generated_at": "2026-11-08 23:08:03",
+    "generated_at": "2026-11-09 19:54:34",
     "reason": ""
   },
   "prediction_counts": {
-    "ocr": 240,
-    "entities": 166,
+    "ocr": 248,
+    "entities": 174,
     "tables": 8,
     "qa_log": 67
   },
@@ -74,10 +74,10 @@
     "cer": {
       "key": "cer",
       "status": "实测",
-      "value": 0.089,
+      "value": 0.0942,
       "judge": "无参考阈值",
       "threshold": null,
-      "detail": "总编辑距离 34 / GT 字数 382，覆盖 7 页",
+      "detail": "总编辑距离 36 / GT 字数 382，覆盖 7 页",
       "per_page": {
         "SYN-2026-001__p0004": {
           "gt_chars": 55,
@@ -99,15 +99,15 @@
         },
         "SYN-2026-001__p0011": {
           "gt_chars": 49,
-          "pred_chars": 48,
-          "distance": 7,
-          "cer": 0.1429
+          "pred_chars": 49,
+          "distance": 8,
+          "cer": 0.1633
         },
         "SYN-2026-001__p0015": {
           "gt_chars": 49,
-          "pred_chars": 48,
-          "distance": 7,
-          "cer": 0.1429
+          "pred_chars": 49,
+          "distance": 8,
+          "cer": 0.1633
         },
         "SYN-2026-001__p0019": {
           "gt_chars": 59,
@@ -132,7 +132,7 @@
           "SYN-2026-001__p0019",
           "SYN-2026-001__p0021"
         ],
-        "cer": 0.089,
+        "cer": 0.0942,
         "note": "繁体页单独统计，未混入总体 CER"
       },
       "variant_subset": {
@@ -156,64 +156,64 @@
     "field_f1": {
       "key": "field_f1",
       "status": "实测",
-      "value": 0.6471,
+      "value": 0.7879,
       "judge": "未达标",
       "threshold": 0.8,
-      "P": 0.66,
-      "R": 0.6346,
-      "TP": 33,
-      "FP": 17,
-      "FN": 19,
+      "P": 0.8298,
+      "R": 0.75,
+      "TP": 39,
+      "FP": 8,
+      "FN": 13,
       "excluded": {
         "gt": 0,
         "pred": 0
       },
       "align_mode": "归一化对齐（正式）",
-      "detail": "TP=33 FP=17 FN=19；对齐键 (page_id,type,name,value)；归一化对齐（正式）"
+      "detail": "TP=39 FP=8 FN=13；对齐键 (page_id,type,name,value)；归一化对齐（正式）"
     },
     "field_f1_legacy": {
       "key": "field_f1",
       "status": "实测",
-      "value": 0.4314,
+      "value": 0.4848,
       "judge": "未达标",
       "threshold": 0.8,
-      "P": 0.44,
-      "R": 0.4231,
-      "TP": 22,
-      "FP": 28,
-      "FN": 30,
+      "P": 0.5106,
+      "R": 0.4615,
+      "TP": 24,
+      "FP": 23,
+      "FN": 28,
       "excluded": {
         "gt": 0,
         "pred": 0
       },
       "align_mode": "原值对齐（修正前对照）",
-      "detail": "TP=22 FP=28 FN=30；对齐键 (page_id,type,name,value)；原值对齐（修正前对照）"
+      "detail": "TP=24 FP=23 FN=28；对齐键 (page_id,type,name,value)；原值对齐（修正前对照）"
     },
     "table_structure": {
       "key": "table_structure",
       "status": "实测",
-      "value": 0.0,
-      "judge": "未达标",
+      "value": 1.0,
+      "judge": "达标",
       "threshold": 0.8,
       "shape_rate": 1.0,
-      "cell_rate": 0.0,
-      "cell_level_accuracy": 0.9444,
-      "cell_correct": 34,
+      "cell_rate": 1.0,
+      "cell_level_accuracy": 1.0,
+      "cell_correct": 36,
       "cell_total": 36,
       "total_tables": 2,
       "matched_tables": 2,
-      "usable": false,
+      "usable": true,
       "per_table": [
         {
           "key": "SYN-2026-001__p0011|SYN-2026-001__p0011-T01",
           "shape_ok": true,
-          "cell_ok": false,
+          "cell_ok": true,
           "matched": true
         },
         {
           "key": "SYN-2026-001__p0015|SYN-2026-001__p0015-T01",
           "shape_ok": true,
-          "cell_ok": false,
+          "cell_ok": true,
           "matched": true
         }
       ],
@@ -221,7 +221,7 @@
         "gt": 0,
         "pred": 0
       },
-      "detail": "结构 2/2、整表单元格全对 0/2、联合 0/2；单元格级正确 34/36（0.9444）"
+      "detail": "结构 2/2、整表单元格全对 2/2、联合 2/2；单元格级正确 36/36（1.0）"
     },
     "traceability": {
       "key": "traceability",
