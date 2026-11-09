@@ -43,6 +43,7 @@ if str(_ROOT) not in sys.path:
 EVAL_DIR = _ROOT / "古籍评测集"
 MATCH_JSONL = _ROOT / "data" / "reports" / "guji_match.jsonl"
 GT_CACHE = _ROOT / "data" / "reports" / "guji_gt.json"
+OFFICIAL_GT = _ROOT / "data" / "annotation" / "official" / "ocr_transcription.jsonl"
 MANUAL_COLS = _ROOT / "data" / "annotation" / "guji_manual_cols.json"
 TUNING_BOOKS = {"天文問答"}
 VALIDATION_BOOKS = {"兵鏡", "杜甫-杜工部集", "兵法集要", "晏子春秋"}
@@ -86,14 +87,42 @@ def cer(pred: str, gold: str) -> Optional[float]:
     return round(levenshtein(p, g) / len(g), 4)
 
 
-def coverage(pred: str, gold: str) -> Optional[float]:
-    """预测字符中能在 GT 里找到的比例（多重集交集 / 预测字数）。"""
-    p, g = norm(pred), norm(gold)
-    if not p:
+def cer_sorted(pred: str, gold: str) -> Optional[float]:
+    """**顺序无关**的 CER（诊断量，不参与任何判定）。
+
+    把两侧字符各自排序后再算编辑距离：若 GT 的字符顺序与页面阅读顺序不一致，
+    严格 CER 会很高而本值很低。差值即「顺序问题」的贡献，用来区分
+    「认错了」与「认对了但排错序」。
+    """
+    g, p = norm(gold), norm(pred)
+    if not g:
         return None
+    return round(levenshtein("".join(sorted(p)), "".join(sorted(g))) / len(g), 4)
+
+
+def match_stats(pred: str, gold: str) -> Dict[str, Any]:
+    """覆盖率 + 插入率（阶段六新增，只用于解释 CER，不替代主指标）。
+
+    覆盖率 = 预测字符中能在 GT 里找到的字数 / 预测字数 —— 衡量「认错的字」
+    插入率 = (预测字数 - 匹配字数) / GT 字数 —— 衡量「多认出来的字」
+             （页眉 / 版心 / 背面透印 / 朱印 / 手写序，GT 只转写正文时必然出现）
+    """
+    p, g = norm(pred), norm(gold)
+    out = {"pred_chars": len(p), "gt_chars": len(g), "matched": 0,
+           "coverage": None, "insert_rate": None}
+    if not p or not g:
+        return out
     pg, gg = Counter(p), Counter(g)
     hit = sum(min(v, gg.get(k, 0)) for k, v in pg.items())
-    return round(hit / len(p), 4)
+    out["matched"] = hit
+    out["coverage"] = round(hit / len(p), 4)
+    out["insert_rate"] = round((len(p) - hit) / len(g), 4)
+    return out
+
+
+def coverage(pred: str, gold: str) -> Optional[float]:
+    """预测字符中能在 GT 里找到的比例（多重集交集 / 预测字数）。"""
+    return match_stats(pred, gold)["coverage"]
 
 
 def book_of(best: str) -> str:
@@ -139,16 +168,45 @@ def load_pages(split: str) -> List[Dict[str, Any]]:
 
 
 def load_dir_pages(dir_path: Path) -> List[Dict[str, Any]]:
-    """按目录评测（医家类小规模验证用）：GT 取 label.csv 的 OCR 列，按文件名匹配。"""
+    """按目录评测：优先用 `import_guji_eval.py --build-gt` 产出的正式 GT 清单。
+
+    阶段六起支持三种布局：
+      ① `古籍评测集/医家类/<书名>/page_N.png`（子目录，书名在目录名里）
+      ② `古籍评测集/医家类/书名page_N.png`（扁平）
+      ③ 正式 GT（`data/annotation/official/ocr_transcription.jsonl`，含 image_path）
+    有正式 GT 时以它为准（页数、书名、页码、原文都来自 GT，避免图片目录里混入无标注页）。
+    """
     exts = {".png", ".jpg", ".jpeg", ".tif", ".tiff"}
     pages: List[Dict[str, Any]] = []
+    if OFFICIAL_GT.exists():
+        rows = [json.loads(l) for l in OFFICIAL_GT.read_text(encoding="utf-8").splitlines() if l.strip()]
+        root = dir_path.resolve()
+        for r in rows:
+            ip = Path(str(r.get("image_path") or ""))
+            if not ip.is_file():
+                continue
+            try:
+                ip.resolve().relative_to(root)
+            except ValueError:
+                continue                      # GT 里的图不在本次评测目录下
+            pages.append({"image": str(ip.resolve()), "gt_name": r.get("source_name", ip.name),
+                          "book": r.get("book", ""), "page_no": r.get("page_no"),
+                          "page_id": r.get("page_id", ""), "gold": r.get("text", "")})
+        if pages:
+            return sorted(pages, key=lambda x: (str(x["book"]), x.get("page_no") or 0))
+
     if not dir_path.is_dir():
         return pages
     for p in sorted(dir_path.iterdir()):
-        if p.suffix.lower() not in exts:
-            continue
-        pages.append({"image": str(p.resolve()), "gt_name": p.name,
-                      "book": p.name.split("page")[0], "page_no": None})
+        if p.is_file() and p.suffix.lower() in exts:
+            pages.append({"image": str(p.resolve()), "gt_name": p.name,
+                          "book": p.name.split("page")[0], "page_no": None})
+        elif p.is_dir():                       # 子目录布局：书名取目录名
+            for q in sorted(p.iterdir()):
+                if q.is_file() and q.suffix.lower() in exts:
+                    pages.append({"image": str(q.resolve()),
+                                  "gt_name": f"{p.name}{q.name}",
+                                  "book": p.name, "page_no": None})
     return pages
 
 
@@ -195,7 +253,7 @@ def main() -> int:
         img = Path(p["image"])
         if not img.is_absolute():
             img = EVAL_DIR / img
-        gold = gt.get(p["gt_name"], "")
+        gold = p.get("gold") or gt.get(p["gt_name"], "")
         if not img.exists() or not gold:
             results.append({**p, "status": "skip", "reason": "缺图或缺 GT"})
             continue
@@ -205,14 +263,18 @@ def main() -> int:
             lay = page_layout(str(img))
             cols = lay["cols"]
             cross = cross_column_rate(ocr.blocks, cols)
+            ms = match_stats(text, gold)
             mcols = (manual.get(p["image"]) or manual.get(p["gt_name"])
                      or manual.get(Path(p["image"]).name))
             cols_ok = None if not mcols else (abs(len(cols) - mcols) <= 2)
             results.append({
                 **p, "status": "ok", "engine": ocr.engine,
-                "blocks": len(ocr.blocks), "chars": len(norm(text)),
-                "gt_chars": len(norm(gold)),
-                "cer": cer(text, gold), "coverage": coverage(text, gold),
+                "blocks": len(ocr.blocks), "chars": ms["pred_chars"],
+                "direction": ocr.layout.direction,
+                "gt_chars": ms["gt_chars"], "matched": ms["matched"],
+                "cer": cer(text, gold), "coverage": ms["coverage"],
+                "insert_rate": ms["insert_rate"],
+                "cer_sorted": cer_sorted(text, gold),
                 "columns": len(ocr.layout.cols), "cols_detected": len(cols),
                 "cols_manual": mcols, "cols_ok": cols_ok,
                 "spread": len(lay["halves"]) > 1, "halves": lay["halves"],
@@ -222,22 +284,44 @@ def main() -> int:
             })
         except Exception as exc:
             results.append({**p, "status": "error", "reason": type(exc).__name__})
-        if i % 5 == 0:
+        if i % 10 == 0:
             print(f"  {i}/{len(pages)} …", flush=True)
 
     ok = [r for r in results if r["status"] == "ok"]
     cers = [r["cer"] for r in ok if r.get("cer") is not None]
     covs = [r["coverage"] for r in ok if r.get("coverage") is not None]
+    inss = [r["insert_rate"] for r in ok if r.get("insert_rate") is not None]
     sampled = [r for r in ok if r.get("cols_manual")]
     cross_total = sum(r["cross_total"] for r in ok)
     cross_boxes = sum(r["cross_boxes"] for r in ok)
+
+    by_book: Dict[str, Any] = {}
+    for b in sorted({r["book"] for r in ok}):
+        rows_b = [r for r in ok if r["book"] == b]
+        cb = [r["cer"] for r in rows_b if r.get("cer") is not None]
+        vb = [r["coverage"] for r in rows_b if r.get("coverage") is not None]
+        ib = [r["insert_rate"] for r in rows_b if r.get("insert_rate") is not None]
+        by_book[b] = {
+            "pages": len(rows_b),
+            "cer_median": median(cb),
+            "cer_mean": round(sum(cb) / len(cb), 4) if cb else None,
+            "coverage_median": median(vb),
+            "insert_rate_median": median(ib),
+            "gt_chars_median": median([r["gt_chars"] for r in rows_b]),
+            "spread_pages": sum(1 for r in rows_b if r.get("spread")),
+        }
     summary = {
         "tag": args.tag or f"vertical={args.vertical}",
-        "split": args.split,
+        "split": args.dir or args.split,
         "pages": len(pages), "ok": len(ok),
         "cer_median": median(cers), "cer_mean": round(sum(cers) / len(cers), 4) if cers else None,
         "cer_best": min(cers) if cers else None, "cer_worst": max(cers) if cers else None,
         "coverage_median": median(covs),
+        "insert_rate_median": median(inss),
+        "insert_rate_mean": round(sum(inss) / len(inss), 4) if inss else None,
+        "cer_sorted_median": median([r["cer_sorted"] for r in ok
+                                     if r.get("cer_sorted") is not None]),
+        "by_book": by_book,
         "cols_accuracy": (round(sum(1 for r in sampled if r["cols_ok"]) / len(sampled), 4)
                           if sampled else None),
         "cols_sampled": len(sampled),

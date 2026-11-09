@@ -127,19 +127,62 @@ def _profiles(img: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     return (bw.sum(axis=0) / 255.0, clean.sum(axis=0) / 255.0, gray.mean(axis=0))
 
 
+def _vertical_line_peaks(img: np.ndarray) -> List[Tuple[int, int, float]]:
+    """贯穿全页的长竖线峰值 [(x0, x1, peak)]：版框边、界行、书脊都算。
+
+    医书对开页左右各有一个矩形版框，两框相邻处有一条（或一对紧挨的）长竖线，
+    落在页面中线附近——这是比「列间隙」更强的书脊证据（《丹方彚编》《合併脉訣》
+    这类宽高比只有 1.06~1.15 的对开页，列间隙法常常抓不到）。
+    """
+    if not _CV2_OK:
+        return []
+    h, w = img.shape[:2]
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    bw = _binarize(gray)
+    bw[_red_mask(img) > 0] = 0
+    vert = cv2.morphologyEx(
+        bw, cv2.MORPH_OPEN,
+        cv2.getStructuringElement(cv2.MORPH_RECT, (1, max(40, h // 25))))
+    proj = vert.sum(axis=0) / 255.0
+    if proj.max() <= 0:
+        return []
+    thr = 0.45 * float(proj.max())
+    peaks: List[Tuple[int, int, float]] = []
+    i = 0
+    while i < w:
+        if proj[i] > thr:
+            j = i
+            while j < w and proj[j] > thr:
+                j += 1
+            peaks.append((i, j, float(proj[i:j].max())))
+            i = j
+        else:
+            i += 1
+    return peaks
+
+
 def _gutter_candidates(img: np.ndarray) -> List[Tuple[float, int, int, str]]:
-    """书脊候选区间 (score, x0, x1, 依据)，三路证据取并集。
+    """书脊候选区间 (score, x0, x1, 依据)，四路证据取并集。
 
     ① 列间隙法：把全页切列后，中窗内**明显宽于常态**的列间隙——对开页两半的间距
        通常是普通列间隙的 1.5 倍以上（实测 page_10 1.93×、page_11 6.25×、page_13(1) 3.49×）；
     ② 阴影型中缝：装订阴影是贯穿全页的长暗带，灰度显著低于纸张中位，
        但它会被 `_remove_lines` 当成竖线减掉，因此去线后前景≈0；
-    ③ 空白型中缝：中窗内去线后前景持续接近 0 的亮纸带。
+    ③ 空白型中缝：中窗内去线后前景持续接近 0 的亮纸带；
+    ④ 中缝竖线（阶段六新增）：版框边 / 书脊在页面中线附近形成的贯穿全页长竖线，
+       对宽高比 1.06~1.15 的医书对开页最有效。
     """
     raw, clean, gray = _profiles(img)
     h, w = img.shape[:2]
     lo, hi = int(GUTTER_WINDOW[0] * w), int(GUTTER_WINDOW[1] * w)
     out: List[Tuple[float, int, int, str]] = []
+
+    # ④ 中缝竖线（先算，权重最高）
+    nlo, nhi = int(0.42 * w), int(0.58 * w)
+    mid = [p for p in _vertical_line_peaks(img) if nlo <= (p[0] + p[1]) / 2 <= nhi]
+    if mid:
+        a, b, _peak = max(mid, key=lambda t: t[2])
+        out.append((6.0, a, b, "中缝竖线"))
 
     # ① 列间隙法
     cols = sorted(split_columns(img), key=lambda c: c["bbox"][0])
@@ -199,12 +242,17 @@ def split_spread(img: np.ndarray) -> List[Tuple[int, int]]:
     raw, clean, _ = _profiles(img)
     total_mass = float(clean.sum()) or 1.0
     for score, a, b, why in sorted(_gutter_candidates(img), key=lambda t: -t[0]):
-        if b - a < max(8, int(0.02 * w)) or a < 10 or b > w - 10:
+        # 竖线型候选本身就是一条细线（2~8px），宽度下限按证据类型区分
+        min_w = 2 if why == "中缝竖线" else max(8, int(0.02 * w))
+        if b - a < min_w or a < 10 or b > w - 10:
             continue
         if abs(a - (w - b)) > 0.2 * w:            # 两半宽度差过大 → 不像对开页
             continue
-        if min(float(clean[:a].sum()), float(clean[b:].sum())) / total_mass < 0.15:
-            continue
+        # 竖线证据强，不要求两半墨量均衡（医书目录页右半页字少是常态）；
+        # 其他证据仍要求两半各占 ≥15% 前景，避免把单页中间的空白当书脊
+        if why != "中缝竖线":
+            if min(float(clean[:a].sum()), float(clean[b:].sum())) / total_mass < 0.15:
+                continue
         if len(split_columns(img[:, :a])) < 3 or len(split_columns(img[:, b:])) < 3:
             continue
         # 右半页先读（古籍从右往左翻）

@@ -192,10 +192,33 @@ def _image_size(path: Path):
         return 0, 0
 
 
+def _scan_images(images_dir: Path) -> Dict[str, Path]:
+    """扫描图片目录 → {逻辑文件名: 实际路径}，兼容两种布局。
+
+      ① 扁平布局：`医家类/丹方彚编page_23.png`            → 键 `丹方彚编page_23.png`
+      ② 子目录布局：`医家类/丹方彚编/page_23.png`          → 键 `丹方彚编page_23.png`（书名取目录名）
+
+    两种布局都归一到 `书名page_N.png`，正好与 `guji_raw.jsonl` 的 `name` 字段对齐。
+    """
+    out: Dict[str, Path] = {}
+    exts = {".png", ".jpg", ".jpeg", ".tif", ".tiff"}
+    if not images_dir.is_dir():
+        return out
+    for p in sorted(images_dir.iterdir()):
+        if p.is_file() and p.suffix.lower() in exts:
+            out[p.name] = p
+        elif p.is_dir():
+            for q in sorted(p.iterdir()):
+                if q.is_file() and q.suffix.lower() in exts:
+                    out[f"{p.name}{q.name}"] = q
+    return out
+
+
 def cmd_build_gt(images_dir: Path) -> int:
     """把 guji_raw.jsonl + 已下载图片 → 正式 GT（整页 Block + 有依据问题集）。
 
     输出到 data/annotation/official/（gitignore 已排除），不污染合成集 GT。
+    只处理「图片目录里实际存在的书」，无标注页跳过并列出清单。
     """
     from app.schemas import source_hash_of
 
@@ -204,20 +227,30 @@ def cmd_build_gt(images_dir: Path) -> int:
         return 2
     raw = [json.loads(l) for l in RAW_PATH.read_text(encoding="utf-8").splitlines() if l.strip()]
 
+    found = _scan_images(images_dir)
+    books = {book_of(n) for n in found}
+    if not found:
+        print(f"图片目录里没有图片：{images_dir}", file=sys.stderr)
+        return 2
+
     ocr_out: List[Dict[str, Any]] = []
     qa_out: List[Dict[str, Any]] = []
     missing: List[str] = []
     skipped_no_size = 0
+    used: set = set()
 
     for x in raw:
-        img = images_dir / x["name"]
-        if not img.exists():
+        if x["book"] not in books:          # 只做有图片的书，其余 7 本不参与
+            continue
+        img = found.get(x["name"])
+        if img is None:
             missing.append(x["name"])
             continue
         w, h = _image_size(img)
         if not w or not h:
             skipped_no_size += 1
             continue
+        used.add(x["name"])
         page_id = f'{x["book"]}-p{x["page_no"]:04d}'
         bbox = [0, 0, w, h]
         ocr_out.append({
@@ -234,6 +267,7 @@ def cmd_build_gt(images_dir: Path) -> int:
             "text_norm": x["ocr"],             # 归一化交给 ocr/normalize 与 align_norm
             "kind": "page",
             "source_name": x["name"],
+            "image_path": str(img),
             "book": x["book"],
             "page_no": x["page_no"],
         })
@@ -254,10 +288,14 @@ def cmd_build_gt(images_dir: Path) -> int:
             for it in items:
                 f.write(json.dumps(it, ensure_ascii=False) + "\n")
 
+    unlabeled = sorted(n for n in found if n not in used)
     print(f"GT 转写：{ocr_path}（{len(ocr_out)} 页）")
     print(f"有依据问题：{qa_path}（{len(qa_out)} 条）")
-    if missing:
-        print(f"未找到图片 {len(missing)} 张，例如：{missing[:5]}")
+    print(f"涉及书目：{len(books)} 本 —— " + "、".join(sorted(books)))
+    print(f"跳过无标注页：{len(unlabeled)} 张")
+    if unlabeled:
+        print("  " + "、".join(unlabeled))
+    print(f"未找到图片：{len(missing)} 张" + (f"，例如：{missing[:5]}" if missing else ""))
     if skipped_no_size:
         print(f"图片宽高读取失败 {skipped_no_size} 张（Pillow 未安装？）")
     print("\n注意：这批 GT 是**外部数据集的机器转写**，不是人工逐字校对；")
