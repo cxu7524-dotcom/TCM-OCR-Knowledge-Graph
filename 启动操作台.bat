@@ -23,7 +23,7 @@ where python >nul 2>&1 || goto no_python
 echo.
 echo   赛题二原型启动中 ...
 echo   页面地址： http://127.0.0.1:8000
-echo   演示模式： 示例数据 / 模型未接入（指标一律待测）
+echo   演示模式： 本地 OCR 识别 / 内置示例
 echo   免责声明： 仅供参考、非诊疗建议
 echo.
 

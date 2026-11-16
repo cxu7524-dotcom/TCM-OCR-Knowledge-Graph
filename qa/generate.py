@@ -23,9 +23,9 @@ from typing import List, Optional
 from app.config import CONFIG
 from app.schemas import Answer, Block, Evidence, quote_hits_blocks
 
-from .disclaimer import DISCLAIMER, answer_disclaimer, out_of_scope_note
+from .disclaimer import DISCLAIMER, answer_disclaimer, out_of_scope_note, wrap
 from .index import VectorIndex
-from .refuse import should_refuse
+from .refuse import NO_EVIDENCE_NOTE, should_refuse
 from .retrieve import hybrid_retrieve, retrieve_with_trace
 
 
@@ -61,22 +61,27 @@ def _extractive_text(query: str, evidences: List[Evidence]) -> str:
 
 
 def _refusal_text(reason: str) -> str:
-    """拒答文案：明确说明无依据 / 越界，并带免责声明。"""
+    """拒答文案：明确说明无依据 / 越界，并带免责声明（不重复追加同一条声明）。"""
     if reason == out_of_scope_note():
-        body = f"{reason} {DISCLAIMER}。"
+        body = reason
     else:
-        body = (f"{reason}（{DISCLAIMER}）。系统未在原文中检索到可引用的依据，"
-                "因此不作答、不做任何推断。")
-    return f"{body} {answer_disclaimer()}"
+        body = f"{reason}。系统未在原文中检索到可引用的依据，因此不作答、不做任何推断。"
+    return wrap(body)
 
 
 def generate_answer(query: str, evidences: List[Evidence], blocks: List[Block],
                     backend: Optional[str] = None,
                     trace_extra: Optional[List[str]] = None,
-                    is_demo: bool = True) -> Answer:
+                    is_demo: bool = True,
+                    answer_text: str = "",
+                    objects: Optional[List[dict]] = None,
+                    refuse_note: str = "") -> Answer:
     """生成入口（桩）。
 
     输入：问题、检索证据、原文块列表
+          answer_text：图谱关系题已拼好的抽取式答案（为空则走通用原文摘录模板）
+          objects    ：图谱关系题的结构化对象，仅在作答时透出
+          refuse_note：题型已知但关系无证据时的具体拒答原因（覆盖通用「未检索到依据」）
     输出：Answer（结构完整，含 evidences / refused / refuse_reason / disclaimer / trace）
     异常：内部兜底，最坏情况返回合规的拒答 Answer，绝不抛异常。
     """
@@ -93,11 +98,13 @@ def generate_answer(query: str, evidences: List[Evidence], blocks: List[Block],
         trace.extend(rtrace)
 
         if refused:
+            if refuse_note and reason == NO_EVIDENCE_NOTE:
+                reason = refuse_note      # 题型已知：说清「本页没有能支持该关系的证据」
             return Answer(
                 text=_refusal_text(reason), evidences=[], refused=True,
                 refuse_reason=reason, disclaimer=DISCLAIMER,
                 trace=trace + [f"生成后端：{backend_name}（拒答，不调用模型）"],
-                backend=backend_name, is_demo=is_demo,
+                backend=backend_name, is_demo=is_demo, objects=[],
             )
 
         if CONFIG.llm.enabled:
@@ -106,12 +113,12 @@ def generate_answer(query: str, evidences: List[Evidence], blocks: List[Block],
             trace.append("生成后端 none：抽取式原文摘录，未调用任何模型")
 
         return Answer(
-            text=_extractive_text(query, verified),
+            text=answer_text or _extractive_text(query, verified),
             evidences=verified,
             refused=False, refuse_reason="", disclaimer=DISCLAIMER,
             trace=trace + ["输出边界：仅原文摘录，未做推断；已附免责声明"],
             backend="stub" if not CONFIG.llm.enabled else f"{backend_name}(stub)",
-            is_demo=is_demo,
+            is_demo=is_demo, objects=list(objects or []),
         )
     except Exception as exc:
         reason = "原文未检索到依据"
@@ -119,7 +126,7 @@ def generate_answer(query: str, evidences: List[Evidence], blocks: List[Block],
             text=_refusal_text(reason), evidences=[], refused=True,
             refuse_reason=reason, disclaimer=DISCLAIMER,
             trace=trace + [f"生成异常，保守拒答：{type(exc).__name__}"],
-            backend=backend_name, is_demo=is_demo,
+            backend=backend_name, is_demo=is_demo, objects=[],
         )
 
 

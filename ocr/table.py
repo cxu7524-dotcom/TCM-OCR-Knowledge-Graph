@@ -139,27 +139,70 @@ def restore_tables(blocks: Iterable[Block], page_id: str = "") -> List[TableStru
         widths = [max(1.0, _box(b)[2] - _box(b)[0]) for b in flat]
         tolerance = statistics.median(widths) * 1.5
         matrix: List[List[str]] = []
+        refs_matrix: List[List[str]] = []
         for row in rows:
             line = [""] * len(col_centers)
+            line_refs = [""] * len(col_centers)
             for b in row:
                 cx = (_box(b)[0] + _box(b)[2]) / 2
                 j = min(range(len(col_centers)),
                         key=lambda k: abs(col_centers[k] - cx)) if col_centers else 0
+                ref = b.block_ref or b.line_id
                 if col_centers and abs(col_centers[j] - cx) <= tolerance and not line[j]:
                     line[j] = b.text
+                    line_refs[j] = ref
                 elif col_centers and not line[j]:
                     line[j] = b.text
+                    line_refs[j] = ref
             matrix.append(line or [b.text for b in row])
+            # 出处矩阵与文本矩阵同形：空位 "" 表示该行列位置没有可定位的块
+            refs_matrix.append(line_refs or [b.block_ref or b.line_id for b in row])
         cells = [b.block_ref or b.line_id for row in rows for b in row]
         quote = "".join("".join(r) for r in matrix)
         return [TableStruct(
             table_id=f"{page_id}-T01", page_id=page_id,
-            rows=matrix, cells=cells,
+            rows=matrix, cells=cells, cell_refs=refs_matrix,
             source_hash=source_hash_of("table", page_id, quote),
             is_demo=all(getattr(b, "is_demo", False) for b in items) if items else True,
         )]
     except Exception:
         return []
+
+
+def align_cell_refs(rows: Sequence[Sequence[str]], cells: Sequence[str],
+                    blocks: Iterable[Block]) -> List[List[str]]:
+    """把扁平的 cells（检测顺序）对齐到 rows 的行列位置；只在**可逐格核验**时返回。
+
+    用途：早期入库的表格快照只有 rows + 扁平的 cells，没有 cell_refs。
+    为了不靠猜，按以下两个硬条件对齐，任一不满足就返回 []（前端标「无法定位」）：
+      1. cells 数量 == rows 里非空单元格数量，且 ref 无重复；
+      2. 每一格文本与对应块文本经 norm_for_match 归一后完全一致。
+    """
+    rows = [list(r) for r in (rows or [])]
+    cells = [str(c or "") for c in (cells or [])]
+    positions = [(r, c) for r, row in enumerate(rows)
+                 for c, text in enumerate(row) if str(text or "").strip()]
+    if not positions or not cells or len(positions) != len(cells):
+        return []
+    if len(set(cells)) != len(cells):
+        return []                      # 同一 ref 出现在多格 → 顺序已不可信
+    by_ref: Dict[str, Block] = {}
+    for b in blocks or []:
+        if not isinstance(b, Block):
+            continue
+        if b.block_ref:
+            by_ref[b.block_ref] = b
+        if b.line_id:
+            by_ref.setdefault(b.line_id, b)
+    matrix: List[List[str]] = [[""] * len(row) for row in rows]
+    for (r, c), ref in zip(positions, cells):
+        b = by_ref.get(ref) or by_ref.get(ref.split(":")[-1])
+        if b is None:
+            return []
+        if norm_for_match(b.text) != norm_for_match(rows[r][c]):
+            return []                  # 文本对不上 → 不猜，留空
+        matrix[r][c] = ref
+    return matrix
 
 
 def fill_missing_cells(image_path: str, blocks: Sequence[Block], page_id: str

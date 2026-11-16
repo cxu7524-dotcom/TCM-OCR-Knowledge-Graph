@@ -134,12 +134,22 @@ class Block(Provenance):
 
 @dataclass
 class TableStruct(_Record):
-    """方剂表 / 剂量表的结构还原结果（表格结构还原指标的对象）。"""
+    """方剂表 / 剂量表的结构还原结果（表格结构还原指标的对象）。
+
+    字段口径：
+      rows      : 二维文本矩阵，保留空白单元格（"" = 该行列位置无检测文本）；
+      cells     : 扁平列表，按 **检测顺序** 记录的 Block.block_ref，供评测 / 报告使用；
+      cell_refs : 与 rows **同形** 的出处矩阵，cell_refs[r][c] 为该格对应的
+                  Block.block_ref / line_id；空位与无法核验出处的格为 ""。
+                  前端据此把单元格定位回原图 bbox（见 app/main.py:_tables_payload）。
+    旧快照没有 cell_refs 时用 ocr/table.align_cell_refs 逐格核验补齐，核不上就留空。
+    """
 
     table_id: str = ""
     page_id: str = ""
     rows: List[List[str]] = field(default_factory=list)
     cells: List[str] = field(default_factory=list)   # Block.block_ref 列表
+    cell_refs: List[List[str]] = field(default_factory=list)  # 与 rows 同形的出处矩阵
     source_hash: str = ""
     is_demo: bool = True
 
@@ -297,11 +307,17 @@ class GraphData(_Record):
 
 @dataclass
 class Evidence(Provenance):
-    """④ 问答证据：必须能在原文 Block.text 中命中，否则答案转拒答。"""
+    """④ 问答证据：必须能在原文 Block.text 中命中，否则答案转拒答。
+
+    role 口径（阶段十新增，默认值保持旧行为）：
+      relation : 直接承载关系的原文行（引文里能看到客体 / 禁忌对象）
+      subject  : 用于确认**主体**的原文行（关系跨行时，证明「这条关系说的是这个主体」）
+    """
 
     score: float = 0.0
     block_ref: str = ""
     channel: str = "sparse"        # sparse | vector | graph
+    role: str = "relation"         # relation | subject
     is_demo: bool = True
 
     def validate(self) -> List[str]:
@@ -313,7 +329,12 @@ class Evidence(Provenance):
 
 @dataclass
 class Answer(_Record):
-    """问答最终产物。所有输出（含拒答）都带免责声明与 trace。"""
+    """问答最终产物。所有输出（含拒答）都带免责声明与 trace。
+
+    objects：图谱关系题的结构化结果（阶段十新增）。每个对象是一条**已通过出处校验**的
+    关系记录，字段含 head / relation / tail / subject_type / relation_line /
+    subject_line / support。普通文本检索题为空列表，旧调用方无需改动。
+    """
 
     text: str = ""
     evidences: List[Evidence] = field(default_factory=list)
@@ -323,6 +344,7 @@ class Answer(_Record):
     trace: List[str] = field(default_factory=list)
     backend: str = "stub"
     is_demo: bool = True
+    objects: List[Dict[str, Any]] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any] | None):

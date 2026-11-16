@@ -240,6 +240,29 @@ class TestUploadErrorClassification(unittest.TestCase):
         self.assertIn("OCR", res.detail)
 
 
+class TestQuestionPageScope(unittest.TestCase):
+    def test_missing_or_empty_page_cannot_use_current_evidence(self):
+        from app import main
+        from app.demo import load_demo_ocr
+
+        demo = load_demo_ocr("DEMO-001")
+        current = {"page_id": demo.page_id, "ocr": demo, "blocks": demo.blocks, "vector_index": None}
+        question = "甘草的性味是什么？"
+        with (mock.patch.dict(main._STATE, current),
+              mock.patch.object(main.store, "get_blocks", return_value=[]),
+              mock.patch.object(main.store, "get_page") as get_page,
+              mock.patch.object(main.store, "log_qa")):
+            answer = main.ask({"question": question, "page_id": demo.page_id})
+            self.assertFalse(answer["refused"])
+            self.assertTrue(answer["evidences"])
+            for page_id, snapshot in (("missing", None), ("empty", {"is_demo": False})):
+                with self.subTest(page_id=page_id):
+                    get_page.return_value = snapshot
+                    answer = main.ask({"question": question, "page_id": page_id})
+                    self.assertTrue(answer["refused"])
+                    self.assertEqual(answer["evidences"], [])
+
+
 def _tiny_png() -> bytes:
     """生成一张 8x8 的合法 PNG（不依赖外部素材）。"""
     from PIL import Image

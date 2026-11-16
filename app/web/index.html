@@ -3,206 +3,318 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>中医古籍 OCR 与知识图谱智能问答原型</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232f5d50'/%3E%3Ctext x='32' y='44' font-size='30' font-family='serif' fill='white' text-anchor='middle'%3E%E6%9C%AC%3C/text%3E%3C/svg%3E">
+<title>中医药古籍智能识别系统 · OCR 与知识图谱问答原型</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='3' y='3' width='58' height='58' rx='6' fill='%23a63a24'/%3E%3Crect x='8' y='8' width='48' height='48' rx='3' fill='none' stroke='%23fbe9df' stroke-width='2'/%3E%3Ctext x='32' y='43' font-size='28' font-family='serif' fill='%23fbe9df' text-anchor='middle'%3E%E6%9C%AC%3C/text%3E%3C/svg%3E">
 <style>
+  /* ============ 色板：宣纸 · 墨 · 朱砂 · 石青 · 赭石 ============ */
   :root {
-    --bg: #f3f6fb; --card: #ffffff; --line: #e3e9f2; --line-soft: #eef2f8;
-    --text: #1e293b; --muted: #64748b; --blue: #2f6fed; --blue-dark: #1d4ed8;
-    --ink: #2f5d50; --seal: #b45309; --green: #16a34a; --red: #dc2626;
-    --amber: #d97706; --purple: #7c3aed; --teal: #0f766e;
-    --shadow-sm: 0 1px 3px rgba(15,35,80,.06);
-    --shadow-md: 0 6px 20px rgba(15,35,80,.08);
+    --paper: #f1e8d3; --paper-2: #fbf6ea; --paper-3: #efe4ca;
+    --ink: #2b2520; --ink-soft: #5a4e44; --muted: #70634f;
+    --line: #d8c7a2; --line-soft: #e9dec4;
+    --cinnabar: #a63a24; --cinnabar-dark: #852c1a; --cinnabar-soft: #f5e1d6;
+    --qing: #2e5e5a; --qing-dark: #224744; --qing-soft: #e0ebe5;
+    --gold: #b8964e;
+    --serif: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "STSong", "SimSun", serif;
+    --kai: "KaiTi", "STKaiti", "Kaiti SC", "BiauKai", "Noto Serif SC", serif;
+    --sans: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+    --mono: ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace;
+    --shadow-sm: 0 1px 2px rgba(70,50,20,.08);
+    --shadow-md: 0 8px 24px rgba(70,50,20,.12);
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; min-height: 100%; }
   body {
-    font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
-    background: linear-gradient(165deg, #f3f6fb 0%, #eff4fa 55%, #eaf0f9 100%);
-    color: var(--text); font-size: 14px; padding-bottom: 28px;
+    font-family: var(--sans); color: var(--ink); font-size: 14px; padding-bottom: 28px;
+    background-color: var(--paper);
+    /* 宣纸纤维质感：多层极淡渐变叠加，无外部图片 */
+    background-image:
+      radial-gradient(ellipse at 12% 8%, rgba(255,255,255,.55), transparent 45%),
+      radial-gradient(ellipse at 88% 92%, rgba(184,150,78,.10), transparent 50%),
+      repeating-linear-gradient(93deg, rgba(120,90,40,.018) 0 2px, transparent 2px 7px),
+      repeating-linear-gradient(-4deg, rgba(120,90,40,.015) 0 1px, transparent 1px 11px);
   }
+  code { font-family: var(--mono); font-size: .92em; background: rgba(184,150,78,.14); padding: 0 4px; border-radius: 3px; }
+
+  /* ============ 匾额式页眉 ============ */
   header {
     display: flex; align-items: center; justify-content: space-between; gap: 16px;
-    padding: 0 22px; height: 62px; background: var(--card);
-    border-bottom: 1px solid var(--line); box-shadow: var(--shadow-sm);
+    padding: 0 24px; min-height: 66px; flex-wrap: wrap;
+    background: linear-gradient(180deg, #2f2a24, #26221d);
+    border-bottom: 3px double var(--gold); color: #f3e9d2;
   }
-  .brand { display: flex; align-items: center; gap: 11px; min-width: 0; }
-  .logo {
-    width: 34px; height: 34px; border-radius: 10px; flex: 0 0 auto;
-    background: linear-gradient(135deg, var(--ink), #4a8b76);
-    color: #fff; display: flex; align-items: center; justify-content: center;
-    font-size: 19px; font-family: serif; box-shadow: 0 3px 8px rgba(47,93,80,.28);
+  .brand { display: flex; align-items: center; gap: 13px; min-width: 0; padding: 9px 0; }
+  .seal {
+    width: 44px; height: 44px; flex: 0 0 auto; border-radius: 4px; background: var(--cinnabar);
+    display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; padding: 4px;
+    box-shadow: inset 0 0 0 2px var(--cinnabar), inset 0 0 0 3.5px #f6dccf; transform: rotate(-2deg);
   }
-  .brand b { font-size: 15px; display: block; line-height: 1.35; white-space: nowrap; }
-  .brand .sub { font-size: 11.5px; color: var(--muted); }
-  .hdr-right { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); flex-wrap: wrap; justify-content: flex-end; }
-  .chip { border-radius: 999px; padding: 4px 11px; background: #eef2ff; color: #4338ca; white-space: nowrap; }
-  .chip.warn { background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; }
-  .chip.ok { background: #ecfdf5; color: #047857; }
-  .dot { width: 7px; height: 7px; border-radius: 50%; background: #cbd5e1; display: inline-block; margin-right: 6px; }
-  .dot.on { background: var(--green); }
+  .seal span { font-family: var(--serif); color: #fbeee6; font-size: 15px; line-height: 1; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+  .brand b { font-family: var(--serif); font-size: 18px; display: block; letter-spacing: 2px; overflow-wrap: anywhere; }
+  .brand .sub { font-size: 11.5px; color: #c9b993; letter-spacing: .5px; }
+  .hdr-right { display: flex; align-items: center; gap: 8px; font-size: 12px; flex-wrap: wrap; justify-content: flex-end; padding: 8px 0; }
+  .chip { border-radius: 3px; padding: 4px 10px; background: rgba(243,233,210,.1); color: #e8dcc0; border: 1px solid rgba(232,220,192,.25); white-space: nowrap; }
+  .chip.warn { background: rgba(166,58,36,.25); color: #ffd9c9; border-color: rgba(255,190,160,.4); }
+  .chip.ok { background: rgba(46,94,90,.35); color: #cfe9df; border-color: rgba(160,220,200,.35); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: #8b7d6a; display: inline-block; margin-right: 6px; }
+  .dot.on { background: #6fcf97; box-shadow: 0 0 6px #6fcf97; }
 
+  /* ============ 评测概览 ============ */
+  .metrics { margin: 14px 24px 0; }
+  .metrics-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .mgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .mcard { background: var(--paper-2); border: 1px solid var(--line-soft); border-top: 3px solid var(--qing); border-radius: 3px; padding: 10px 12px; }
+  .mcard.bad { border-top-color: var(--cinnabar); }
+  .mcard.neutral { border-top-color: var(--gold); }
+  .mcard .ml { font-size: 11.5px; color: var(--muted); }
+  .mcard .mv { font-family: var(--serif); font-size: 22px; font-weight: 700; margin: 2px 0; font-variant-numeric: tabular-nums; }
+  .mcard .mt { font-size: 11px; color: var(--ink-soft); }
+  .mbar { height: 4px; background: var(--line-soft); border-radius: 2px; margin-top: 6px; position: relative; overflow: visible; }
+  .mbar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--qing); border-radius: 2px; }
+  .mcard.bad .mbar i { background: var(--cinnabar); }
+  .mcard.neutral .mbar i { background: var(--gold); }
+  .mbar s { position: absolute; top: -3px; width: 2px; height: 10px; background: var(--ink); }
+
+  /* ============ 朱批式免责条 ============ */
   .disclaimer-bar {
-    margin: 14px 22px 0; padding: 10px 16px; border-radius: 10px;
-    background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412;
-    font-size: 13px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    margin: 14px 24px 0; padding: 9px 14px; border-radius: 3px;
+    background: var(--cinnabar-soft); border: 1px solid #e3b9a6; border-left: 4px solid var(--cinnabar);
+    color: var(--cinnabar-dark); font-size: 13px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   }
-  .disclaimer-bar b { font-weight: 700; letter-spacing: .3px; }
+  .disclaimer-bar .mini-seal { font-family: var(--serif); border: 1.5px solid var(--cinnabar); color: var(--cinnabar); padding: 1px 5px; font-size: 13px; font-weight: 700; letter-spacing: 1px; transform: rotate(-4deg); }
+  .disclaimer-bar b { font-weight: 700; letter-spacing: 1px; font-family: var(--serif); }
   .disclaimer-bar .grow { flex: 1 1 240px; }
 
-  .steps { display: flex; gap: 10px; margin: 16px 22px 0; flex-wrap: wrap; }
+  /* ============ 四卷书签式步骤导航 ============ */
+  .steps { display: flex; gap: 10px; margin: 16px 24px 0; flex-wrap: wrap; }
   .step-btn {
-    flex: 1 1 190px; display: flex; align-items: center; gap: 10px; text-align: left;
-    padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line);
-    background: var(--card); box-shadow: var(--shadow-sm); cursor: pointer;
-    color: var(--muted); transition: .18s; font-family: inherit; font-size: 13px;
+    flex: 1 1 200px; display: flex; align-items: stretch; gap: 12px; text-align: left;
+    padding: 0 14px 0 0; border-radius: 3px; border: 1px solid var(--line);
+    background: var(--paper-2); box-shadow: var(--shadow-sm); cursor: pointer; overflow: hidden;
+    color: var(--ink-soft); transition: .18s; font-family: inherit; font-size: 13px;
   }
-  .step-btn:hover { border-color: #b9cdf5; transform: translateY(-1px); }
-  .step-btn.active { border-color: var(--ink); background: #f0f7f4; color: var(--ink); box-shadow: var(--shadow-md); }
-  .step-btn.done { color: var(--ink); }
+  .step-btn:hover { border-color: var(--gold); transform: translateY(-1px); }
+  .step-btn.active { border-color: var(--cinnabar); background: #fffaf0; color: var(--ink); box-shadow: var(--shadow-md); }
   .step-num {
-    width: 26px; height: 26px; border-radius: 50%; flex: 0 0 auto;
-    display: flex; align-items: center; justify-content: center;
-    background: #eef2f8; color: var(--muted); font-weight: 700; font-size: 12px;
+    writing-mode: vertical-rl; font-family: var(--serif); letter-spacing: 3px; font-size: 13px;
+    padding: 10px 7px; background: var(--paper-3); color: var(--muted); border-right: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: center; font-weight: 700;
   }
-  .step-btn.active .step-num { background: var(--ink); color: #fff; }
-  .step-btn.done .step-num { background: #d1fae5; color: #047857; }
-  .step-btn b { display: block; font-size: 13px; color: inherit; }
-  .step-btn small { display: block; font-size: 11px; opacity: .75; margin-top: 2px; }
+  .step-btn.active .step-num { background: var(--cinnabar); color: #fbeee6; border-right-color: var(--cinnabar); }
+  .step-btn.done .step-num { background: var(--qing-soft); color: var(--qing); }
+  .step-btn > span:last-child { padding: 11px 0; }
+  .step-btn b { display: block; font-family: var(--serif); font-size: 15px; color: inherit; letter-spacing: 2px; }
+  .step-btn b em { font-style: normal; font-size: 12px; color: var(--muted); letter-spacing: 0; margin-left: 6px; font-family: var(--sans); font-weight: 400; }
+  .step-btn small { display: block; font-size: 11.5px; color: var(--muted); margin-top: 3px; }
 
-  main { margin: 16px 22px 0; }
+  /* ============ 通用：版框卡片 ============ */
+  main { margin: 16px 24px 0; }
   .panel { display: none; }
-  .panel.active { display: block; animation: fade .22s ease; }
+  .panel.active { display: block; animation: fade .25s ease; }
   @keyframes fade { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
   .grid { display: grid; gap: 16px; }
   .grid.two { grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); }
   @media (max-width: 980px) { .grid.two { grid-template-columns: 1fr; } }
   .card {
-    background: var(--card); border: 1px solid var(--line); border-radius: 14px;
-    box-shadow: var(--shadow-sm); padding: 18px; min-width: 0;
+    background: var(--paper-2); border: 1px solid var(--line); border-radius: 3px; padding: 20px; min-width: 0;
+    box-shadow: var(--shadow-sm), inset 0 0 0 4px var(--paper-2), inset 0 0 0 5px var(--line-soft);
   }
-  .card h2 { margin: 0 0 4px; font-size: 15px; }
-  .card .hint { color: var(--muted); font-size: 12px; line-height: 1.7; margin: 0 0 14px; }
-  .card h3 { font-size: 13px; margin: 18px 0 8px; color: var(--ink); }
+  .card h2 { margin: 0 0 4px; font-size: 17px; font-family: var(--serif); letter-spacing: 1.5px; display: flex; align-items: center; gap: 8px; }
+  /* 鱼尾标记：古籍版心的鱼尾纹 */
+  .card h2::before { content: ""; width: 12px; height: 14px; background: var(--cinnabar); clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 62%, 0 100%); flex: 0 0 auto; }
+  .card .hint { color: var(--muted); font-size: 12px; line-height: 1.8; margin: 0 0 14px; }
+  .card h3 { font-size: 13.5px; margin: 18px 0 8px; color: var(--qing); font-family: var(--serif); letter-spacing: 1px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   .btn {
-    border: 1px solid var(--line); background: #fff; color: var(--text);
-    padding: 9px 15px; border-radius: 9px; cursor: pointer; font: inherit; font-size: 13px;
-    transition: .16s;
+    border: 1px solid var(--line); background: var(--paper-2); color: var(--ink);
+    padding: 8px 15px; border-radius: 3px; cursor: pointer; font: inherit; font-size: 13px; transition: .16s;
   }
-  .btn:hover:not(:disabled) { border-color: var(--blue); color: var(--blue-dark); }
-  .btn.primary { background: var(--ink); border-color: var(--ink); color: #fff; font-weight: 600; }
-  .btn.primary:hover:not(:disabled) { background: #244a40; color: #fff; }
+  .btn:hover:not(:disabled) { border-color: var(--qing); color: var(--qing); }
+  .btn.primary { background: var(--cinnabar); border-color: var(--cinnabar); color: #fff; font-weight: 600; letter-spacing: 1px; }
+  .btn.primary:hover:not(:disabled) { background: var(--cinnabar-dark); color: #fff; }
   .btn:disabled { opacity: .45; cursor: not-allowed; }
-  .btn.sm { padding: 6px 11px; font-size: 12px; }
+  .btn.sm { padding: 5px 11px; font-size: 12px; }
   input[type=text], input[type=file] {
-    font: inherit; font-size: 13px; padding: 9px 11px; border-radius: 9px;
-    border: 1px solid var(--line); background: #fff; color: var(--text);
+    font: inherit; font-size: 13px; padding: 9px 11px; border-radius: 3px;
+    border: 1px solid var(--line); background: #fffdf7; color: var(--ink);
   }
+  input[type=text]:focus { outline: 2px solid rgba(46,94,90,.3); border-color: var(--qing); }
   input[type=text] { flex: 1 1 260px; min-width: 0; }
   .drop {
-    border: 1.5px dashed #cbd5e1; border-radius: 12px; padding: 26px 16px; text-align: center;
-    background: #fafbfe; color: var(--muted); font-size: 13px; line-height: 1.8; cursor: pointer;
+    border: 1.5px dashed var(--line); border-radius: 3px; padding: 24px 16px; text-align: center;
+    background: repeating-linear-gradient(90deg, transparent 0 38px, rgba(184,150,78,.12) 38px 39px), #fffcf3;
+    color: var(--muted); font-size: 13px; line-height: 1.8; cursor: pointer; transition: .16s;
   }
-  .drop.hover { border-color: var(--ink); background: #f0f7f4; }
-  .drop b { color: var(--ink); }
-  .kv { display: grid; grid-template-columns: 118px 1fr; gap: 7px 12px; font-size: 12.5px; }
+  .drop.hover { border-color: var(--cinnabar); background-color: var(--cinnabar-soft); }
+  .drop b { color: var(--ink); font-family: var(--serif); font-size: 14.5px; letter-spacing: 1px; }
+  .kv { display: grid; grid-template-columns: 118px 1fr; gap: 7px 12px; font-size: 12.5px; margin: 0; }
   .kv dt { color: var(--muted); }
   .kv dd { margin: 0; word-break: break-all; }
-  .badge { display: inline-block; border-radius: 999px; padding: 3px 10px; font-size: 11.5px; background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; }
-  .badge.gray { background: #f1f5f9; color: #475569; border-color: #e2e8f0; }
-  .badge.red { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
-  .badge.green { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
-  .note-list { margin: 10px 0 0; padding-left: 18px; color: var(--muted); font-size: 12px; line-height: 1.8; }
-
+  .badge { display: inline-block; border-radius: 2px; padding: 2px 8px; font-size: 11.5px; background: var(--cinnabar-soft); color: var(--cinnabar-dark); border: 1px solid #e3b9a6; font-weight: 400; font-family: var(--sans); letter-spacing: 0; }
+  .badge.gray { background: var(--paper-3); color: var(--ink-soft); border-color: var(--line); }
+  .badge.ok, .badge.green { background: var(--qing-soft); color: var(--qing-dark); border-color: #b9d3c8; }
+  .badge.red { background: var(--cinnabar-soft); color: var(--cinnabar-dark); border-color: #e3b9a6; }
+  .note-list { margin: 10px 0 0; padding-left: 18px; color: var(--ink-soft); font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; }
   /* 步骤二：古籍页预览 */
-  .page-wrap { background: #f6f1e6; border: 1px solid #e6dcc5; border-radius: 10px; padding: 14px; overflow: auto; max-height: 620px; }
-  .page-canvas { position: relative; width: 100%; aspect-ratio: 720 / 1000; min-width: 330px; background: #fbf7ec; border: 1px solid #ddd0b3; box-shadow: inset 0 0 30px rgba(120,95,50,.08); }
+  .page-wrap { background: #f3ead8; border: 1px solid #e0d1ad; border-radius: 3px; padding: 14px; overflow: auto; max-height: 620px; }
+  .page-canvas { position: relative; width: 100%; aspect-ratio: 720 / 1000; min-width: 330px; background: #faf4e6; border: 1px solid #d8c7a2; box-shadow: inset 0 0 30px rgba(120,95,50,.08); }
   .bbox {
-    position: absolute; border: 1px solid rgba(47,111,237,.55); background: rgba(47,111,237,.06);
+    position: absolute; border: 1px solid rgba(46,94,90,.55); background: rgba(46,94,90,.06);
     border-radius: 2px; cursor: pointer; overflow: hidden;
   }
-  .bbox:hover, .bbox.sel { border-color: var(--seal); background: rgba(180,83,9,.12); }
+  .bbox:hover, .bbox.sel { border-color: var(--cinnabar); background: rgba(166,58,36,.12); }
   .bbox .vtext { writing-mode: vertical-rl; font-family: "KaiTi", "STKaiti", serif; font-size: 11px; line-height: 1.25; color: #3f3324; padding: 2px; height: 100%; overflow: hidden; }
-  .bbox .tag { position: absolute; right: 0; bottom: 0; font-size: 9px; background: rgba(47,111,237,.85); color: #fff; padding: 0 3px; border-radius: 2px; }
-  .bbox.sel .tag { background: var(--seal); }
+  .bbox .tag { position: absolute; right: 0; bottom: 0; font-size: 9px; background: rgba(46,94,90,.85); color: #fff; padding: 0 3px; border-radius: 2px; }
+  .bbox.sel .tag { background: var(--cinnabar); }
   /* 真实页预览：原图打底 + 半透明 bbox 叠加；示例页无原图时退回纯文字框 */
   .page-canvas img.base { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; user-select: none; }
-  .page-canvas.overlay .bbox { background: rgba(47,111,237,.10); border-color: rgba(47,111,237,.7); }
-  .page-canvas.overlay .bbox:hover, .page-canvas.overlay .bbox.sel { background: rgba(180,83,9,.22); border-color: var(--seal); }
+  .page-canvas.overlay .bbox { background: rgba(46,94,90,.10); border-color: rgba(46,94,90,.7); }
+  .page-canvas.overlay .bbox:hover, .page-canvas.overlay .bbox.sel { background: rgba(166,58,36,.22); border-color: var(--cinnabar); }
   .page-canvas.overlay .bbox .vtext { display: none; }
   .page-canvas.overlay .bbox .tag { right: auto; left: 0; }
   .page-canvas.overlay .bbox:hover .vtext { display: block; background: rgba(255,255,255,.92); }
   .page-list { max-height: 260px; overflow: auto; }
-  .page-item { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 6px; font-size: 12px; cursor: pointer; background: #fff; }
-  .page-item:hover { border-color: var(--seal); }
-  .page-item.cur { border-color: var(--seal); background: #fdf6ee; }
+  .page-item { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 3px; margin-bottom: 6px; font-size: 12px; cursor: pointer; background: #fff; }
+  .page-item:hover { border-color: var(--cinnabar); }
+  .page-item.cur { border-color: var(--cinnabar); background: #f5e1d6; }
   .page-item .pid { font-family: ui-monospace, Menlo, monospace; font-size: 11.5px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .page-item .del { border: 0; background: transparent; color: var(--danger, #dc2626); cursor: pointer; font-size: 11.5px; }
   .page-item .del:hover { text-decoration: underline; }
   .block-list { max-height: 300px; overflow: auto; }
-  .block-item { border: 1px solid var(--line-soft); border-radius: 8px; padding: 8px 10px; margin-bottom: 7px; font-size: 12px; cursor: pointer; }
-  .block-item:hover, .block-item.sel { border-color: var(--ink); background: #f0f7f4; }
+  .entity-filter { margin-bottom: 10px; color: var(--muted); }
+  .entity-filter select { font: inherit; color: var(--text); background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: 4px 8px; }
+  .source-link { font: inherit; color: var(--ink); border: 0; background: none; padding: 2px 0; text-decoration: underline; cursor: pointer; }
+  .block-item { border: 1px solid var(--line-soft); border-radius: 3px; padding: 8px 10px; margin-bottom: 7px; font-size: 12px; cursor: pointer; }
+  .block-item:hover, .block-item.sel { border-color: var(--ink); background: #e0ebe5; }
   .block-item .meta { color: var(--muted); font-size: 11px; margin-top: 4px; }
   .block-item .txt { font-family: "KaiTi", "STKaiti", serif; font-size: 13px; color: #2f3a2f; }
   table { width: 100%; border-collapse: collapse; font-size: 12px; }
   th, td { text-align: left; padding: 7px 9px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
-  th { color: var(--muted); font-weight: 600; background: #fafbfe; position: sticky; top: 0; }
-  .scroll { max-height: 250px; overflow: auto; border: 1px solid var(--line-soft); border-radius: 8px; }
+  th { color: var(--muted); font-weight: 600; background: #f3ead8; position: sticky; top: 0; }
+  .scroll { max-height: 250px; overflow: auto; border: 1px solid var(--line-soft); border-radius: 3px; }
+
+  /* 步骤二：方剂表还原（行列 + 逐格出处） */
+  .tbl-scroll { overflow: auto; max-height: 430px; border: 1px solid var(--line); border-radius: 3px; background: #fffdf7; }
+  table.fangji { border-collapse: separate; border-spacing: 0; width: auto; min-width: 100%; font-size: 12.5px; }
+  table.fangji th, table.fangji td {
+    border-right: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft);
+    padding: 6px 10px; text-align: left; vertical-align: middle; white-space: nowrap;
+  }
+  table.fangji thead th { position: sticky; top: 0; z-index: 2; background: #f3ead8; color: var(--muted); font-weight: 600; }
+  table.fangji tbody th {
+    position: sticky; left: 0; top: auto; z-index: 1; background: #f7eeda;
+    color: var(--muted); font-weight: 400; text-align: center; font-size: 11.5px;
+  }
+  table.fangji td.cell { cursor: pointer; }
+  table.fangji td.cell:hover:not(.empty) { background: rgba(46,94,90,.09); }
+  table.fangji td.cell.sel { background: rgba(166,58,36,.14); box-shadow: inset 0 0 0 2px var(--cinnabar); }
+  table.fangji td.cell .ctext { display: block; font-family: var(--kai); font-size: 14px; color: #2f3a2f; line-height: 1.35; }
+  table.fangji td.cell .ref { display: block; font-family: var(--mono); font-size: 10px; color: var(--muted); line-height: 1.5; }
+  table.fangji td.cell .ref.noloc { font-family: var(--sans); color: var(--cinnabar-dark); }
+  table.fangji td.cell.empty {
+    cursor: default;
+    background: repeating-linear-gradient(45deg, rgba(120,95,50,.06) 0 6px, transparent 6px 12px);
+  }
+  table.fangji td.cell.empty .ctext { color: #b7a683; font-size: 12px; }
+  .tbl-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 10px; }
+  .tbl-tab { border: 1px solid var(--line); background: #fff; border-radius: 3px; padding: 4px 10px; font-size: 12px; cursor: pointer; color: var(--ink-soft); }
+  .tbl-tab.active { border-color: var(--cinnabar); color: var(--cinnabar-dark); background: var(--cinnabar-soft); }
+  .tbl-cap { font-size: 11.5px; color: var(--muted); margin: 8px 0 0; line-height: 1.7; overflow-wrap: anywhere; }
+  .tbl-detail {
+    margin-top: 10px; padding: 10px 12px; border: 1px solid var(--line-soft); border-left: 3px solid var(--qing);
+    border-radius: 3px; background: #fff; font-size: 12px; line-height: 1.9; color: var(--ink-soft);
+  }
+  .tbl-detail b { color: var(--ink); }
+  .tbl-detail.noloc { border-left-color: var(--cinnabar); background: #fbf1ea; }
 
   /* 步骤三：图谱 */
-  .graph-wrap { position: relative; border: 1px solid var(--line-soft); border-radius: 10px; background: #fbfcfe; overflow: hidden; }
+  .graph-wrap { position: relative; border: 1px solid var(--line-soft); border-radius: 3px; background: #fcf8ed; overflow: hidden; }
   canvas { display: block; width: 100%; height: 520px; cursor: grab; }
   .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); margin-top: 10px; }
   .legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 5px; }
   .node-detail { font-size: 12.5px; line-height: 1.9; color: var(--muted); }
-  .node-detail b { color: var(--text); }
+  .node-detail b { color: var(--ink); }
 
   /* 步骤四：问答 */
   .qchips { display: flex; gap: 7px; flex-wrap: wrap; margin: 10px 0 16px; }
-  .qchip { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 6px 12px; font-size: 12px; cursor: pointer; color: var(--text); }
+  .qchip { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 6px 12px; font-size: 12px; cursor: pointer; color: var(--ink); }
   .qchip:hover { border-color: var(--ink); color: var(--ink); }
-  .qchip.refuse { border-color: #fecaca; color: #b91c1c; background: #fffafa; }
-  .answer { border: 1px solid var(--line); border-radius: 12px; padding: 16px; background: #fbfcfe; white-space: pre-wrap; line-height: 1.9; font-size: 13.5px; min-height: 90px; }
-  .answer.refused { background: #fff7ed; border-color: #fed7aa; color: #9a3412; }
-  .ev-card { border: 1px solid var(--line-soft); border-left: 3px solid var(--ink); border-radius: 8px; padding: 10px 12px; margin-top: 9px; background: #fff; font-size: 12.5px; }
+  .qchip.refuse { border-color: #e3b9a6; color: #852c1a; background: #fbefe7; }
+  .answer { border: 1px solid var(--line); border-radius: 3px; padding: 16px; background: #fcf8ed; white-space: pre-wrap; line-height: 1.9; font-size: 13.5px; min-height: 90px; }
+  .answer.refused { background: #f5e1d6; border-color: #e3b9a6; color: #852c1a; }
+  .ev-card { border: 1px solid var(--line-soft); border-left: 3px solid var(--ink); border-radius: 3px; padding: 10px 12px; margin-top: 9px; background: #fff; font-size: 12.5px; }
   .ev-card .q { font-family: "KaiTi", "STKaiti", serif; font-size: 14px; color: #2f3a2f; margin-bottom: 6px; }
   .ev-card .loc { color: var(--muted); font-size: 11px; word-break: break-all; line-height: 1.7; }
+  .obj-head { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  .obj-card { border: 1px solid var(--line-soft); border-left: 3px solid var(--qing, #4a6b52); border-radius: 3px; padding: 9px 12px; margin-bottom: 8px; background: #fcf8ed; font-size: 12.5px; cursor: pointer; }
+  .obj-card:hover { border-color: var(--qing, #4a6b52); }
+  .obj-main { font-size: 13.5px; color: #2b2520; line-height: 1.7; }
+  .obj-type { display: inline-block; margin: 0 5px; padding: 0 5px; border: 1px solid var(--line-soft); border-radius: 2px; font-size: 11px; color: var(--muted); }
+  .obj-rel { margin: 0 5px; color: #8a4b2a; font-family: "KaiTi", "STKaiti", serif; }
+  .obj-meta { color: var(--muted); font-size: 11px; margin-top: 4px; }
+  .ev-badge { display: inline-block; margin-left: 6px; padding: 0 5px; border-radius: 2px; font-size: 10.5px; border: 1px solid var(--line-soft); color: var(--muted); }
+  .ev-badge.rel { border-color: #c9a227; color: #8a6d1a; }
+  .ev-badge.subj { border-color: #7a9b8e; color: #3f6156; }
   details { margin-top: 14px; font-size: 12px; color: var(--muted); }
-  summary { cursor: pointer; color: var(--blue-dark); }
-  details pre { white-space: pre-wrap; background: #f8fafc; border: 1px solid var(--line-soft); border-radius: 8px; padding: 10px; max-height: 220px; overflow: auto; }
+  summary { cursor: pointer; color: var(--qing-dark); }
+  details pre { white-space: pre-wrap; background: #f3ead8; border: 1px solid var(--line-soft); border-radius: 3px; padding: 10px; max-height: 220px; overflow: auto; }
 
   footer { margin: 20px 22px 0; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11.5px; line-height: 1.9; }
-  .toast { position: fixed; right: 22px; bottom: 22px; background: #1e293b; color: #fff; padding: 11px 16px; border-radius: 9px; font-size: 12.5px; box-shadow: var(--shadow-md); opacity: 0; pointer-events: none; transition: .2s; z-index: 20; max-width: 380px; }
+  .toast { position: fixed; right: 22px; bottom: 22px; background: #2b2520; color: #fff; padding: 11px 16px; border-radius: 3px; font-size: 12.5px; box-shadow: var(--shadow-md); opacity: 0; pointer-events: none; transition: .2s; z-index: 20; max-width: 380px; }
   .toast.show { opacity: 1; }
   .empty { color: var(--muted); font-size: 12.5px; padding: 18px 0; text-align: center; }
+  .lex { margin-top: 12px; color: var(--ink-soft); font-size: 12px; line-height: 1.7; }
+  .mcard .mt { min-height: 2.8em; }
+  .mcard .ml, .metrics-head, .card .hint { color: var(--ink-soft); }
+  .metrics-head h2 { margin: 0; color: var(--ink); font: 700 15px var(--serif); }
+  .metrics-head p { margin: 0; }
+  .metric-note { margin: 8px 0 0; color: var(--ink-soft); font-size: 12px; line-height: 1.6; }
+  .mbar { overflow: hidden; }
+  .mbar s { top: 0; height: 4px; transform: translateX(-1px); }
+  .ev-card:focus-visible { outline: 2px solid var(--qing); outline-offset: 2px; }
+  .graph-wrap canvas { cursor: pointer; }
+  @media (max-width: 640px) {
+    header { padding-inline: 14px; gap: 0; }
+    .hdr-right { justify-content: flex-start; }
+    .hdr-right .chip { white-space: normal; overflow-wrap: anywhere; }
+    .steps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .steps, .disclaimer-bar, main, .metrics, footer { margin-inline: 12px; }
+    .step-btn { gap: 7px; padding-right: 6px; }
+    .step-btn b { font-size: 13px; letter-spacing: 0; }
+    .step-btn small { display: none; }
+    .card { padding: 14px; }
+    .page-canvas { min-width: 0; }
+    .toast { left: 12px; right: 12px; max-width: none; }
+    input[type=file] { max-width: 100%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  }
 </style>
 </head>
 <body>
 
 <header>
   <div class="brand">
-    <div class="logo">本</div>
+    <div class="seal" aria-hidden="true"><span>古</span><span>籍</span><span>溯</span><span>源</span></div>
     <div>
       <b>中医古籍 OCR 与知识图谱智能问答原型</b>
-      <span class="sub">赛题二 · 框架搭建阶段 · 四步演示台</span>
+      <span class="sub">赛题二 · 本地演示台</span>
     </div>
   </div>
   <div class="hdr-right">
     <span class="chip" id="cfgChip">配置读取中…</span>
     <span class="chip warn" id="demoChip">示例数据 · 非命题单位样本</span>
-    <span class="chip ok"><span class="dot on" id="healthDot"></span><span id="healthText">服务状态检查中</span></span>
+    <span class="chip ok"><span class="dot" id="healthDot"></span><span id="healthText">服务状态检查中</span></span>
   </div>
 </header>
 
 <div class="disclaimer-bar">
   <b>仅供参考、非诊疗建议</b>
   <span class="grow" id="bannerText">本系统为赛事研发原型，所有内容不构成诊断、用药或治疗建议，不得用于临床决策。</span>
-  <span class="badge" id="metricChip">指标：见正式评测报告</span>
 </div>
 
-<nav class="steps">
-  <button class="step-btn active" data-step="1"><span class="step-num">1</span><span><b>上传古籍页</b><small>上传扫描页 / 加载示例数据</small></span></button>
+<nav class="steps" aria-label="演示步骤">
+  <button class="step-btn active" data-step="1" aria-current="step"><span class="step-num">1</span><span><b>上传古籍页</b><small>上传扫描页 / 加载示例数据</small></span></button>
   <button class="step-btn" data-step="2"><span class="step-num">2</span><span><b>识别与结构化</b><small>OCR 文本块 · 实体 · 三元组</small></span></button>
   <button class="step-btn" data-step="3"><span class="step-num">3</span><span><b>图谱可视化</b><small>本地力导向图 · 零外部依赖</small></span></button>
   <button class="step-btn" data-step="4"><span class="step-num">4</span><span><b>可溯源问答</b><small>证据引用 · 无依据拒答</small></span></button>
@@ -213,24 +325,19 @@
   <section class="panel active" id="panel1">
     <div class="grid two">
       <div class="card">
-        <h2>步骤一 · 上传古籍页</h2>
-        <p class="hint">上传一张古籍扫描页会调用本机 <code>rapidocr-onnxruntime</code>（ONNX CPU、离线）做<b>真实识别</b>，返回带 bbox 的识别文本；点击「加载示例古籍页」则走 <code>data/demo/</code> 示例数据（桩输出，界面会明确标注）。真实识别页的数据来源为合成示意页，非命题单位样本。</p>
+        <h2>上传古籍页</h2>
+        <p class="hint">上传扫描页，使用本机模型识别文字并提取实体和关系。也可加载内置示例熟悉操作。</p>
         <div class="drop" id="drop">
           <b>点击选择图片，或拖拽到此处</b><br>
           支持 png / jpg / jpeg / bmp / webp / tif；文件仅保存在本机 data/uploads/
           <div style="margin-top:10px"><input type="file" id="fileInput" accept="image/*,.tif,.tiff"></div>
         </div>
         <div class="row" style="margin-top:14px">
-          <button class="btn primary" id="btnDemo">加载示例古籍页（推荐）</button>
+          <button class="btn primary" id="btnDemo">加载示例古籍页</button>
           <button class="btn" id="btnUpload" disabled>上传所选图片</button>
           <button class="btn" id="btnNext1" disabled>下一步：查看识别结果</button>
         </div>
-        <h3>本阶段边界</h3>
-        <ul class="note-list">
-          <li>OCR 走本机 ONNX 模型真实推理（默认自动加载 <code>ch_PP-OCRv5_rec_mobile.onnx</code>，缺失时回退包内简体 v3 并在识别说明里标注）。</li>
-          <li>推理全本地、零密钥、零公网调用；不需要数据库服务与 GPU；本地 LLM 仍为 <code>none</code>。</li>
-          <li>合成示意数据用于工程自测，非命题单位样本、非官方评测结果；命题单位脱敏样本未到位、不得外传。</li>
-        </ul>
+        <p class="lex" id="lexiconStats" hidden></p>
       </div>
       <div class="card">
         <h2>当前页面状态</h2>
@@ -238,10 +345,8 @@
         <dl class="kv" id="pageInfo"></dl>
         <div id="pageNotes"></div>
         <h3>已入库页面 <span class="badge gray" id="pageCount">0</span></h3>
-        <p class="hint" style="margin:4px 0 8px">数据来自 <code>GET /api/pages</code>：可切回历史页查看其 OCR / 图谱 / 问答，也可删除（删除会二次确认）。</p>
+        <p class="hint">选择一页可查看其识别结果、图谱和问答。</p>
         <div class="page-list" id="pageList"><div class="empty">读取中…</div></div>
-        <h3>免责与演示标注</h3>
-        <p class="hint" style="margin:0">所有页面常驻「仅供参考、非诊疗建议」；示例页标注「示例数据 · 非命题单位样本」，真实页标注「本地 OCR 真实识别 · 模型名」。两类数据在界面上不混用。</p>
       </div>
     </div>
   </section>
@@ -255,11 +360,24 @@
         <div class="row"><span class="badge" id="s2badge">示例数据 · 非命题单位样本</span><button class="btn sm" id="btnNext2">下一步：图谱可视化</button></div>
       </div>
     </div>
+    <div class="card" id="tableCard" style="margin-bottom:16px">
+      <div class="row" style="justify-content:space-between;align-items:flex-start">
+        <div>
+          <h2>方剂表还原 <span class="badge gray" id="tableCount">0</span></h2>
+          <p class="hint" style="margin:0">沿用本页 OCR 的行列结构：空白单元格与行列位置原样保留，药名 / 剂量 / 炮制等内容以 OCR 实际返回为准。点击有出处的单元格可回到下方预览图的原图位置，并同步选中文本块；缺少可验证出处的单元格照原样显示内容并标「无法定位」。</p>
+        </div>
+        <span class="badge gray" id="tableSrc">—</span>
+      </div>
+      <div class="tbl-tabs" id="tableTabs" hidden></div>
+      <div class="tbl-scroll" id="tableWrap"><div class="empty">请先上传扫描页或加载示例</div></div>
+      <p class="tbl-cap" id="tableCap"></p>
+      <div class="tbl-detail" id="tableDetail">点击任一有出处的单元格，可回到预览图中的原图位置。</div>
+    </div>
     <div class="grid two">
       <div class="card">
         <h2 id="s2title">古籍页预览</h2>
-        <p class="hint" id="s2sub">真实页显示原图 + bbox 叠加（框与字应对齐）；示例页无原图，退回重排文字框。点击框可定位右侧文本块。</p>
-        <div class="page-wrap"><div class="page-canvas" id="pageCanvas"><div class="empty" style="padding:60px 0">请先在步骤一加载示例数据</div></div></div>
+        <p class="hint" id="s2sub">真实页显示原图 + bbox 叠加（框与字应对齐）；示例页无原图，退回重排文字框。点击框可查看对应文本块。</p>
+        <div class="page-wrap"><div class="page-canvas" id="pageCanvas"><div class="empty" style="padding:60px 0">请先上传扫描页或加载示例</div></div></div>
         <h3>文本块明细</h3>
         <div class="block-list" id="blockList"></div>
       </div>
@@ -267,6 +385,9 @@
         <h2>结构化抽取</h2>
         <p class="hint">实体与三元组由 <code>extract/rules.py</code> 的确定性规则产出（词典 + 模式，未接入 LLM）；每个对象都带 page_id / bbox / line_id / quote / source_hash，<code>is_demo</code> 从页面透传。</p>
         <h3>实体 <span class="badge gray" id="entCount">0</span></h3>
+        <label class="row entity-filter">实体类型
+          <select id="entityType"><option value="">全部类型</option></select>
+        </label>
         <div class="scroll"><table><thead><tr><th>名称</th><th>类型</th><th>值</th><th>出处</th></tr></thead><tbody id="entBody"></tbody></table></div>
         <h3>三元组 <span class="badge gray" id="triCount">0</span></h3>
         <div class="scroll"><table><thead><tr><th>头</th><th>关系</th><th>尾</th><th>出处</th></tr></thead><tbody id="triBody"></tbody></table></div>
@@ -307,32 +428,41 @@
     <div class="grid two">
       <div class="card">
         <h2>步骤四 · 可溯源问答</h2>
-        <p class="hint">只做原文摘录，不做推断。每条证据都必须能在原文文本块中命中，否则转拒答；无依据或涉及个人诊疗、疗效、用药建议的问题一律拒答并说明「原文未检索到依据」。</p>
-        <div class="row"><input type="text" id="qInput" placeholder="例如：甘草的性味是什么？"><button class="btn primary" id="btnAsk">提问</button></div>
+        <p class="hint">只做原文摘录，不做推断。支持三类图谱关系题：「某症状可用哪些药材」「某症状用什么方」「某药有什么禁忌」——只认当前页原文中能确认主体与关系方向的记载，逐条给出引文；其他问题走原文文本检索。每条证据都必须能在原文文本块中命中，否则转拒答；无依据或涉及个人诊疗、疗效、用药建议的问题一律拒答并说明「原文未检索到依据」。</p>
+        <div class="row"><input type="text" id="qInput" aria-label="输入古籍问题" placeholder="例如：甘草的性味是什么？"><button class="btn primary" id="btnAsk">提问</button></div>
         <div class="qchips" id="qchips"></div>
-        <div class="answer" id="answerBox">请先在步骤一加载示例数据，然后点击上方示例问题或自行输入。</div>
+        <div class="answer" id="answerBox" aria-live="polite">请先上传扫描页或加载示例，然后点击上方示例问题或自行输入。</div>
         <details><summary>查看生成链路 trace</summary><pre id="traceBox">（暂无）</pre></details>
       </div>
       <div class="card">
         <h2>答案证据与溯源</h2>
         <p class="hint" id="evHint">每条证据携带 quote / page_id / bbox / line_id / score / source_hash。</p>
+        <div id="objList"></div>
         <div id="evList"></div>
       </div>
     </div>
   </section>
 </main>
 
+<section class="metrics" aria-labelledby="metricsTitle">
+  <div class="metrics-head">
+    <h2 id="metricsTitle">评测概览</h2>
+    <p id="metricsScope">合成示意集 · 工程自测 · 非命题单位样本 · 非官方评测结果</p>
+  </div>
+  <div class="mgrid" id="metricsGrid"></div>
+  <p class="metric-note" id="metricsNote" role="status">正在读取本地评测明细…</p>
+</section>
+
 <footer>
-  <b>仅供参考、非诊疗建议</b>：本系统为赛事研发原型，不构成诊断、用药或治疗建议；问答仅返回原文摘录，未做推断。<br>
-  当前阶段：<b>阶段九 · 真实古籍页四步链路跑通</b>（本地 ONNX OCR 真实推理 + 词典/规则抽取，未接入 LLM），五项指标（CER / 字段 F1 / 表格结构还原 / 可溯源率 / 拒答率）由 <code>python eval/run_all.py</code> 产出真实数值，见 <code>data/reports/正式评测报告.md</code>；<b>合成集结果不是官方评测结论</b>。<br>
-  数据合规：命题单位脱敏样本仅限赛事研发使用，不得外传；真实扫描页与人工标注不进仓库、不上传任何外部服务。
+  <b>仅供参考、非诊疗建议</b>。命题单位脱敏样本仅限赛事研发使用。真实扫描页与人工标注均在本地保管。
 </footer>
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status"></div>
 
 <script>
 "use strict";
 /* 四步演示台：零外部依赖（无 CDN、无 npm 包），离线可完整运行 */
-const S = { pageId: null, ingest: null, ocr: null, graph: null, meta: null, nodes: [], links: [], selected: null };
+const S = { pageId: null, ingest: null, ocr: null, graph: null, meta: null, nodes: [], links: [], selected: null,
+            tables: [], tableSel: 0, cellSel: null, tableNote: "", ocrSeq: 0 };
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
 const fmt = v => v == null ? "—" : (typeof v === "object" ? JSON.stringify(v) : String(v));
@@ -363,10 +493,12 @@ function goto(step) {
   document.querySelectorAll(".step-btn").forEach(b => {
     const n = +b.dataset.step;
     b.classList.toggle("active", n === step);
+    if (n === step) b.setAttribute("aria-current", "step");
+    else b.removeAttribute("aria-current");
     b.classList.toggle("done", n < step);
   });
   document.querySelectorAll(".panel").forEach(p => p.classList.toggle("active", p.id === "panel" + step));
-  if (step === 2 && S.pageId) loadOcr();
+  if (step === 2) loadOcr();
   if (step === 3) loadGraph();
   if (step === 4) setTimeout(() => $("qInput").focus(), 60);
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -382,6 +514,14 @@ async function init() {
   try {
     const [h, m] = await Promise.all([api("/api/health"), api("/api/meta")]);
     S.meta = m;
+    const dict = m.dictionary;
+    if (dict) {
+      const stats = $("lexiconStats");
+      stats.textContent = (dict.degraded ? "内置备用词表" : "规则抽取词表") +
+        " · 药材 " + dict["药材"] + " · 方剂 " + dict["方剂"] + " · 功效词 " + dict["功效词"];
+      stats.title = dict.note;
+      stats.hidden = false;
+    }
     $("bannerText").textContent = m.banner;
     $("demoChip").textContent = badgeOf(h);
     $("demoChip").className = "chip " + (h.is_demo ? "warn" : "ok");
@@ -409,6 +549,9 @@ async function ingest(fd, label) {
     $("s1hint").textContent = label + "，正在处理…";
     const r = await api("/api/pages", { method: "POST", body: fd });
     S.pageId = r.page_id; S.ingest = r;
+    S.ocr = null;                                  // 新页入库：面板二与表格区整体重取
+    resetTables("正在读取本页方剂表…", "loading");
+    clearAnswer("已换页：问答按当前页生效，请重新提问。");
     $("s1hint").textContent = "已加载页面，可进入步骤二查看 OCR 与结构化结果。";
     $("demoChip").textContent = badgeOf(r);
     $("demoChip").className = "chip " + (r.is_demo ? "warn" : "ok");
@@ -475,6 +618,9 @@ async function loadPages() {
 function switchPage(pid) {
   if (!pid || pid === S.pageId) return;
   S.pageId = pid; S.pendingHighlight = null;
+  S.ocr = null;                                   // 旧页对象立即作废，面板二不沿用上一页
+  resetTables("正在读取本页方剂表…", "loading");   // 切页即清掉上一页表格与格选中态
+  clearAnswer();                                  // 问答也按页生效：旧页答案与证据不留
   $("s1hint").textContent = "已切换到历史页 " + pid + "，可查看其 OCR / 图谱 / 问答。";
   loadPages();
   const active = document.querySelector(".panel.active");
@@ -491,6 +637,8 @@ async function deletePage(pid) {
       S.pageId = null; S.ocr = null; S.graph = null;
       $("pageInfo").innerHTML = ""; $("pageNotes").innerHTML = "";
       $("s1hint").textContent = "当前页已删除，请重新上传或加载示例。";
+      resetTables("当前页已删除，请重新上传或加载示例", "empty");
+      clearAnswer("当前页已删除：问答已清空。");
     }
     $("pageCount").textContent = (r.pages || []).length;
     loadPages();
@@ -500,9 +648,23 @@ async function deletePage(pid) {
 
 /* ---------------- 步骤二：OCR 与结构化 ---------------- */
 async function loadOcr() {
-  if (!S.pageId) { toast("请先在步骤一加载示例数据"); return; }
+  const pageId = S.pageId;
+  const seq = ++S.ocrSeq;                      // 快速切页：旧请求回来时序号已变，直接丢弃
+  if (!pageId || S.ocr?.page?.page_id !== pageId) {
+    S.ocr = null;
+    $("s2badge").textContent = "";
+    $("s2sub").textContent = "";
+    $("s2hint").textContent = pageId ? "正在读取古籍页…" : "请先上传扫描页或加载示例";
+    renderPreview({}, []);
+    renderBlocks([]);
+    renderEntities([], []);
+    $("blockDetail").textContent = "点击左侧任一文本块查看。";
+    resetTables(pageId ? "正在读取本页方剂表…" : "请先上传扫描页或加载示例", "loading");
+  }
+  if (!pageId) return;
   try {
-    const r = await api("/api/pages/" + encodeURIComponent(S.pageId) + "/ocr");
+    const r = await api("/api/pages/" + encodeURIComponent(pageId) + "/ocr");
+    if (seq !== S.ocrSeq || pageId !== S.pageId) return;   // 旧页数据不得覆盖当前页
     S.ocr = r;
     $("s2badge").textContent = badgeOf(r);
     $("demoChip").textContent = badgeOf(r);
@@ -511,21 +673,25 @@ async function loadOcr() {
       (r.blocks || []).length + " 个文本块，已按 reading_order 排序。所有坐标与摘抄均可回原文核对。";
     $("s2sub").textContent = r.is_demo
       ? "示例数据无原图，此处为重排文字框（bbox 来自示例标注）。"
-      : "原图 + bbox 叠加：框为 OCR 检测框，悬停显示识别文本，点击可定位右侧文本块。";
+      : "原图 + bbox 叠加：悬停查看识别文本，点击框可查看对应的文本块与溯源字段。";
     renderPreview(r.page || {}, r.blocks || []);
     renderBlocks(r.blocks || []);
     renderEntities(r.entities || [], r.triples || []);
-    // 从步骤四证据卡片跳转过来时，定位并高亮对应原文块
+    renderTables(r);
     if (S.pendingHighlight) {
-      const i = (S.ocr.blocks || []).findIndex(b => b.line_id === S.pendingHighlight);
-      if (i >= 0) {
-        selectBlock(i);
-        const el = document.querySelector('.bbox[data-i="' + i + '"]');
-        if (el) el.scrollIntoView({ block: "center", behavior: "smooth" });
-      }
+      const lineId = S.pendingHighlight;
       S.pendingHighlight = null;
+      locateBlock(lineId);
     }
-  } catch (e) { $("s2hint").textContent = "读取失败：" + e.message; toast("读取失败：" + e.message); }
+  } catch (e) {
+    if (seq !== S.ocrSeq || pageId !== S.pageId) return;
+    $("s2hint").textContent = "读取失败：" + e.message;
+    renderPreview({}, []);
+    renderBlocks([]);
+    renderEntities([], []);
+    resetTables("方剂表读取失败：" + errText(e) + "（上一页表格与选中状态已清除）", "error");
+    toast("读取失败：" + e.message);
+  }
 }
 /* 真实页原图地址：只认本系统命名的上传文件（P<时间戳>-<hash>.<ext>），示例页没有原图 */
 function imageUrlOf(page) {
@@ -569,14 +735,207 @@ function selectBlock(i) {
     ["source_hash", b.source_hash], ["kind / conf", b.kind + " / " + b.conf],
   ].map(([k, v]) => `<div><b>${esc(k)}：</b>${esc(fmt(v))}</div>`).join("");
 }
-function renderEntities(ents, tris) {
-  $("entCount").textContent = ents.length; $("triCount").textContent = tris.length;
-  $("entBody").innerHTML = ents.length ? ents.slice(0, 60).map(e =>
-    `<tr><td>${esc(e.name)}</td><td><span class="badge gray">${esc(e.type)}</span></td><td>${esc(e.value)}</td><td>${esc(e.line_id)}</td></tr>`).join("")
+function locateBlock(lineId, blockRef) {
+  const blocks = S.ocr?.blocks || [];
+  let index = blockRef ? blocks.findIndex(block => block.block_ref === blockRef) : -1;
+  if (index < 0 && lineId) index = blocks.findIndex(block => block.line_id === lineId);
+  if (index < 0) {
+    toast("当前页没有对应的原文块");
+    return;
+  }
+  selectBlock(index);
+  document.querySelector('.bbox[data-i="' + index + '"]')
+    ?.scrollIntoView({ block: "center", behavior: "smooth" });
+}
+/* ---------------- 步骤二：方剂表还原（行列 + 逐格出处） ---------------- */
+const TABLE_IDLE = "请先上传扫描页或加载示例";
+const refShort = ref => String(ref || "").split(":").pop();
+
+/* 清空表格区与格选中态：切页 / 无表 / 缺字段 / 请求失败都走这里，避免上一页残留 */
+function resetTables(message, kind) {
+  S.tables = []; S.tableSel = 0; S.cellSel = null; S.tableNote = "";
+  $("tableCount").textContent = "0";
+  $("tableSrc").textContent = "—";
+  $("tableSrc").className = "badge gray";
+  $("tableTabs").hidden = true;
+  $("tableTabs").innerHTML = "";
+  const wrap = $("tableWrap");
+  wrap.dataset.state = kind || "empty";
+  wrap.innerHTML = '<div class="empty">' + esc(message || TABLE_IDLE) + "</div>";
+  $("tableCap").textContent = "";
+  const det = $("tableDetail");
+  det.className = "tbl-detail";
+  det.textContent = "点击任一有出处的单元格，可回到预览图中的原图位置。";
+  document.querySelectorAll("td.cell.sel").forEach(el => el.classList.remove("sel"));
+}
+
+/* 后端新口径带 top-level tables / tables_status；老后端只能退回 page.tables 判断 */
+function tablesOf(res) {
+  if (res && Object.prototype.hasOwnProperty.call(res, "tables")) {
+    const list = Array.isArray(res.tables) ? res.tables : [];
+    return { list, status: res.tables_status || (list.length ? "ok" : "none"), note: res.tables_note || "" };
+  }
+  const legacy = res && res.page ? res.page.tables : undefined;
+  if (Array.isArray(legacy)) {
+    return { list: legacy, status: legacy.length ? "ok" : "none", note: "" };
+  }
+  return { list: [], status: "no_table_field", note: "" };
+}
+
+/* 出处 ref → 块下标；要同时满足「ref 能对上块」与「块文本 = 格内文本」才算可验证出处 */
+function blockIndexOfRef(ref, expectText) {
+  const blocks = (S.ocr && S.ocr.blocks) || [];
+  const key = String(ref || "");
+  if (!key) return -1;
+  let i = blocks.findIndex(b => b.block_ref === key);
+  if (i < 0) i = blocks.findIndex(b => b.line_id === key);
+  if (i < 0) i = blocks.findIndex(b => b.line_id === refShort(key));
+  if (i < 0) return -1;
+  if (expectText != null && String(blocks[i].text || "").trim() !== String(expectText).trim()) return -1;
+  const bbox = blocks[i].bbox || [];
+  const ok = bbox.length === 4 && bbox.every(v => Number.isFinite(Number(v))) &&
+    Number(bbox[2]) > Number(bbox[0]) && Number(bbox[3]) > Number(bbox[1]);
+  return ok ? i : -1;
+}
+
+function renderTables(res) {
+  const got = tablesOf(res);
+  const messages = {
+    no_table_field: "历史记录缺少表格字段：该页入库时尚未保存表格结构（早于方剂表还原功能的旧记录），无法还原方剂表。请重新识别该页。",
+    none: "本页未识别到方剂表（bbox 行列聚类要求至少 2 行、多数行 ≥2 格；竖排正文页不会被误判为表格）。",
+    error: "方剂表读取失败。",
+    loading: "正在读取本页方剂表…",
+  };
+  if (!got.list.length) {
+    resetTables(messages[got.status] || "本页暂无可展示的方剂表。", got.status);
+    return;
+  }
+  S.tables = got.list;
+  S.tableSel = 0;
+  S.cellSel = null;
+  S.tableNote = got.note || "";
+  $("tableWrap").dataset.state = "ok";
+  $("tableCount").textContent = S.tables.length + " 张";
+  const derived = S.tables.some(t => t.refs_source === "derived");
+  const missing = S.tables.length > 0 && S.tables.every(t => t.refs_source === "missing");
+  $("tableSrc").textContent = derived ? "出处逐格核对补齐" : missing ? "出处缺失" : "出处来自 OCR";
+  $("tableSrc").className = "badge " + (derived || missing ? "red" : "gray");
+  $("tableTabs").hidden = S.tables.length < 2;
+  $("tableTabs").innerHTML = S.tables.length < 2 ? "" : S.tables.map((t, i) =>
+    `<button class="tbl-tab" data-t="${i}">${esc(t.table_id || ("表" + (i + 1)))}</button>`).join("");
+  $("tableTabs").querySelectorAll(".tbl-tab").forEach(el =>
+    el.onclick = () => renderTable(+el.dataset.t));
+  renderTable(0);
+}
+
+function renderTable(index) {
+  const t = S.tables[index];
+  if (!t) { resetTables("本页暂无可展示的方剂表。", "empty"); return; }
+  S.tableSel = index;
+  document.querySelectorAll(".tbl-tab").forEach(el =>
+    el.classList.toggle("active", +el.dataset.t === index));
+  const rows = Array.isArray(t.rows) ? t.rows : [];
+  const refs = Array.isArray(t.cell_refs) ? t.cell_refs : [];
+  const cols = rows.reduce((m, row) => Math.max(m, Array.isArray(row) ? row.length : 0), 0);
+  let filled = 0, located = 0;
+  const head = "<thead><tr><th>行＼列</th>" +
+    Array.from({ length: cols }, (_, c) => `<th>列${c + 1}</th>`).join("") + "</tr></thead>";
+  const body = rows.map((row, r) => {
+    const cells = Array.from({ length: cols }, (_, c) => {
+      const text = String((row && row[c] != null) ? row[c] : "");
+      const ref = (refs[r] && refs[r][c]) || "";
+      if (!text.trim()) {
+        return `<td class="cell empty" data-r="${r}" data-c="${c}" data-i="-1" title="空白单元格（OCR 未检测到文本，行列位置保留）"><span class="ctext">（空）</span></td>`;
+      }
+      filled++;
+      const idx = blockIndexOfRef(ref, text);
+      if (idx >= 0) {
+        located++;
+        return `<td class="cell" data-r="${r}" data-c="${c}" data-i="${idx}" title="点击定位到原图对应区域"><span class="ctext">${esc(text)}</span><span class="ref">${esc(refShort(ref))}</span></td>`;
+      }
+      return `<td class="cell noloc" data-r="${r}" data-c="${c}" data-i="-1" title="缺少可验证的 line_id / bbox，无法定位"><span class="ctext">${esc(text)}</span><span class="ref noloc">无法定位</span></td>`;
+    }).join("");
+    return `<tr><th>行${r + 1}</th>${cells}</tr>`;
+  }).join("");
+  $("tableWrap").innerHTML = `<table class="fangji">${head}<tbody>${body}</tbody></table>`;
+
+  const st = t.stats || {};
+  const cap = ["表 " + (t.table_id || "—"),
+    (st.rows != null ? st.rows : rows.length) + " 行 × " + (st.cols != null ? st.cols : cols) + " 列",
+    "非空格 " + filled + "，可定位 " + located].join(" · ");
+  $("tableCap").textContent = cap + (t.source_hash ? " · source_hash " + t.source_hash : "") +
+    (S.tables.length > 1 ? "（共 " + S.tables.length + " 张，点上方标签切换）" : "") +
+    (S.tableNote ? " · " + S.tableNote : "");
+
+  $("tableWrap").onclick = ev => {
+    const td = ev.target.closest("td.cell");
+    if (!td) return;
+    const r = +td.dataset.r, c = +td.dataset.c, idx = +td.dataset.i;
+    document.querySelectorAll("td.cell.sel").forEach(el => el.classList.remove("sel"));
+    td.classList.add("sel");
+    S.cellSel = r + ":" + c;
+    const text = String((S.tables[S.tableSel]?.rows?.[r] || [])[c] ?? "");
+    const det = $("tableDetail");
+    if (td.classList.contains("empty")) {
+      document.querySelectorAll(".bbox.sel, .block-item.sel").forEach(el => el.classList.remove("sel"));
+      det.className = "tbl-detail";
+      det.innerHTML = `<b>第 ${r + 1} 行 第 ${c + 1} 列</b>：空白单元格（OCR 未检测到文本）。行列位置已保留，不填充任何推测内容。`;
+      return;
+    }
+    const b = (S.ocr && S.ocr.blocks && S.ocr.blocks[idx]) || null;
+    if (idx < 0 || !b) {
+      // 不留下与本次点击无关的旧高亮，避免让人误以为定位成功
+      document.querySelectorAll(".bbox.sel, .block-item.sel").forEach(el => el.classList.remove("sel"));
+      $("blockDetail").textContent = "该单元格没有可验证的出处，未选中任何文本块。";
+      det.className = "tbl-detail noloc";
+      det.innerHTML = `<b>第 ${r + 1} 行 第 ${c + 1} 列</b>「${esc(text)}」：该单元格没有可验证的出处（line_id / bbox 缺失，或与原文本块对不上），<b>无法定位</b>；内容按 OCR 原样保留，未做推测。`;
+      toast("该单元格无可验证出处，无法定位到原图");
+      return;
+    }
+    selectBlock(idx);
+    const box = document.querySelector('.bbox[data-i="' + idx + '"]');
+    if (box) box.scrollIntoView({ block: "center", behavior: "smooth" });
+    det.className = "tbl-detail";
+    det.innerHTML = [
+      ["单元格原文", text], ["行列", "第 " + (r + 1) + " 行 · 第 " + (c + 1) + " 列"],
+      ["定位依据", "line_id / block_ref → 文本块 bbox"], ["line_id", b.line_id],
+      ["bbox", fmt(b.bbox)], ["block_ref", b.block_ref], ["conf", b.conf],
+      ["定位状态", "已定位到原图（预览图中高亮框）"],
+    ].map(([k, v]) => `<div><b>${esc(k)}：</b>${esc(fmt(v))}</div>`).join("");
+  };
+}
+
+function sourceCell(item) {
+  if (!item.line_id && !item.block_ref) return "—";
+  return '<button type="button" class="source-link" data-ref="' + esc(item.block_ref) +
+    '" data-line="' + esc(item.line_id) + '">' + esc(item.line_id || "定位原文") + '</button>';
+}
+function renderEntityRows(entities) {
+  const type = $("entityType").value;
+  const rows = type ? entities.filter(entity => entity.type === type) : entities;
+  $("entCount").textContent = type ? rows.length + " / " + entities.length : entities.length;
+  $("entBody").innerHTML = rows.length ? rows.map(e =>
+    '<tr><td>' + esc(e.name) + '</td><td><span class="badge gray">' + esc(e.type) +
+    '</span></td><td>' + esc(e.value) + '</td><td>' + sourceCell(e) + '</td></tr>').join("")
     : "<tr><td colspan='4' class='empty'>暂无实体</td></tr>";
-  $("triBody").innerHTML = tris.length ? tris.slice(0, 60).map(t =>
-    `<tr><td>${esc(t.head)}</td><td>${esc(t.relation)}</td><td>${esc(t.tail)}</td><td>${esc(t.line_id)}</td></tr>`).join("")
+}
+function renderEntities(entities, triples) {
+  const filter = $("entityType");
+  const types = [...new Set(entities.map(entity => entity.type).filter(Boolean))];
+  filter.replaceChildren(new Option("全部类型", ""), ...types.map(type => new Option(type, type)));
+  renderEntityRows(entities);
+  $("triCount").textContent = triples.length;
+  $("triBody").innerHTML = triples.length ? triples.map(t =>
+    '<tr><td>' + esc(t.head) + '</td><td>' + esc(t.relation) + '</td><td>' +
+    esc(t.tail) + '</td><td>' + sourceCell(t) + '</td></tr>').join("")
     : "<tr><td colspan='4' class='empty'>暂无三元组</td></tr>";
+}
+$("entityType").onchange = () => renderEntityRows(S.ocr?.entities || []);
+for (const id of ["entBody", "triBody"]) {
+  $(id).onclick = event => {
+    const source = event.target.closest(".source-link");
+    if (source) locateBlock(source.dataset.line, source.dataset.ref);
+  };
 }
 
 /* ---------------- 步骤三：原生力导向图 ---------------- */
@@ -590,6 +949,7 @@ async function loadGraph() {
     S.links = (r.links || []).filter(l => S.nodes.some(n => n.id === l.source) && S.nodes.some(n => n.id === l.target));
     $("graphBadge").textContent = badgeOf(r);
     $("demoChip").textContent = badgeOf(r);
+    $("demoChip").className = "chip " + (r.is_demo ? "warn" : "ok");
     const st = r.stats || {};
     $("graphHint").textContent = "共 " + S.nodes.length + " 个节点 / " + S.links.length + " 条边；" +
       (st.note || "规模不是评测指标");
@@ -613,7 +973,7 @@ function drawGraph() {
   const ctx = cv.getContext("2d"); ctx.scale(dpr, dpr);
   ctx.clearRect(0, 0, W, H);
   const n = S.nodes.length;
-  if (!n) { ctx.fillStyle = "#94a3b8"; ctx.font = "13px sans-serif"; ctx.textAlign = "center"; ctx.fillText("暂无图谱数据，请先在步骤一加载示例古籍页", W / 2, H / 2); return; }
+  if (!n) { ctx.fillStyle = "#786b59"; ctx.font = "13px sans-serif"; ctx.textAlign = "center"; ctx.fillText("暂无图谱数据，请先在步骤一加载示例古籍页", W / 2, H / 2); return; }
 
   // 初始位置：环形散布（确定性，刷新后布局一致）
   S.nodes.forEach((nd, i) => { const a = i * 2.399963; const r = Math.min(W, H) * (0.16 + 0.22 * Math.sqrt(i / Math.max(1, n))); nd.x = W / 2 + Math.cos(a) * r; nd.y = H / 2 + Math.sin(a) * r; nd.vx = 0; nd.vy = 0; });
@@ -644,9 +1004,9 @@ function drawGraph() {
   S.links.forEach(l => {
     const a = S.nodes[idx[l.source]], b = S.nodes[idx[l.target]];
     if (!a || !b) return;
-    ctx.strokeStyle = "rgba(100,116,139,.38)"; ctx.lineWidth = 1;
+    ctx.strokeStyle = "rgba(95,79,60,.38)"; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
-    ctx.fillStyle = "#94a3b8"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
+    ctx.fillStyle = "#786b59"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
     ctx.fillText(l.relation || "", (a.x + b.x) / 2, (a.y + b.y) / 2 - 3);
   });
   // 节点
@@ -655,7 +1015,7 @@ function drawGraph() {
     ctx.beginPath(); ctx.arc(nd.x, nd.y, r, 0, Math.PI * 2);
     ctx.fillStyle = colorOf(nd.type); ctx.fill();
     ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
-    ctx.fillStyle = "#1e293b"; ctx.font = "11.5px sans-serif"; ctx.textAlign = "center";
+    ctx.fillStyle = "#2b2520"; ctx.font = "11.5px sans-serif"; ctx.textAlign = "center";
     ctx.fillText(nd.label || nd.id, nd.x, nd.y + r + 13);
   });
   cv.onclick = ev => {
@@ -675,10 +1035,17 @@ function drawGraph() {
 }
 
 /* ---------------- 步骤四：问答 ---------------- */
+function clearAnswer(message) {
+  $("answerBox").textContent = message || "已切换页面：问答按当前页生效，请重新提问。";
+  $("answerBox").classList.remove("refused");
+  $("objList").innerHTML = ""; $("evList").innerHTML = "";
+  $("evHint").textContent = "证据与关系结论只对当前页有效；切换页面或重新提问会清空。";
+  $("traceBox").textContent = "（暂无）";
+}
 $("btnAsk").onclick = () => { const q = $("qInput").value.trim(); if (q) ask(q); };
 $("qInput").addEventListener("keydown", e => { if (e.key === "Enter") $("btnAsk").click(); });
 async function ask(q) {
-  $("answerBox").textContent = "检索中…"; $("evList").innerHTML = "";
+  $("answerBox").textContent = "检索中…"; $("evList").innerHTML = ""; $("objList").innerHTML = "";
   try {
     const r = await api("/api/qa", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -693,27 +1060,107 @@ async function ask(q) {
     }
     $("traceBox").textContent = (r.trace || []).join("\n") + "\n\n免责声明：" + r.disclaimer;
     const evs = r.evidences || [];
+    const objs = r.objects || [];
     $("evHint").textContent = r.refused
-      ? "已拒答（" + (r.refuse_reason || "") + "），无可用证据。仅供参考、非诊疗建议。"
-      : "共 " + evs.length + " 条证据，quote 已逐条回原文校验。";
-    $("evList").innerHTML = evs.length ? evs.map((e, i) =>
-      `<div class="ev-card" data-line="${esc(e.line_id)}" data-page="${esc(e.page_id)}" style="cursor:pointer" title="点击定位到步骤二的原文块">
-       <div class="q">[${i + 1}] 「${esc(e.quote)}」</div>
+      ? "已拒答（" + (r.refuse_reason || "") + "），无可用证据；不引用其他页，不做补答。仅供参考、非诊疗建议。"
+      : (objs.length
+          ? "共 " + objs.length + " 条关系、 " + evs.length + " 条证据（关系引文 + 主体引文），quote 已逐条回原文校验。"
+          : "共 " + evs.length + " 条证据，quote 已逐条回原文校验。");
+    // 图谱关系题的结论：每条都标明主体、关系方向与两处引文
+    $("objList").innerHTML = objs.length ? (
+      `<div class="obj-head">关系结论 · ${objs.length} 条（方向：主体 —关系→ 客体，均来自当前页原文）</div>` +
+      objs.map((o, i) => `<div class="obj-card" data-line="${esc(o.relation_line)}" data-page="${esc(o.page_id)}"
+         title="点击定位到关系引文所在行">
+         <div class="obj-main">[${i + 1}] <b>${esc(o.head)}</b><span class="obj-type">${esc(o.subject_type || "—")}</span>
+           <span class="obj-rel">—${esc(o.relation)}→</span>${esc(o.tail)}</div>
+         <div class="obj-meta">关系引文 ${esc(o.relation_line)}：${esc(o.relation_quote)}<br>
+         主体出处：${o.support === "carry"
+            ? "主体引文 " + esc(o.subject_line) + "「" + esc(o.subject_quote) + "」（与关系分列两行）"
+            : "与关系同行（同一条引文即可确认）"}</div>
+       </div>`).join("")
+    ) : "";
+    $("objList").querySelectorAll(".obj-card").forEach(el => el.onclick = () => {
+      if (el.dataset.page !== S.pageId) switchPage(el.dataset.page);
+      S.pendingHighlight = el.dataset.line;
+      goto(2);
+    });
+    $("evList").innerHTML = evs.length ? evs.map((e, i) => {
+      const isGraph = e.channel === "graph";
+      const role = e.role === "subject" ? "主体引文" : (isGraph ? "关系引文" : "文本证据");
+      const badge = `<span class="ev-badge ${e.role === "subject" ? "subj" : (isGraph ? "rel" : "")}">${role}</span>`;
+      return `<div class="ev-card" data-line="${esc(e.line_id)}" data-page="${esc(e.page_id)}" style="cursor:pointer" title="点击定位到步骤二的原文块">
+       <div class="q">[${i + 1}] 「${esc(e.quote)}」${badge}</div>
        <div class="loc">page_id: ${esc(e.page_id)} · line_id: ${esc(e.line_id)} · bbox: ${esc(fmt(e.bbox))}<br>
-       检索得分: ${esc(e.score)} · 通道: ${esc(e.channel)} · block_ref: ${esc(e.block_ref)}<br>
-       source_hash: ${esc(e.source_hash)}<br><span style="color:var(--ink)">点击此卡片可高亮对应原文块</span></div></div>`).join("")
+       检索得分: ${esc(e.score)} · 通道: ${esc(e.channel)}${isGraph ? " · 角色: " + role : ""} · block_ref: ${esc(e.block_ref)}<br>
+       source_hash: ${esc(e.source_hash)}<br><span style="color:var(--ink)">点击此卡片可高亮对应原文块</span></div></div>`;
+    }).join("")
       : `<div class="empty">${r.refused ? "无依据，按约定拒答，不提供任何推断性内容。" : "暂无证据"}</div>`;
     $("evList").querySelectorAll(".ev-card").forEach(el => el.onclick = () => {
+      if (el.dataset.page !== S.pageId) switchPage(el.dataset.page);
       S.pendingHighlight = el.dataset.line;
       goto(2);
     });
   } catch (e) {
     $("answerBox").textContent = "请求失败：" + e.message;
+    $("objList").innerHTML = ""; $("evList").innerHTML = "";
     toast("问答失败：" + e.message);
   }
 }
 
+async function loadMetrics() {
+  const note = $("metricsNote");
+  try {
+    const report = await api("/api/metrics");
+    if (!report.available) {
+      note.textContent = report.notice;
+      return;
+    }
+
+    const cards = report.items.map(metric => {
+      const card = document.createElement("div");
+      const measured = Number.isFinite(metric.value);
+      const bounded = measured && metric.value >= 0 && metric.value <= 1;
+      const hasThreshold = Number.isFinite(metric.threshold);
+      const status = metric.judge === "达标" ? "" : metric.judge === "未达标" ? " bad" : " neutral";
+      card.className = "mcard" + status;
+      card.innerHTML = '<div class="ml"></div><div class="mv"></div><div class="mt"></div>';
+      card.querySelector(".ml").textContent = metric.label;
+      card.querySelector(".mv").textContent = measured ? metric.value.toFixed(4) : "—";
+      card.querySelector(".mt").textContent = hasThreshold
+        ? (metric.better === "lower" ? "≤ " : "≥ ") + metric.threshold.toFixed(2) + " · " + (metric.judge || metric.status)
+        : (metric.judge || metric.status || "");
+      if (metric.detail) card.title = metric.detail;
+      if (bounded && hasThreshold) {
+        const bar = document.createElement("div");
+        bar.className = "mbar";
+        bar.setAttribute("aria-hidden", "true");
+        const fill = document.createElement("i");
+        const threshold = document.createElement("s");
+        fill.style.width = metric.value * 100 + "%";
+        threshold.style.left = metric.threshold * 100 + "%";
+        bar.append(fill, threshold);
+        card.append(bar);
+      }
+      return card;
+    });
+    $("metricsGrid").replaceChildren(...cards);
+    const scope = [report.notice || $("metricsScope").textContent];
+    if (report.test_only === true && Number.isInteger(report.test_pages)) {
+      scope.push("计分范围：测试集 " + report.test_pages + " 页");
+    } else if (report.test_only === false) {
+      scope.push("计分范围：全部页面");
+    }
+    if (report.gt_version) scope.push("GT " + report.gt_version);
+    $("metricsScope").textContent = scope.join(" · ");
+    note.textContent = "可溯源率衡量已返回的证据能否回查原文，需与应答题正确作答率配对解读。";
+    if (report.generated_at) note.textContent += " 报告生成于 " + report.generated_at + "。";
+  } catch (error) {
+    note.textContent = "评测概览读取失败：" + error.message;
+  }
+}
+
 init();
+loadMetrics();
 </script>
 </body>
 </html>

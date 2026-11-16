@@ -14,6 +14,7 @@ app/main.py —— FastAPI 入口与路由（四步演示台的服务端）
     DELETE /api/pages/{id}          删除一页及其派生数据（前端二次确认）
     GET    /api/pages/{id}/ocr      OCR 与结构化结果（blocks 按 reading_order 排序）
     GET    /api/graph               图谱可视化 JSON（支持 ?page_id= 按页重建）
+    GET    /api/metrics             评测概览（只读 data/reports/评测明细.json）
     POST   /api/qa                  可溯源问答
     GET    /uploads/{name}          上传页预览
     GET    /docs                    FastAPI 自带接口文档
@@ -31,6 +32,8 @@ from __future__ import annotations
 
 import argparse
 import io
+import json
+import json
 import logging
 import shutil
 import sys
@@ -51,16 +54,20 @@ from app.config import CONFIG                                            # noqa:
 from app.demo import demo_flags, load_demo_ocr, load_demo_questions        # noqa: E402
 from app.schemas import Answer, Block, Entity, GraphData, OCRResult, Triple  # noqa: E402
 from app import store                                                     # noqa: E402
-from extract.rules import extract_all                                      # noqa: E402
+from extract.rules import (candidate_triples, extract_all,               # noqa: E402
+                           extract_entities as candidate_entities)
 from extract.schema import dictionary_stats, warn_if_degraded              # noqa: E402
 from graph.build import build_graph, build_triples                         # noqa: E402
 from graph.export import (                                                 # noqa: E402
     empty_payload, export_graph_json, load_graph_json, to_vis_payload,
 )
+from graph.query import run_query                                          # noqa: E402
 from ocr.pipeline import new_page_id, run_demo, run_ocr                    # noqa: E402
+from ocr import table as table_mod                                         # noqa: E402
 from ocr.recognize import get_adapter, rec_model_name, resolve_rec_model   # noqa: E402
 from qa.disclaimer import DISCLAIMER, page_banner                          # noqa: E402
 from qa.generate import answer as qa_answer                                # noqa: E402
+from qa.graph_qa import detect_intent, graph_answer as graph_qa_answer     # noqa: E402
 from qa.index import build_index                                           # noqa: E402
 
 logger = logging.getLogger("tcm.app")
@@ -154,22 +161,62 @@ def _ingest(ocr: OCRResult) -> Dict[str, Any]:
 
 
 def _blocks_for(page_id: Optional[str]) -> List[Block]:
-    """取问答用的原文块：优先内存状态，其次 SQLite，最后示例数据兜底。"""
-    if page_id and page_id == _STATE["page_id"] and _STATE["blocks"]:
+    """指定页只检索该页。无选页时使用内置示例。"""
+    if not page_id:
+        return load_demo_ocr("DEMO-001").blocks
+    if page_id == _STATE["page_id"]:
         return _STATE["blocks"]
-    if page_id:
-        rows = store.get_blocks(page_id)
-        if rows:
-            return rows
-    if _STATE["blocks"]:
-        return _STATE["blocks"]
-    return load_demo_ocr("DEMO-001").blocks
+    return store.get_blocks(page_id)
 
 
 def _current_graph() -> Optional[GraphData]:
     if _STATE["graph"] is not None:
         return _STATE["graph"]
     return load_graph_json()
+
+
+def _objects_for(page_id: Optional[str], blocks: List[Block],
+                 is_demo: bool = True):
+    """问答用的实体 / 三元组：**只用当前页**。
+
+    优先用入库时保存的图谱（JSON 快照 → SQLite）；该页快照里没有三元组时
+    （早期入库的页），用与入库同一套确定性规则基于本页原文就地重建，
+    不引入任何新规则，也不跨页拼凑。
+    """
+    ent: List[Entity] = []
+    tri: List[Triple] = []
+    if page_id:
+        ent, tri = _snapshot_objects(page_id)
+    elif _STATE["triples"]:
+        ent, tri = _STATE["entities"], _STATE["triples"]
+    if tri or not blocks:
+        return ent, tri
+    try:
+        ent = ent or candidate_entities(blocks, is_demo=is_demo)
+        return ent, build_triples(ent, blocks,
+                                  candidate_triples(blocks, is_demo=is_demo))
+    except Exception:
+        return ent, tri
+
+
+def _cross_page_hits(page_id: str, question: str) -> int:
+    """统计「同一问题在其他页命中多少条关系」——只写进 trace，绝不作为证据。"""
+    try:
+        intent, term = detect_intent(question)
+        if not intent:
+            return 0
+        total = 0
+        for p in store.list_pages():
+            pid = p.get("page_id") if isinstance(p, dict) else getattr(p, "page_id", "")
+            if not pid or pid == page_id:
+                continue
+            _e, tris = _snapshot_objects(pid)
+            if not tris:
+                continue
+            total += int(run_query(intent, term, tris, page_id=pid).get("count") or 0)
+        return total
+    except Exception:
+        return 0
 
 
 def _snapshot_objects(page_id: str):
@@ -257,6 +304,62 @@ def meta():
         "dictionary": dictionary_stats(),
         "rec_model_name": rec_model_name(),
     }
+
+
+_METRIC_ORDER = [
+    ("cer", "字符错误率 CER", "lower"),
+    ("field_f1", "字段级 F1", "higher"),
+    ("table_structure", "表格结构还原", "higher"),
+    ("traceability", "可溯源率", "higher"),
+    ("refusal", "无依据拒答率", "higher"),
+    ("answer_rate", "应答题正确作答率", "higher"),
+]
+
+
+@app.get("/api/metrics")
+def metrics():
+    """读取 eval/run_all.py 产出的 data/reports/评测明细.json，供前端展示评测概览。
+
+    只读、不重算；文件缺失时返回 available=False，前端据此提示「尚未评测」。
+    """
+    path = CONFIG.paths.reports_dir / "评测明细.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {"available": False, "items": [],
+                "notice": "尚未生成评测明细，请先运行 python eval/run_all.py"}
+    except (OSError, ValueError) as exc:
+        return {"available": False, "items": [],
+                "notice": f"评测明细读取失败（{type(exc).__name__}）"}
+    if not isinstance(data, dict) or not isinstance(data.get("results"), dict):
+        return {"available": False, "items": [], "notice": "评测明细格式不正确"}
+    results = data["results"]
+    items = []
+    for key, label, better in _METRIC_ORDER:
+        r = results.get(key)
+        if not isinstance(r, dict):
+            continue
+        items.append({"key": key, "label": label, "better": better,
+                      "value": r.get("value"), "threshold": r.get("threshold"),
+                      "judge": r.get("judge"), "status": r.get("status"),
+                      "detail": r.get("detail")})
+    if not items:
+        return {"available": False, "items": [], "notice": "评测明细没有可展示的指标"}
+    dataset = data.get("dataset")
+    if not isinstance(dataset, dict):
+        dataset = {}
+    test_pages = results.get("test_pages")
+    return {"available": True, "items": items,
+            "generated_at": data.get("generated_at"),
+            "gt_version": data.get("gt_version"),
+            "test_only": results.get("test_only"),
+            "test_pages": len(test_pages) if isinstance(test_pages, list) else None,
+            "notice": data.get("notice"),
+            "counts": dataset.get("counts"),
+            "test_pages": dataset.get("test_pages"),
+            "pages_total": dataset.get("pages_total"),
+            "gt_version": data.get("gt_version"),
+            "reproduce": data.get("reproduce")}
 
 
 # ------------------------------------------------------------------
@@ -379,6 +482,73 @@ def delete_page(page_id: str):
 # ② OCR 与结构化
 # ------------------------------------------------------------------
 
+_TABLE_NO_FIELD = ("历史记录缺少表格字段：该页入库时尚未保存表格结构"
+                   "（早于方剂表还原功能的旧记录），无法还原表格。请重新识别该页。")
+_TABLE_NONE = "本页未识别到方剂表（bbox 行列聚类要求至少 2 行且多数行 ≥2 格，竖排正文页不会误判）。"
+
+
+def _tables_payload(page: Dict[str, Any],
+                    blocks: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """把页面快照里的表格整理成前端可直接渲染、且**逐格可定位**的结构。
+
+    复用 OCR 已产出的 TableStruct，不改动识别结果：
+      - rows 与 cell_refs 同形，行列位置与空白单元格原样保留；
+      - cell_refs 缺失（旧记录）时用 align_cell_refs 逐格核验补齐，
+        核不上就留空，前端标「无法定位」，不拿文本相似度硬凑；
+      - 快照里**没有 tables 字段**时返回 tables_status="no_table_field"，
+        与「本页确实无表」（tables_status="none"）区分开，不用空表冒充。
+    """
+    if "tables" not in page:
+        return {"tables": [], "tables_status": "no_table_field",
+                "tables_note": _TABLE_NO_FIELD}
+    raw_tables = page.get("tables") or []
+    if not isinstance(raw_tables, list):
+        return {"tables": [], "tables_status": "no_table_field",
+                "tables_note": _TABLE_NO_FIELD}
+    if not raw_tables:
+        return {"tables": [], "tables_status": "none", "tables_note": _TABLE_NONE}
+
+    block_objs = [Block.from_dict(b) if isinstance(b, dict) else b for b in blocks]
+    out: List[Dict[str, Any]] = []
+    for i, raw in enumerate(raw_tables):
+        t = raw if isinstance(raw, dict) else (
+            raw.to_dict() if hasattr(raw, "to_dict") else {})
+        rows = [list(r) if isinstance(r, (list, tuple)) else [r]
+                for r in (t.get("rows") or [])]
+        refs = t.get("cell_refs") or []
+        refs_source = "ocr"
+        if not refs:
+            refs = table_mod.align_cell_refs(rows, t.get("cells") or [], block_objs)
+            refs_source = "derived" if refs else "missing"
+        # 行列数按实际 rows 归一，缺列的行补空，保证前端网格不错位
+        width = max((len(r) for r in rows), default=0)
+        refs_norm = []
+        for r_i, row in enumerate(rows):
+            rows[r_i] = row + [""] * (width - len(row))
+            line = list(refs[r_i]) if r_i < len(refs) and isinstance(refs[r_i], list) else []
+            refs_norm.append((line + [""] * width)[:width])
+        total = sum(1 for row in rows for text in row if str(text or "").strip())
+        located = sum(1 for line in refs_norm for ref in line if str(ref or "").strip())
+        out.append({
+            "table_id": t.get("table_id") or f"{page.get('page_id', '')}-T{i + 1:02d}",
+            "page_id": t.get("page_id") or page.get("page_id", ""),
+            "rows": rows,
+            "cell_refs": refs_norm,
+            "cells": t.get("cells") or [],
+            "source_hash": t.get("source_hash", ""),
+            "is_demo": bool(t.get("is_demo", True)),
+            "refs_source": refs_source,
+            "stats": {"rows": len(rows), "cols": width,
+                      "filled_cells": total, "located_cells": located},
+        })
+    note = ""
+    if any(t["refs_source"] == "derived" for t in out):
+        note = "出处由 rows / cells 逐格核对补齐（旧记录无 cell_refs 字段），核对不上即标「无法定位」。"
+    elif all(t["refs_source"] == "missing" for t in out):
+        note = "该页表格缺少可核验的出处字段，单元格内容照原样展示，但无法定位到原图。"
+    return {"tables": out, "tables_status": "ok", "tables_note": note}
+
+
 @app.get("/api/pages/{page_id}/ocr")
 def get_ocr(page_id: str):
     snap = store.get_page(page_id)
@@ -398,6 +568,8 @@ def get_ocr(page_id: str):
         "entities": snap.get("entities", []),
         "triples": snap.get("triples", []),
         "blocks": blocks,
+        # 方剂表：rows + 同形 cell_refs，供步骤二「方剂表还原」渲染与定位
+        **_tables_payload(page, blocks),
         "is_demo": snap.get("is_demo", True),
         "engine": page.get("engine", "stub"),
         "rec_model": rec_model_name(),
@@ -443,7 +615,13 @@ def get_graph(page_id: Optional[str] = None):
 
 @app.post("/api/qa")
 def ask(payload: Dict[str, Any] = Body(default={})):
-    """可溯源问答。无证据 / 越界一律拒答，所有输出带免责声明。"""
+    """可溯源问答。无证据 / 越界一律拒答，所有输出带免责声明。
+
+    入口分两路（阶段十）：
+      1. 图谱关系题（症状→药材 / 症状→方剂 / 药材→禁忌）：走 qa.graph_qa，
+         只引用当前页三元组，逐条校验出处与主体归属；
+      2. 其他题：沿用原有文本混合检索（qa.generate.answer），口径不变。
+    """
     payload = payload or {}
     question = str(payload.get("question") or payload.get("q") or "").strip()
     page_id = payload.get("page_id") or _STATE["page_id"]
@@ -462,8 +640,16 @@ def ask(payload: Dict[str, Any] = Body(default={})):
         )
     else:
         blocks = _blocks_for(page_id)
-        ans = qa_answer(question, blocks, vector_index=_STATE["vector_index"],
-                        is_demo=flags["is_demo"])
+        entities, triples = _objects_for(page_id, blocks, is_demo=flags["is_demo"])
+        ans = graph_qa_answer(
+            question, blocks, triples, entities=entities, page_id=page_id or "",
+            is_demo=flags["is_demo"],
+            page_exists=bool(page_id) and store.get_page(page_id) is not None,
+            other_page_hits=_cross_page_hits(page_id, question) if page_id else 0,
+        )
+        if ans is None:
+            index = _STATE["vector_index"] if page_id and page_id == _STATE["page_id"] else None
+            ans = qa_answer(question, blocks, vector_index=index, is_demo=flags["is_demo"])
     try:
         store.log_qa(question, ans)
     except Exception:

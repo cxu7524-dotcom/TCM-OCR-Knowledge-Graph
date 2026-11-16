@@ -68,3 +68,6 @@ data/reports/bbox_check/
 data/reports/guji_*.json
 data/reports/_ab_*.json
 data/reports/_probe_*.json
+
+# 本地交付文件包含公开古籍画面
+/output/
