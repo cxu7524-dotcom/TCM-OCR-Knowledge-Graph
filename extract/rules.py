@@ -48,6 +48,9 @@ _DOSE_R = re.compile(r"([一-龥]{1,6}?)\s*(" + DOSE_RE + r")")
 # 新口径：任意 1-6 个汉字紧邻剂量，药名段再回查词典；查不到时按尾部汉字兜底
 _DOSE_TAIL_R = re.compile(r"([一-龥]{1,6})\s*(" + DOSE_RE + r")")
 _ZHUZHI_R = re.compile(ZHUZHI_RE)
+
+# 「此方 / 前方」类指代：出现时主体应取方名，而不是沿用上文药名
+_FORMULA_ANAPHORA = ("此方", "是方", "前方", "本方", "斯方", "此藥", "此药", "此丸", "此散")
 _FORMULA_R = re.compile(FORMULA_RE)
 
 # 表格表头：不参与实体抽取（否则「劑量」会被当成剂量值、「藥名」被当成药材）
@@ -273,13 +276,14 @@ def _entity(name: str, etype: str, b: Block, value: str = "",
 
 
 def _triple(head: str, relation: str, tail: str, b: Block,
-            is_demo: bool = True) -> Triple:
-    """构造带完整溯源字段的三元组。"""
+            is_demo: bool = True, subject_rule: str = "") -> Triple:
+    """构造带完整溯源字段的三元组。subject_rule 记录主体来源，便于核验复盘。"""
     return Triple(
         page_id=b.page_id, bbox=list(b.bbox), line_id=b.line_id,
         quote=b.text, source_hash=b.source_hash,
         head=head, relation=relation, tail=tail,
-        evidence_refs=[b.block_ref or b.line_id], is_demo=is_demo,
+        evidence_refs=[b.block_ref or b.line_id],
+        subject_rule=subject_rule, is_demo=is_demo,
     )
 
 
@@ -431,18 +435,47 @@ def candidate_triples(blocks: Iterable[Block],
                       is_demo: bool = True) -> List[Triple]:
     """从原文行生成候选三元组（规则）。
 
-    归属策略（启发式，已在模块说明中标注为 TODO）：
-      - 行内出现方名 → 记为「当前方」，其后含剂量的行视为该方组成；
-      - 行内首个药材记为「当前主语」，跨行的主治 / 功效 / 禁忌归到它；
-        本行没有药材但有「当前方」时，主治 / 功效归到方剂（方书页的主治病证是方的）；
-      - 药名紧邻剂量 → (药材, 剂量, 剂量值)，同时补 (方剂, 组成, 药材)。
+    主体切换规则（阶段十一，替换原「本行药材 → 上文药材 → 当前方名」）：
+      1. **最近主体**：每遇到「主体行」就把主语更新为该行主体，主体行是
+         —— 含方名 → 方名（方剂）；否则含药名 → 首个非忌口药名（药材）。
+         方名优先于同一行里的药名（方名常包含药名，如「藿香正氣湯」）。
+      2. 其后没有主体的行（续行：主治 / 功效 / 性味 / 禁忌）沿用最近主体，
+         不再让「上文药材」越过方名一直占位。
+      3. 「此方 / 前方 / 是方 / 本方 / 斯方」等指代：主体取本页在先出现的方名；
+         本页没有方名时不强行归属，记入 audit 的「未确认」并**不产出关系**。
+      4. 本页首个主体出现之前的续行（跨页续文）同样不产出关系。
+      5. 方剂组成仍按「最近出现过的方名」归属，剂量仍按「药名紧邻剂量」成对抽取。
+
     输入：Block 列表（entities 参数保留给后续 LLM 抽取结果复用）
-    输出：Triple 列表，字段完整，不抛异常。
+    输出：Triple 列表，字段完整（含 subject_rule），不抛异常。
     """
+    triples, _skipped = _candidate_triples_audited(blocks, is_demo)
+    return triples
+
+
+def candidate_triples_audited(blocks: Iterable[Block],
+                              entities: Optional[Iterable[Entity]] = None,
+                              is_demo: bool = True
+                              ) -> Tuple[List[Triple], List[Dict[str, str]]]:
+    """候选三元组 + 「未确认归属」审计记录（公开入口，供核验脚本 / 单测使用）。"""
+    return _candidate_triples_audited(blocks, is_demo)
+
+
+def _candidate_triples_audited(blocks: Iterable[Block],
+                               is_demo: bool = True
+                               ) -> Tuple[List[Triple], List[Dict[str, str]]]:
+    """同 candidate_triples，同时返回「未确认归属」的审计记录（不产出关系）。"""
     out: List[Triple] = []
+    skipped: List[Dict[str, str]] = []
     current_formula = ""
-    current_herb = ""
+    # 最近主体：(名称, 类型) —— 类型 ∈ {"药材", "方剂"}
+    last_subject: Optional[Tuple[str, str]] = None
     strict = CONFIG.ocr.extract_dose_strict
+
+    def skip(b: Block, relation: str, tail: str, reason: str) -> None:
+        skipped.append({"page_id": b.page_id, "line_id": b.line_id,
+                        "relation": relation, "tail": tail, "reason": reason})
+
     try:
         for b in blocks:
             if not isinstance(b, Block):
@@ -452,14 +485,20 @@ def candidate_triples(blocks: Iterable[Block],
                 continue
 
             f_hits = _formula_hits(text)
-            if f_hits:
-                current_formula = f_hits[0][1].rstrip("方")
+            formula = f_hits[0][1].rstrip("方") if f_hits else ""
+            if formula:
+                current_formula = formula
 
             herbs = [h for _p, h in _scan(text, _HERB_IDX)]
-            if herbs and not text.startswith("忌"):
-                current_herb = herbs[0]
+            herb_subject = next((h for h in herbs if h not in CONTRA_WORDS), "")
 
-            # 方剂组成 + 剂量
+            # —— 主体行：更新最近主体（方名优先） ——
+            if formula:
+                last_subject = (formula, "方剂")
+            elif herb_subject and not text.startswith("忌"):
+                last_subject = (herb_subject, "药材")
+
+            # 方剂组成 + 剂量（口径不变：组成挂最近方名，剂量挂紧邻药名）
             pairs: List[Tuple[str, str]] = []
             if strict:
                 for herb, dose in _DOSE_R.findall(text):
@@ -469,37 +508,72 @@ def candidate_triples(blocks: Iterable[Block],
             else:
                 pairs = [(h, d) for h, d, _e in _pair_herb_dose(text)]
             for herb, dose in pairs:
-                out.append(_triple(herb or "（未识别药名）", "剂量", dose, b, is_demo))
+                out.append(_triple(herb or "（未识别药名）", "剂量", dose, b, is_demo,
+                                   subject_rule="same_line"))
                 if current_formula and herb != current_formula:
-                    out.append(_triple(current_formula, "组成", herb, b, is_demo))
+                    out.append(_triple(current_formula, "组成", herb, b, is_demo,
+                                       subject_rule="formula_scope"))
 
-            # 主语：本行药材 → 上文药材 → 当前方（方书页的主治属于方）
-            subject = (herbs[0] if herbs else "") or current_herb or current_formula
+            # —— 主语：本行主体 → 最近主体；指代词走方名 ——
+            anaphora = any(w in text for w in _FORMULA_ANAPHORA)
+            if herb_subject or formula:
+                subject, rule = (formula or herb_subject), "same_line"
+            elif anaphora:
+                if current_formula:
+                    subject, rule = current_formula, "formula_scope"
+                else:
+                    subject, rule = "", ""
+            elif last_subject:
+                subject, rule = last_subject[0], "carry"
+            else:
+                subject, rule = "", ""
 
             # 性味
             for pat in NATURE_PATTERNS:
                 m = re.search(pat, text)
                 if m and subject:
-                    out.append(_triple(subject, "性味", m.group(0), b, is_demo))
+                    out.append(_triple(subject, "性味", m.group(0), b, is_demo,
+                                       subject_rule=rule))
                     break
 
             # 主治 / 功效
             m = _ZHUZHI_R.search(text)
-            if m and subject and is_valid_indication(m.group(1)):
-                out.append(_triple(subject, "主治", m.group(1), b, is_demo))
+            if m and is_valid_indication(m.group(1)):
+                if subject:
+                    out.append(_triple(subject, "主治", m.group(1), b, is_demo,
+                                       subject_rule=rule))
+                elif anaphora:
+                    skip(b, "主治", m.group(1),
+                         "指代词「此方」类但本页无方名可指代（疑似跨页续文），不强行归属")
+                else:
+                    skip(b, "主治", m.group(1), "本页此前没有主体（疑似跨页续文），不强行归属")
             eff = _pick_main(text, EFFECT_WORDS)
-            if eff and subject:
-                out.append(_triple(subject, "功效", eff, b, is_demo))
+            if eff:
+                if subject:
+                    out.append(_triple(subject, "功效", eff, b, is_demo, subject_rule=rule))
+                elif anaphora:
+                    skip(b, "功效", eff,
+                         "指代词「此方」类但本页无方名可指代（疑似跨页续文），不强行归属")
+                else:
+                    skip(b, "功效", eff, "本页此前没有主体（疑似跨页续文），不强行归属")
 
-            # 禁忌：优先取本行主语（避免跨行猜测），行内无主语才回退到上文主语
+            # 禁忌：本行药材优先（排除忌口对象），否则沿用最近主体
             if "忌" in text:
-                subj = next((h for h in herbs if h not in CONTRA_WORDS), current_herb)
+                subj, sub_rule = "", ""
+                if herb_subject:
+                    subj, sub_rule = herb_subject, "same_line"
+                elif last_subject:
+                    subj, sub_rule = last_subject[0], "carry"
                 for word in sorted(CONTRA_WORDS, key=lambda s: (-len(s), s)):
-                    if word in text and subj:
-                        out.append(_triple(subj, "禁忌", word, b, is_demo))
+                    if word in text:
+                        if subj:
+                            out.append(_triple(subj, "禁忌", word, b, is_demo,
+                                               subject_rule=sub_rule))
+                        else:
+                            skip(b, "禁忌", word, "本页此前没有主体，不强行归属")
     except Exception:
-        return out
-    return out
+        return out, skipped
+    return out, skipped
 
 
 def extract_all(blocks: Iterable[Block],

@@ -232,12 +232,20 @@ class Entity(Provenance):
 
 @dataclass
 class Triple(Provenance):
-    """③ 知识图谱三元组：head -relation-> tail，携带原文证据。"""
+    """③ 知识图谱三元组：head -relation-> tail，携带原文证据。
+
+    subject_rule：主体是从哪里取的（阶段十一新增，便于核验与复盘）：
+      same_line      —— 主体出现在该关系行本身；
+      carry          —— 主体取自上文最近一个「主体行」（药材或方名）；
+      formula_scope  —— 行文用「此方 / 前方」指代，主体取自本页在先出现的方名；
+      ""             —— 旧数据 / 未标注。
+    """
 
     head: str = ""
     relation: str = ""
     tail: str = ""
     evidence_refs: List[str] = field(default_factory=list)  # Block.block_ref / Evidence.quote
+    subject_rule: str = ""         # same_line | carry | formula_scope
     is_demo: bool = True
 
     def __post_init__(self) -> None:
