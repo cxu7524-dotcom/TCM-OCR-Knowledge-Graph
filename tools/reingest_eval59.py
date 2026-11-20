@@ -31,7 +31,10 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from app import store                                               # noqa: E402
-from extract.rules import extract_all                               # noqa: E402
+from app.config import CONFIG                                       # noqa: E402
+from extract.rules import extract_all_audited                       # noqa: E402
+from extract.formula_segments import extract_formula_candidates     # noqa: E402
+from extract.formula_rows import extract_formula_rows               # noqa: E402
 from graph.build import build_graph, build_triples                  # noqa: E402
 from ocr.pipeline import run_ocr                                    # noqa: E402
 from ocr.recognize import get_adapter, rec_model_name               # noqa: E402
@@ -101,19 +104,42 @@ def main() -> int:
         src = IMG_DIR / name
         dest = UPLOADS / f"{pid}{src.suffix.lower()}"
 
-        store.delete_page(pid)                   # 删转写版（blocks/entities/triples 一并删）
+        store.delete_page(pid)                   # 删旧页（blocks/entities/triples 一并删）
         shutil.copyfile(src, dest)
         t0 = time.time()
         ocr = run_ocr(str(dest), pid)
-        entities, candidates = extract_all(ocr.blocks, is_demo=False)
+        # ↓↓↓ 与 app/main.py:_ingest 的入库流程逐行对齐 ↓↓↓
+        # 幂等：重复入库前剔除上一轮附着的小字证据块
+        ocr.blocks = [b for b in ocr.blocks if b.kind != 'small_column_evidence']
+        entities, candidates, unresolved = extract_all_audited(ocr.blocks, is_demo=False)
         triples = build_triples(entities, ocr.blocks, candidates)
         build_graph(triples, entities)           # 校验可构建（demo台按页现查 store）
-        store.save_page(ocr, entities, triples)
+        # 正文方剂表：候选分段 → 行抽取（无条件，随页入库）
+        segmented = extract_formula_candidates(ocr.blocks)
+        formula_extraction = extract_formula_rows(ocr.blocks, segmented['candidates'])
+        formula_extraction['continuation_hints'] = segmented['continuation_hints']
+        # 双列小字复识：实验性开关 TCM_OCR_SMALL_COLUMNS=1 才启用（默认关，
+        # 与生产行为一致；失败只降级不阻断入库）
+        if CONFIG.ocr.small_columns_enabled:
+            try:
+                from ocr.small_columns_attach import attach_small_columns
+                evidence, formula_extraction, small_audit = attach_small_columns(
+                    ocr, formula_extraction, server_fallback=CONFIG.ocr.small_columns_server_enabled)
+                ocr.blocks.extend(evidence)
+                formula_extraction['small_columns_audit'] = small_audit
+            except Exception as exc:
+                formula_extraction['small_columns_audit'] = {'enabled': True, 'fallback': True,
+                                                             'reason': type(exc).__name__}
+        formula_extraction['_printed_tables'] = [t.to_dict() for t in ocr.tables]
+        store.save_page(ocr, entities, triples, unresolved=unresolved,
+                        formula_extraction=formula_extraction)
         n_block += len(ocr.blocks)
         n_ent += len(entities)
         n_tri += len(triples)
+        n_frows = sum(len(f.get('rows') or []) for f in (formula_extraction.get('formulas') or []))
         print(f"  [{i}/{len(rows)}] {pid}  块 {len(ocr.blocks)}  实体 {len(entities)}"
-              f"  关系 {len(triples)}  {time.time() - t0:.1f}s")
+              f"  关系 {len(triples)}  方剂 {len(formula_extraction.get('formulas') or [])}/行 {n_frows}"
+              f"  待核 {len(unresolved)}  {time.time() - t0:.1f}s")
 
     print(f"\n59 页重建完成，总耗时 {time.time() - t_all:.0f}s："
           f"块 {n_block} / 实体 {n_ent} / 关系 {n_tri}")
