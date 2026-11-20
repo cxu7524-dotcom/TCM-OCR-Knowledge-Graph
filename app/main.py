@@ -37,6 +37,7 @@ import json
 import logging
 import shutil
 import sys
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -866,6 +867,50 @@ def ask(payload: Dict[str, Any] = Body(default={})):
         pass
     return {**ans.to_dict(), **page_banner(), "page_id": page_id,
             "badge": flags["badge"], "is_demo": flags["is_demo"]}
+
+
+# ------------------------------------------------------------------
+# 语音输入（本机离线识别）—— 新增路由，只调用 app/asr_voice.py
+# 浏览器原生识别连不上外网时，前端自动降级到这两条接口；识别结果只填进
+# 输入框，由用户自己改错别字后再发送，不直接替用户提问。
+# ------------------------------------------------------------------
+
+@app.get("/api/asr/status")
+def api_asr_status():
+    """语音通道自检：模型是否就位、依赖是否装好、可选语言档位。"""
+    from app import asr_voice
+    info = asr_voice.info()
+    # 页面一打开就后台预热模型，用户真按麦克风时不用再等那几秒
+    if info["ready"] and not info["loaded"]:
+        threading.Thread(target=asr_voice.warm_up, daemon=True).start()
+    return info
+
+
+@app.post("/api/asr")
+async def api_asr(file: UploadFile = File(...), lang: str = Form("zh")):
+    """录音（webm / m4a / wav …）→ 文字。
+
+    lang：zh 普通话 / yue 粤语 / en English（与 app/asr_voice.LANGS 同一张表）
+    """
+    from app import asr_voice
+    info = asr_voice.info()
+    if not info["ready"]:
+        raise HTTPException(status_code=503,
+                            detail="本机语音识别未就绪：" + (info["error"] or "模型或依赖缺失"))
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="没有收到音频数据")
+    if len(data) > 25 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="录音过大（上限 25MB）")
+    try:
+        r = asr_voice.transcribe_bytes(data, file.filename or "voice.webm", lang)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="识别失败：%s" % e)
+    if not r.get("text"):
+        raise HTTPException(status_code=422, detail="没听清，再说一次")
+    return r
 
 
 # ------------------------------------------------------------------

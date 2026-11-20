@@ -106,7 +106,7 @@ $env:TCM_LLM_BACKEND = "ollama"; $env:TCM_LLM_MODEL = "qwen2.5:7b"
 ```
 
 - 问答的检索链路、阈值与出处格式见上文「语义检索与 RAG 问答」；全部环境变量见「配置」一节。
-- 改动代码前后跑回归：`python -m unittest discover -s tests -t .`（当前 135 用例）。
+- 改动代码前后跑回归：`python -m unittest discover -s tests -t .`（当前 206 用例，6 项按环境跳过）。
 - 只存在于本机、不进仓库的东西：`data/store/`（SQLite 与向量索引）、`模型权重/`、
   `古籍评测集/`（原图）、`data/uploads/`、`data/screenshots/`。重建它们就是上面第 1–2 步。
 
@@ -152,6 +152,45 @@ Windows 安装依赖后也可双击 `启动操作台.bat`。脚本优先使用�
 4. 输入问题，查看答案及证据，点击证据回到对应原文。页面列表支持切换历史页和删除页面。
 
 支持 `png`、`jpg`、`jpeg`、`bmp`、`webp`、`tif`、`tiff`。默认上传大小上限为 20 MB。
+
+## 语音输入（普通话 / 粤语 / English）
+
+首页问答面板的输入框左边有一个话筒和一个语种下拉。说话 → 文字**填进输入框**，不自动发送：先自己看一眼，有听错或错别字直接改，确认后再按发送。
+
+两条通道，前端自动选，不用手动切：
+
+| 通道 | 实现 | 特点 |
+|---|---|---|
+| ① 浏览器原生识别 | `SpeechRecognition`（`zh-CN` / `zh-HK` / `en-US`） | 实时出字、快；但要连微软 / 谷歌的语音服务器，国内经常连不上 |
+| ② 本机离线识别 | 录音 → `POST /api/asr` → `faster-whisper` small / int8 / CPU | 慢 1~3 秒，全程不出本机，断网可用 |
+
+第一次点话筒走 ①；一旦浏览器报 `network`（外网不通），就把这台机器记进 `localStorage`，以后直接走 ②，不再白等。
+
+语种档位与实测（本机 small 模型，2026-11-20）：
+
+| 档位 | 底层 | 实测 |
+|---|---|---|
+| 普通话 `zh` | `language="zh"` + 中医/文档领域提示词 | 「甘草有什么功效和禁忌？」「麻黄汤有哪些药材组成？」「当归补血汤的组成和用法」全对；「伤寒论」会听成「商涵论」（小模型对书名弱，靠用户改字） |
+| 粤语 `yue` | `language="zh"` + 最短提示 | 「帮我将这份文件的标题改成季度报告」全对。**不能**用 `language="yue"`：这颗模型直接吐空还白跑十几秒 |
+| 英语 `en` | `language="en"` | 「Please change the title of this document to Quarterly Report.」全对；挂中文档位会把英文硬转成中文胡说 |
+
+启用本机通道：
+
+```bash
+pip install -r requirements.txt          # 装了 faster-whisper 才会启用 ②
+# 模型放到 模型权重/faster-whisper-small/（约 461MB，不入库）
+#   model.bin / tokenizer.json / config.json / vocabulary.txt
+curl -s http://127.0.0.1:8100/api/asr/status   # ready=true 即可用
+```
+
+接口：
+
+| 接口 | 用途 |
+|---|---|
+| `GET /api/asr/status` | 模型与依赖自检、可选语种；打开页面时顺带后台预热模型 |
+| `POST /api/asr` | 表单 `file`（webm / m4a / wav）+ `lang`（`zh` / `yue` / `en`）→ `{text, seconds, duration, lang}` |
+
+识别层只做「声音 → 文字」，不改写语义；识别结果为空（没说清、只有静音、或在念提示词）时返回 422「没听清，再说一次」，不会把幻觉结果塞进输入框。
 
 ## 评测与测试
 
@@ -200,6 +239,8 @@ python eval/run_all.py --refresh
 | `POST /api/qa` | 提问并返回答案、出处或拒答；支持 `history` 多轮上下文与 `scope=page\|library` |
 | `GET /api/rag/status` | 知识库规模、向量模型、索引状态与阈值参数 |
 | `POST /api/rag/rebuild` | 强制重建语义向量索引 |
+| `GET /api/asr/status` | 语音识别自检：模型与依赖、可选语种 |
+| `POST /api/asr` | 录音转文字（`lang=zh\|yue\|en`），结果只填进输入框由用户改字 |
 
 `POST /api/qa` 的响应除 `text` / `evidences` / `trace` 外，新增两个字段：
 

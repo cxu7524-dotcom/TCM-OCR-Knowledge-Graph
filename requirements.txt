@@ -23,6 +23,13 @@ pillow>=10.0                   # 实测 13.0.0（合成页渲染 + 图像宽高�
 numpy>=1.26                    # 实测 2.5.4（OCR 预处理）
 opencv-python>=4.8             # 实测 5.0.0.93（rapidocr 的透视裁剪依赖）
 
+# ---------- 可选：语音输入的本机离线识别（缺了只是语音不可用，其它功能照旧） ----------
+# faster-whisper 走 CPU int8；ctranslate2 / av / tokenizers 由它自动带入。
+# 模型不入库（.gitignore 已忽略「模型权重/」与「*.bin」），需本地放好：
+#   模型权重/faster-whisper-small/{model.bin, tokenizer.json, config.json, vocabulary.txt}（约 461MB）
+# 没装模型时 /api/asr/status 返回 ready=false，界面照常用浏览器语音通道。
+faster-whisper>=1.2,<2.0       # 实测 1.2.1（ctranslate2 4.9.0 / av 19.0.2）
+
 # ---------- 可选：其他 OCR 后端（未安装、未启用，选中会如实降级） ----------
 # paddleocr>=2.8
 
@@ -44,6 +51,7 @@ opencv-python>=4.8             # 实测 5.0.0.93（rapidocr 的透视裁剪依�
 
 # ============================================================
 # 明确移除的旧依赖（不要恢复）：数据库服务端驱动、办公文档读写、
-# 语音合成与识别、WebSocket 与公网 HTTP 客户端。
-# 理由：装机门槛与旧业务链均与赛题二无关，详见 docs/改造说明.md。
+# 语音合成、WebSocket 与公网 HTTP 客户端。
+# 语音**识别**已按需回归（见上面的 faster-whisper，纯本机离线、CPU 可跑），
+# 语音合成仍然不要。理由：装机门槛与旧业务链均与赛题二无关，详见 docs/改造说明.md。
 # ============================================================
