@@ -226,6 +226,24 @@
   .tbl-detail b { color: var(--ink); }
   .tbl-detail.noloc { border-left-color: var(--cinnabar); background: #fbf1ea; }
 
+  .formula-panel { border: 1px solid var(--line-soft); background: #fffdf7; margin: 0 0 12px; }
+  .formula-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 9px 10px; background: #f7eeda; }
+  .formula-name { border: 0; padding: 2px 0; background: none; color: var(--qing-dark); font: 600 16px var(--serif); text-decoration: underline; cursor: pointer; }
+  .formula-name.sel { background: var(--cinnabar-soft); outline: 2px solid var(--cinnabar); }
+  .formula-name[disabled] { color: var(--ink); text-decoration: none; cursor: default; }
+  .formula-continuation { margin: 8px 0; color: var(--cinnabar-dark); font-size: 12px; }
+  /* 未确认归属（审计）：不产出关系，只留原文、行号、坐标与原因 */
+  .audit-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+  .audit-item {
+    border: 1px solid var(--line-soft); border-left: 3px solid var(--cinnabar);
+    border-radius: 3px; background: #fbf1ea; padding: 9px 12px;
+    font-size: 12px; line-height: 1.85; color: var(--ink-soft); cursor: pointer;
+  }
+  .audit-item:hover { border-color: var(--cinnabar); }
+  .audit-item .a-head { color: var(--ink); font-weight: 600; }
+  .audit-item .a-meta { color: var(--muted); font-size: 11px; word-break: break-all; }
+  .audit-item .a-why { color: var(--cinnabar); }
+
   /* 步骤三：图谱 */
   .graph-wrap { position: relative; border: 1px solid var(--line-soft); border-radius: 3px; background: #fcf8ed; overflow: hidden; }
   canvas { display: block; width: 100%; height: 520px; cursor: grab; }
@@ -364,14 +382,26 @@
       <div class="row" style="justify-content:space-between;align-items:flex-start">
         <div>
           <h2>方剂表还原 <span class="badge gray" id="tableCount">0</span></h2>
-          <p class="hint" style="margin:0">沿用本页 OCR 的行列结构：空白单元格与行列位置原样保留，药名 / 剂量 / 炮制等内容以 OCR 实际返回为准。点击有出处的单元格可回到下方预览图的原图位置，并同步选中文本块；缺少可验证出处的单元格照原样显示内容并标「无法定位」。</p>
+          <p class="hint" style="margin:0">正文按方剂分表，原书规整表保留原有行列。点击方名、药材或剂量可核对原图与 OCR；待核和原文未载如有上下文，可点击查看相关位置。</p>
         </div>
         <span class="badge gray" id="tableSrc">—</span>
       </div>
+      <div id="formulaContinuation" class="formula-continuation" hidden></div>
       <div class="tbl-tabs" id="tableTabs" hidden></div>
       <div class="tbl-scroll" id="tableWrap"><div class="empty">请先上传扫描页或加载示例</div></div>
       <p class="tbl-cap" id="tableCap"></p>
       <div class="tbl-detail" id="tableDetail">点击任一有出处的单元格，可回到预览图中的原图位置。</div>
+    </div>
+    <div class="card" id="auditCard" style="margin-bottom:16px">
+      <div class="row" style="justify-content:space-between;align-items:flex-start">
+        <div>
+          <h2>未确认归属（审计） <span class="badge gray" id="auditCount">0</span></h2>
+          <p class="hint" style="margin:0">这些行本来可能是主治 / 功效 / 禁忌，但本页找不到能确认的主体（典型是跨页续文的「此方」「前方」）。系统<b>不产出关系、不猜主体</b>，只把原文、行号、坐标和原因留存供核查；点击一条可回到下方预览图的对应位置。</p>
+        </div>
+        <span class="badge gray" id="auditSrc">—</span>
+      </div>
+      <div id="auditList"><div class="empty">请先上传扫描页或加载示例</div></div>
+      <p class="tbl-cap" id="auditNote"></p>
     </div>
     <div class="grid two">
       <div class="card">
@@ -462,7 +492,8 @@
 "use strict";
 /* 四步演示台：零外部依赖（无 CDN、无 npm 包），离线可完整运行 */
 const S = { pageId: null, ingest: null, ocr: null, graph: null, meta: null, nodes: [], links: [], selected: null,
-            tables: [], tableSel: 0, cellSel: null, tableNote: "", ocrSeq: 0 };
+            tables: [], tableSel: 0, cellSel: null, tableNote: "", ocrSeq: 0,
+            audit: [], auditNote: "" };
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
 const fmt = v => v == null ? "—" : (typeof v === "object" ? JSON.stringify(v) : String(v));
@@ -551,6 +582,7 @@ async function ingest(fd, label) {
     S.pageId = r.page_id; S.ingest = r;
     S.ocr = null;                                  // 新页入库：面板二与表格区整体重取
     resetTables("正在读取本页方剂表…", "loading");
+    resetAudit("正在读取本页未确认记录…", "loading");
     clearAnswer("已换页：问答按当前页生效，请重新提问。");
     $("s1hint").textContent = "已加载页面，可进入步骤二查看 OCR 与结构化结果。";
     $("demoChip").textContent = badgeOf(r);
@@ -620,6 +652,7 @@ function switchPage(pid) {
   S.pageId = pid; S.pendingHighlight = null;
   S.ocr = null;                                   // 旧页对象立即作废，面板二不沿用上一页
   resetTables("正在读取本页方剂表…", "loading");   // 切页即清掉上一页表格与格选中态
+  resetAudit("正在读取本页未确认记录…", "loading");  // 审计记录同样按页清空
   clearAnswer();                                  // 问答也按页生效：旧页答案与证据不留
   $("s1hint").textContent = "已切换到历史页 " + pid + "，可查看其 OCR / 图谱 / 问答。";
   loadPages();
@@ -638,6 +671,7 @@ async function deletePage(pid) {
       $("pageInfo").innerHTML = ""; $("pageNotes").innerHTML = "";
       $("s1hint").textContent = "当前页已删除，请重新上传或加载示例。";
       resetTables("当前页已删除，请重新上传或加载示例", "empty");
+      resetAudit("当前页已删除，请重新上传或加载示例", "empty");
       clearAnswer("当前页已删除：问答已清空。");
     }
     $("pageCount").textContent = (r.pages || []).length;
@@ -660,6 +694,7 @@ async function loadOcr() {
     renderEntities([], []);
     $("blockDetail").textContent = "点击左侧任一文本块查看。";
     resetTables(pageId ? "正在读取本页方剂表…" : "请先上传扫描页或加载示例", "loading");
+    resetAudit(pageId ? "正在读取本页未确认记录…" : "请先上传扫描页或加载示例", "loading");
   }
   if (!pageId) return;
   try {
@@ -678,6 +713,7 @@ async function loadOcr() {
     renderBlocks(r.blocks || []);
     renderEntities(r.entities || [], r.triples || []);
     renderTables(r);
+    renderAudit(r);
     if (S.pendingHighlight) {
       const lineId = S.pendingHighlight;
       S.pendingHighlight = null;
@@ -690,6 +726,7 @@ async function loadOcr() {
     renderBlocks([]);
     renderEntities([], []);
     resetTables("方剂表读取失败：" + errText(e) + "（上一页表格与选中状态已清除）", "error");
+    resetAudit("未确认记录读取失败：" + errText(e) + "（上一页记录已清除）", "error");
     toast("读取失败：" + e.message);
   }
 }
@@ -725,16 +762,19 @@ function renderBlocks(blocks) {
   $("blockList").querySelectorAll(".block-item").forEach(el => el.onclick = () => selectBlock(+el.dataset.i));
   if (blocks.length) selectBlock(0);
 }
-function selectBlock(i) {
-  const b = (S.ocr && S.ocr.blocks || [])[i]; if (!b) return;
-  document.querySelectorAll(".bbox, .block-item").forEach(el => el.classList.toggle("sel", el.dataset.i === String(i)));
-  $("blockDetail").innerHTML = [
-    ["text（原文）", b.text], ["text_norm", b.text_norm], ["quote", b.quote],
-    ["page_id", b.page_id], ["bbox", fmt(b.bbox)], ["line_id", b.line_id],
-    ["col_id / 阅读顺序", b.col_id + " / " + b.reading_order], ["block_ref", b.block_ref],
-    ["source_hash", b.source_hash], ["kind / conf", b.kind + " / " + b.conf],
-  ].map(([k, v]) => `<div><b>${esc(k)}：</b>${esc(fmt(v))}</div>`).join("");
+function selectBlocks(indices) {
+  const blocks = S.ocr?.blocks || [];
+  const picked = [...new Set(indices)].filter(i => Number.isInteger(i) && blocks[i]);
+  if (!picked.length) return;
+  const keys = new Set(picked.map(String));
+  document.querySelectorAll(".bbox, .block-item").forEach(el => el.classList.toggle("sel", keys.has(el.dataset.i)));
+  $("blockDetail").innerHTML = picked.map(i => {
+    const b = blocks[i];
+    return `<div><b>${esc(b.line_id)} · OCR 原文：</b>${esc(b.text)}<br>` +
+      `text_norm：${esc(b.text_norm)} · quote：${esc(b.quote)} · page_id：${esc(b.page_id)} · bbox：${esc(fmt(b.bbox))} · block_ref：${esc(b.block_ref)} · 阅读顺序：${esc(b.reading_order)} · source_hash：${esc(b.source_hash)} · kind/conf：${esc(b.kind)} / ${esc(b.conf)}</div>`;
+  }).join("");
 }
+function selectBlock(i) { selectBlocks([i]); }
 function locateBlock(lineId, blockRef) {
   const blocks = S.ocr?.blocks || [];
   let index = blockRef ? blocks.findIndex(block => block.block_ref === blockRef) : -1;
@@ -759,6 +799,8 @@ function resetTables(message, kind) {
   $("tableSrc").className = "badge gray";
   $("tableTabs").hidden = true;
   $("tableTabs").innerHTML = "";
+  $("formulaContinuation").hidden = true;
+  $("formulaContinuation").innerHTML = "";
   const wrap = $("tableWrap");
   wrap.dataset.state = kind || "empty";
   wrap.innerHTML = '<div class="empty">' + esc(message || TABLE_IDLE) + "</div>";
@@ -798,111 +840,198 @@ function blockIndexOfRef(ref, expectText) {
   return ok ? i : -1;
 }
 
-function renderTables(res) {
-  const got = tablesOf(res);
-  const messages = {
-    no_table_field: "历史记录缺少表格字段：该页入库时尚未保存表格结构（早于方剂表还原功能的旧记录），无法还原方剂表。请重新识别该页。",
-    none: "本页未识别到方剂表（bbox 行列聚类要求至少 2 行、多数行 ≥2 格；竖排正文页不会被误判为表格）。",
-    error: "方剂表读取失败。",
-    loading: "正在读取本页方剂表…",
-  };
-  if (!got.list.length) {
-    resetTables(messages[got.status] || "本页暂无可展示的方剂表。", got.status);
-    return;
-  }
-  S.tables = got.list;
-  S.tableSel = 0;
-  S.cellSel = null;
-  S.tableNote = got.note || "";
-  $("tableWrap").dataset.state = "ok";
-  $("tableCount").textContent = S.tables.length + " 张";
-  const derived = S.tables.some(t => t.refs_source === "derived");
-  const missing = S.tables.length > 0 && S.tables.every(t => t.refs_source === "missing");
-  $("tableSrc").textContent = derived ? "出处逐格核对补齐" : missing ? "出处缺失" : "出处来自 OCR";
-  $("tableSrc").className = "badge " + (derived || missing ? "red" : "gray");
-  $("tableTabs").hidden = S.tables.length < 2;
-  $("tableTabs").innerHTML = S.tables.length < 2 ? "" : S.tables.map((t, i) =>
-    `<button class="tbl-tab" data-t="${i}">${esc(t.table_id || ("表" + (i + 1)))}</button>`).join("");
-  $("tableTabs").querySelectorAll(".tbl-tab").forEach(el =>
-    el.onclick = () => renderTable(+el.dataset.t));
-  renderTable(0);
+/* ---------------- 步骤二：未确认归属（审计） ---------------- */
+const AUDIT_IDLE = "请先上传扫描页或加载示例";
+
+/* 清空审计区：切页 / 新入库 / 删除 / 读取失败都走这里，避免上一页记录残留 */
+function resetAudit(message, kind) {
+  S.audit = []; S.auditNote = "";
+  $("auditCount").textContent = "0";
+  $("auditSrc").textContent = "—";
+  $("auditSrc").className = "badge gray";
+  const box = $("auditList");
+  box.dataset.state = kind || "empty";
+  box.innerHTML = '<div class="empty">' + esc(message || AUDIT_IDLE) + "</div>";
+  $("auditNote").textContent = "";
 }
 
-function renderTable(index) {
-  const t = S.tables[index];
-  if (!t) { resetTables("本页暂无可展示的方剂表。", "empty"); return; }
-  S.tableSel = index;
-  document.querySelectorAll(".tbl-tab").forEach(el =>
-    el.classList.toggle("active", +el.dataset.t === index));
-  const rows = Array.isArray(t.rows) ? t.rows : [];
-  const refs = Array.isArray(t.cell_refs) ? t.cell_refs : [];
-  const cols = rows.reduce((m, row) => Math.max(m, Array.isArray(row) ? row.length : 0), 0);
-  let filled = 0, located = 0;
-  const head = "<thead><tr><th>行＼列</th>" +
-    Array.from({ length: cols }, (_, c) => `<th>列${c + 1}</th>`).join("") + "</tr></thead>";
-  const body = rows.map((row, r) => {
-    const cells = Array.from({ length: cols }, (_, c) => {
-      const text = String((row && row[c] != null) ? row[c] : "");
-      const ref = (refs[r] && refs[r][c]) || "";
-      if (!text.trim()) {
-        return `<td class="cell empty" data-r="${r}" data-c="${c}" data-i="-1" title="空白单元格（OCR 未检测到文本，行列位置保留）"><span class="ctext">（空）</span></td>`;
-      }
-      filled++;
-      const idx = blockIndexOfRef(ref, text);
-      if (idx >= 0) {
-        located++;
-        return `<td class="cell" data-r="${r}" data-c="${c}" data-i="${idx}" title="点击定位到原图对应区域"><span class="ctext">${esc(text)}</span><span class="ref">${esc(refShort(ref))}</span></td>`;
-      }
-      return `<td class="cell noloc" data-r="${r}" data-c="${c}" data-i="-1" title="缺少可验证的 line_id / bbox，无法定位"><span class="ctext">${esc(text)}</span><span class="ref noloc">无法定位</span></td>`;
-    }).join("");
-    return `<tr><th>行${r + 1}</th>${cells}</tr>`;
-  }).join("");
-  $("tableWrap").innerHTML = `<table class="fangji">${head}<tbody>${body}</tbody></table>`;
+/* 后端新口径带 unresolved / unresolved_source；老后端没有该字段时按「不可用」处理 */
+function auditOf(res) {
+  if (res && Object.prototype.hasOwnProperty.call(res, "unresolved")) {
+    return { list: Array.isArray(res.unresolved) ? res.unresolved : [],
+             source: res.unresolved_source || "stored", note: res.unresolved_note || "" };
+  }
+  const legacy = res && res.page ? res.page.unresolved : undefined;
+  if (Array.isArray(legacy)) return { list: legacy, source: "stored", note: "" };
+  return { list: [], source: "", note: "" };
+}
 
-  const st = t.stats || {};
-  const cap = ["表 " + (t.table_id || "—"),
-    (st.rows != null ? st.rows : rows.length) + " 行 × " + (st.cols != null ? st.cols : cols) + " 列",
-    "非空格 " + filled + "，可定位 " + located].join(" · ");
-  $("tableCap").textContent = cap + (t.source_hash ? " · source_hash " + t.source_hash : "") +
-    (S.tables.length > 1 ? "（共 " + S.tables.length + " 张，点上方标签切换）" : "") +
-    (S.tableNote ? " · " + S.tableNote : "");
+function renderAudit(res) {
+  const got = auditOf(res);
+  if (!got.source) {
+    resetAudit("该页返回中没有未确认归属字段（后端版本较旧）", "unavailable");
+    return;
+  }
+  S.audit = got.list;
+  S.auditNote = got.note || "";
+  $("auditCount").textContent = S.audit.length + " 条";
+  $("auditSrc").textContent = got.source === "derived" ? "按原文重算（旧记录）" : "入库时留存";
+  $("auditSrc").className = "badge " + (got.source === "derived" ? "warn" : "gray");
+  $("auditNote").textContent = S.auditNote;
+  if (!S.audit.length) {
+    $("auditList").dataset.state = "none";
+    $("auditList").innerHTML = '<div class="empty">本页没有未确认归属的行：' +
+      "每条输出的关系都能在本页确认主体。</div>";
+    return;
+  }
+  $("auditList").dataset.state = "ok";
+  $("auditList").innerHTML = S.audit.map((u, i) =>
+    `<div class="audit-item" data-i="${i}" data-line="${esc(u.line_id)}" title="点击回到该行在原图中的位置">
+       <div class="a-head">[${i + 1}] ${esc(u.relation || "关系")}：${esc(u.tail || "—")}</div>
+       <div>原文：「${esc(u.quote || "—")}」</div>
+       <div class="a-why">未确认原因：${esc(u.reason || "—")}</div>
+       <div class="a-meta">line_id: ${esc(u.line_id || "—")} · bbox: ${esc(fmt(u.bbox))} ·
+         page_id: ${esc(u.page_id || "")} · source_hash: ${esc(u.source_hash || "—")}</div>
+     </div>`).join("");
+  $("auditList").querySelectorAll(".audit-item").forEach(el => el.onclick = () => {
+    locateBlock(el.dataset.line);          // 选中该文本块并滚动到对应 bbox
+  });
+}
 
+// 正文字段以 API 提供的字符区间核验，而非要求整个 OCR 块等于字段值。
+function fieldSources(table, r, c) {
+  const detail = table.field_details?.[r]?.[c];
+  const scope = table.cell_ref_scopes?.[r]?.[c] || "无";
+  const evidence = detail?.source || detail?.evidence_context;
+  const expectedRefs = table.cell_refs_multi?.[r]?.[c] || [];
+  if (!evidence || !Array.isArray(evidence.sources) || !expectedRefs.length) return { indices: [], scope };
+  const indices = [];
+  for (const src of evidence.sources) {
+    const ref = String(src.block_ref || "");
+    if (!ref || !expectedRefs.includes(ref)) return { indices: [], scope };
+    const idx = (S.ocr?.blocks || []).findIndex(b => b.block_ref === ref && b.page_id === S.pageId);
+    const b = S.ocr?.blocks?.[idx], range = src.block_raw_range;
+    if (!b || blockIndexOfRef(ref) !== idx || !Array.isArray(range) || range.length !== 2 ||
+        !Number.isInteger(range[0]) || !Number.isInteger(range[1]) || range[0] < 0 ||
+        range[1] < range[0] || range[1] > Array.from(String(b.text || "")).length ||
+        Array.from(String(b.text || "")).slice(range[0], range[1]).join("") !== String(src.text || "")) return { indices: [], scope };
+    indices.push(idx);
+  }
+  if (new Set(evidence.sources.map(s => s.block_ref)).size !== new Set(expectedRefs).size) return { indices: [], scope };
+  return { indices: [...new Set(indices)], scope };
+}
+function tableOrder(t) {
+  const all = [];
+  if (t.start_cue?.sources) all.push(...t.start_cue.sources.map(s => s.block_ref));
+  for (const row of t.cell_refs_multi || []) for (const cell of row || []) all.push(...(cell || []));
+  for (const row of t.cell_refs || []) all.push(...(row || []));
+  const orders = all.map(ref => {
+    const i = blockIndexOfRef(ref); return i < 0 ? Infinity : Number(S.ocr.blocks[i].reading_order || Infinity);
+  });
+  return orders.length ? Math.min(...orders) : Infinity;
+}
+function renderTables(res) {
+  const got = tablesOf(res), hints = Array.isArray(res?.formula_continuation_hints) ? res.formula_continuation_hints : [];
+  if (!got.list.length) {
+    const messages = {
+      no_table_field: "历史记录缺少表格字段：该页入库时尚未保存表格结构，请重新识别该页。",
+      none: "本页未识别到方剂表。", error: "方剂表读取失败。", loading: "正在读取本页方剂表…",
+    };
+    resetTables(messages[got.status] || "本页暂无可展示的方剂表。", got.status);
+    renderContinuationHints(hints);
+    return;
+  }
+  S.tables = got.list.map((t, i) => ({ t, i })).sort((a,b) => tableOrder(a.t) - tableOrder(b.t) || a.i - b.i).map(x => x.t);
+  S.tableSel = 0; S.cellSel = null; S.tableNote = got.note || "";
+  $("tableWrap").dataset.state = "ok";
+  $("tableCount").textContent = S.tables.length + " 张";
+  $("tableSrc").textContent = "按原文顺序展示";
+  $("tableSrc").className = "badge gray";
+  $("tableTabs").hidden = true; $("tableTabs").innerHTML = "";
+  $("tableWrap").innerHTML = S.tables.map((t,i) => renderOneTable(t,i)).join("");
+  $("tableCap").textContent = S.tableNote;
+  $("tableDetail").textContent = "点击方名、药材或剂量，可查看相关原图位置和 OCR 文本。";
+  renderContinuationHints(hints);
   $("tableWrap").onclick = ev => {
-    const td = ev.target.closest("td.cell");
-    if (!td) return;
-    const r = +td.dataset.r, c = +td.dataset.c, idx = +td.dataset.i;
-    document.querySelectorAll("td.cell.sel").forEach(el => el.classList.remove("sel"));
-    td.classList.add("sel");
-    S.cellSel = r + ":" + c;
-    const text = String((S.tables[S.tableSel]?.rows?.[r] || [])[c] ?? "");
-    const det = $("tableDetail");
-    if (td.classList.contains("empty")) {
-      document.querySelectorAll(".bbox.sel, .block-item.sel").forEach(el => el.classList.remove("sel"));
-      det.className = "tbl-detail";
-      det.innerHTML = `<b>第 ${r + 1} 行 第 ${c + 1} 列</b>：空白单元格（OCR 未检测到文本）。行列位置已保留，不填充任何推测内容。`;
-      return;
-    }
-    const b = (S.ocr && S.ocr.blocks && S.ocr.blocks[idx]) || null;
-    if (idx < 0 || !b) {
-      // 不留下与本次点击无关的旧高亮，避免让人误以为定位成功
-      document.querySelectorAll(".bbox.sel, .block-item.sel").forEach(el => el.classList.remove("sel"));
-      $("blockDetail").textContent = "该单元格没有可验证的出处，未选中任何文本块。";
-      det.className = "tbl-detail noloc";
-      det.innerHTML = `<b>第 ${r + 1} 行 第 ${c + 1} 列</b>「${esc(text)}」：该单元格没有可验证的出处（line_id / bbox 缺失，或与原文本块对不上），<b>无法定位</b>；内容按 OCR 原样保留，未做推测。`;
-      toast("该单元格无可验证出处，无法定位到原图");
-      return;
-    }
-    selectBlock(idx);
-    const box = document.querySelector('.bbox[data-i="' + idx + '"]');
-    if (box) box.scrollIntoView({ block: "center", behavior: "smooth" });
-    det.className = "tbl-detail";
-    det.innerHTML = [
-      ["单元格原文", text], ["行列", "第 " + (r + 1) + " 行 · 第 " + (c + 1) + " 列"],
-      ["定位依据", "line_id / block_ref → 文本块 bbox"], ["line_id", b.line_id],
-      ["bbox", fmt(b.bbox)], ["block_ref", b.block_ref], ["conf", b.conf],
-      ["定位状态", "已定位到原图（预览图中高亮框）"],
-    ].map(([k, v]) => `<div><b>${esc(k)}：</b>${esc(fmt(v))}</div>`).join("");
+    const target = ev.target.closest("td.cell, button.formula-name");
+    if (!target || target.disabled) return;
+    showTableField(+target.dataset.t, +target.dataset.r, +target.dataset.c, target);
   };
+  $("tableWrap").onkeydown = ev => {
+    const target = ev.target.closest("td.cell[role=button]");
+    if (target && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); target.click(); }
+  };
+}
+function renderContinuationHints(hints) {
+  const el = $("formulaContinuation"); el.hidden = !hints.length;
+  el.innerHTML = hints.map((h,i) => `<button type="button" class="source-link continuation-hint" data-h="${i}">可能续页：查看相关原文</button>`).join(" ");
+  el.onclick = ev => {
+    const button = ev.target.closest(".continuation-hint"); if (!button) return;
+    const sources = hints[+button.dataset.h]?.passage?.sources || [];
+    const pseudo = { field_details: [[{ source: { sources } }]], cell_refs_multi: [[sources.map(s => s.block_ref)]], cell_ref_scopes: [["配伍上下文"]] };
+    const resolved = fieldSources(pseudo, 0, 0);
+    showResolved(resolved.indices, "可能续页", "配伍上下文");
+  };
+}
+function renderOneTable(t, index) {
+  const textTable = t.source_type === "正文抽取";
+  const rows = Array.isArray(t.rows) ? t.rows : [];
+  const bodyRows = textTable ? rows.slice(1) : rows;
+  const cols = textTable ? [1,2] : Array.from({ length: rows.reduce((m,r) => Math.max(m,r.length),0) },(_,i)=>i);
+  const firstName = rows[1]?.[0] || "无名方";
+  let title = `表 ${index+1}`;
+  if (textTable) {
+    const nameRefs = fieldSources(t,1,0);
+    title = `<button type="button" class="formula-name" data-t="${index}" data-r="1" data-c="0" ${nameRefs.indices.length ? "" : "disabled"}>${esc(firstName)}</button>`;
+  }
+  const label = textTable ? "正文抽取" : "原书表格";
+  const cont = t.continuation === "可能续页" ? '<span class="badge red">可能续页</span>' : "";
+  const head = textTable ? "<thead><tr><th>药材</th><th>剂量</th></tr></thead>" :
+    "<thead><tr><th>行＼列</th>" + cols.map((_,c) => `<th>列${c+1}</th>`).join("") + "</tr></thead>";
+  const body = bodyRows.map((row, j) => {
+    const r = textTable ? j+1 : j;
+    const cells = cols.map(c => {
+      const text = String(row?.[c] ?? ""), ref = t.cell_refs?.[r]?.[c] || "";
+      if (!text.trim()) return `<td class="cell empty" data-t="${index}" data-r="${r}" data-c="${c}"><span class="ctext">（空）</span></td>`;
+      const resolved = textTable ? fieldSources(t,r,c) : { indices: [blockIndexOfRef(ref,text)].filter(i=>i>=0), scope: "原文字段" };
+      const short = textTable ? (t.cell_refs_multi?.[r]?.[c] || []).map(refShort).join("、") : refShort(ref);
+      const label = resolved.indices.length ? (resolved.scope === "配伍上下文" ? "查看上下文 · " : "") + short : "无法定位";
+      return `<td role="button" tabindex="0" class="cell ${resolved.indices.length ? "" : "noloc"}" data-t="${index}" data-r="${r}" data-c="${c}" title="${resolved.indices.length ? "点击核对原图" : "无法核对出处"}"><span class="ctext">${esc(text)}</span><span class="ref ${resolved.indices.length ? "" : "noloc"}">${esc(label)}</span></td>`;
+    }).join("");
+    return `<tr>${textTable ? "" : `<th>行${r+1}</th>`}${cells}</tr>`;
+  }).join("");
+  return `<section class="formula-panel" data-table="${index}"><div class="formula-heading">${title}<span class="badge gray">${label}</span>${cont}</div><table class="fangji">${head}<tbody>${body}</tbody></table></section>`;
+}
+function showResolved(indices, text, scope) {
+  const det = $("tableDetail");
+  if (!indices.length) {
+    document.querySelectorAll(".bbox.sel, .block-item.sel").forEach(el => el.classList.remove("sel"));
+    $("blockDetail").textContent = "该字段没有可验证的出处，未选中任何文本块。";
+    det.className = "tbl-detail noloc";
+    det.textContent = `「${text}」没有可验证的出处，无法定位。`;
+    return;
+  }
+  selectBlocks(indices);
+  document.querySelector(`.bbox[data-i="${indices[0]}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+  det.className = "tbl-detail";
+  const info = indices.map(i => S.ocr.blocks[i]).map(b =>
+    `<div><b>${esc(b.line_id)} · OCR 原文：</b>${esc(b.text)} · bbox ${esc(fmt(b.bbox))} · ${esc(b.block_ref)}</div>`).join("");
+  det.innerHTML = `<div><b>字段：</b>${esc(text)} · ${esc(scope === "配伍上下文" ? "定位配伍上下文" : "定位原文字段")} · 已高亮 ${indices.length} 个文本块</div>` + info;
+}
+function showTableField(index, r, c, target) {
+  const t = S.tables[index]; if (!t) return;
+  S.tableSel = index; S.cellSel = r + ":" + c;
+  document.querySelectorAll("td.cell.sel, .formula-name.sel").forEach(el => el.classList.remove("sel"));
+  target.classList.add("sel");
+  const text = String(t.rows?.[r]?.[c] ?? "");
+  if (target.classList.contains("empty")) { showResolved([], "空白单元格", "无"); return; }
+  let found;
+  if (t.source_type === "正文抽取") found = fieldSources(t,r,c);
+  else {
+    const idx = blockIndexOfRef(t.cell_refs?.[r]?.[c], text);
+    found = { indices: idx < 0 ? [] : [idx], scope: "原文字段" };
+  }
+  showResolved(found.indices, text, found.scope);
 }
 
 function sourceCell(item) {

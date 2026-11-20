@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import re
 import statistics
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from app.config import CONFIG
 from app.schemas import Block, Entity, Triple
@@ -456,25 +456,32 @@ def candidate_triples(blocks: Iterable[Block],
 def candidate_triples_audited(blocks: Iterable[Block],
                               entities: Optional[Iterable[Entity]] = None,
                               is_demo: bool = True
-                              ) -> Tuple[List[Triple], List[Dict[str, str]]]:
-    """候选三元组 + 「未确认归属」审计记录（公开入口，供核验脚本 / 单测使用）。"""
+                              ) -> Tuple[List[Triple], List[Dict[str, Any]]]:
+    """候选三元组 + 「未确认归属」审计记录（公开入口，供入库 / 核验 / 单测使用）。"""
     return _candidate_triples_audited(blocks, is_demo)
 
 
 def _candidate_triples_audited(blocks: Iterable[Block],
                                is_demo: bool = True
-                               ) -> Tuple[List[Triple], List[Dict[str, str]]]:
+                               ) -> Tuple[List[Triple], List[Dict[str, Any]]]:
     """同 candidate_triples，同时返回「未确认归属」的审计记录（不产出关系）。"""
     out: List[Triple] = []
-    skipped: List[Dict[str, str]] = []
+    skipped: List[Dict[str, Any]] = []
     current_formula = ""
     # 最近主体：(名称, 类型) —— 类型 ∈ {"药材", "方剂"}
     last_subject: Optional[Tuple[str, str]] = None
     strict = CONFIG.ocr.extract_dose_strict
 
     def skip(b: Block, relation: str, tail: str, reason: str) -> None:
-        skipped.append({"page_id": b.page_id, "line_id": b.line_id,
-                        "relation": relation, "tail": tail, "reason": reason})
+        # 审计记录带齐「哪一页 / 哪一行 / 什么关系 / 客体 / 为什么没归」，
+        # 并附 bbox + quote + source_hash，便于事后回原图复核
+        skipped.append({
+            "page_id": b.page_id, "line_id": b.line_id,
+            "relation": relation, "tail": tail, "reason": reason,
+            "bbox": list(b.bbox), "quote": b.text,
+            "source_hash": b.source_hash,
+            "reading_order": b.reading_order,
+        })
 
     try:
         for b in blocks:
@@ -582,3 +589,16 @@ def extract_all(blocks: Iterable[Block],
     items = list(blocks)
     return (extract_entities(items, is_demo=is_demo),
             candidate_triples(items, is_demo=is_demo))
+
+
+def extract_all_audited(blocks: Iterable[Block],
+                        is_demo: bool = True
+                        ) -> Tuple[List[Entity], List[Triple], List[Dict[str, Any]]]:
+    """同 extract_all，额外返回「未确认归属」审计记录（普通入库走这个入口）。
+
+    与 extract_all 共用同一套规则，实体 / 三元组结果逐条一致；
+    多出来的第三项只用于审计，不参与图谱构建、不进问答检索。
+    """
+    items = list(blocks)
+    triples, skipped = _candidate_triples_audited(items, is_demo)
+    return extract_entities(items, is_demo=is_demo), triples, skipped

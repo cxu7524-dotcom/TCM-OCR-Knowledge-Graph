@@ -54,8 +54,12 @@ from app.config import CONFIG                                            # noqa:
 from app.demo import demo_flags, load_demo_ocr, load_demo_questions        # noqa: E402
 from app.schemas import Answer, Block, Entity, GraphData, OCRResult, Triple  # noqa: E402
 from app import store                                                     # noqa: E402
-from extract.rules import (candidate_triples, extract_all,               # noqa: E402
+from extract.rules import (candidate_triples,                           # noqa: E402
+                           extract_all_audited,
                            extract_entities as candidate_entities)
+from extract.formula_segments import extract_formula_candidates
+from extract.formula_rows import extract_formula_rows
+from extract.formula_tables import text_formula_tables
 from extract.schema import dictionary_stats, warn_if_degraded              # noqa: E402
 from graph.build import build_graph, build_triples                         # noqa: E402
 from graph.export import (                                                 # noqa: E402
@@ -90,6 +94,7 @@ _STATE: Dict[str, Any] = {
     "blocks": [],
     "entities": [],
     "triples": [],
+    "unresolved": [],
     "graph": None,
     "vector_index": None,
     "last_ingest": None,
@@ -127,10 +132,32 @@ def _ingest(ocr: OCRResult) -> Dict[str, Any]:
     is_demo 从页面**透传**给抽取层：示例页 True、真实页 False，
     不再像阶段八那样在 rules.py 里写死 True。
     """
-    entities, candidates = extract_all(ocr.blocks, is_demo=ocr.is_demo)
+    # 同一 OCRResult 重复入库时，从原始块重新生成本轮证据，防止证据重复进抽取流。
+    ocr.blocks = [b for b in ocr.blocks if b.kind != 'small_column_evidence']
+    entities, candidates, unresolved = extract_all_audited(ocr.blocks, is_demo=ocr.is_demo)
     triples = build_triples(entities, ocr.blocks, candidates)
     graph = build_graph(triples, entities)
-    stat = store.save_page(ocr, entities, triples)
+    # 未确认归属随页入库：这些行「找不到可确认主体」，不产出关系，
+    # 但记录要能事后核查（page_id / line_id / 关系 / 客体 / 原因 / bbox）。
+    segmented = extract_formula_candidates(ocr.blocks)
+    formula_extraction = extract_formula_rows(ocr.blocks, segmented['candidates'])
+    formula_extraction['continuation_hints'] = segmented['continuation_hints']
+    if CONFIG.ocr.small_columns_enabled:
+        try:
+            from ocr.small_columns_attach import attach_small_columns
+            evidence, formula_extraction, small_audit = attach_small_columns(
+                ocr, formula_extraction, server_fallback=CONFIG.ocr.small_columns_server_enabled)
+            ocr.blocks.extend(evidence)
+            formula_extraction['small_columns_audit'] = small_audit
+        except Exception as exc:
+            # 原 OCR 与基线方表不变；实验失败不能导致错写剂量。
+            logger.exception('小字证据回退：%s', type(exc).__name__)
+            formula_extraction['small_columns_audit'] = {'enabled': True, 'fallback': True,
+                                                          'reason': type(exc).__name__}
+    # 保存原书表结构以便 JSON 快照不可读时从 SQLite 恢复。
+    formula_extraction['_printed_tables'] = [t.to_dict() for t in ocr.tables]
+    stat = store.save_page(ocr, entities, triples, unresolved=unresolved,
+                           formula_extraction=formula_extraction)
     export_graph_json(graph)
 
     _STATE.update({
@@ -139,8 +166,9 @@ def _ingest(ocr: OCRResult) -> Dict[str, Any]:
         "blocks": ocr.blocks,
         "entities": entities,
         "triples": triples,
+        "unresolved": unresolved,
         "graph": graph,
-        "vector_index": build_index(ocr.blocks),
+        "vector_index": build_index([b for b in ocr.blocks if b.kind != 'small_column_evidence']),
         "last_ingest": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     })
     return {
@@ -148,9 +176,13 @@ def _ingest(ocr: OCRResult) -> Dict[str, Any]:
         "blocks": len(ocr.blocks),
         "entities": len(entities),
         "triples": len(triples),
+        "unresolved": len(unresolved),
         "graph_nodes": len(graph.nodes),
         "graph_edges": len(graph.edges),
         "ingest": stat,
+        **_tables_payload(ocr.to_dict(), [b.to_dict() for b in ocr.blocks], formula_extraction),
+        "formula_continuation_hints": formula_extraction['continuation_hints'],
+        "formula_extraction_status": "stored",
         "engine": ocr.engine,
         "rec_model": rec_model_name(),
         "model_loaded": ocr.model_loaded,
@@ -192,6 +224,7 @@ def _objects_for(page_id: Optional[str], blocks: List[Block],
     if tri or not blocks:
         return ent, tri
     try:
+        blocks = [b for b in blocks if b.kind != 'small_column_evidence']
         ent = ent or candidate_entities(blocks, is_demo=is_demo)
         return ent, build_triples(ent, blocks,
                                   candidate_triples(blocks, is_demo=is_demo))
@@ -474,7 +507,8 @@ def delete_page(page_id: str):
         raise HTTPException(status_code=404, detail="未找到该页面（可能已被删除）")
     if _STATE["page_id"] == page_id:
         _STATE.update({"page_id": None, "ocr": None, "blocks": [], "entities": [],
-                       "triples": [], "graph": None, "vector_index": None})
+                       "triples": [], "unresolved": [], "graph": None,
+                       "vector_index": None})
     return {"ok": True, **stat, "pages": store.list_pages()}
 
 
@@ -487,8 +521,8 @@ _TABLE_NO_FIELD = ("历史记录缺少表格字段：该页入库时尚未保存
 _TABLE_NONE = "本页未识别到方剂表（bbox 行列聚类要求至少 2 行且多数行 ≥2 格，竖排正文页不会误判）。"
 
 
-def _tables_payload(page: Dict[str, Any],
-                    blocks: List[Dict[str, Any]]) -> Dict[str, Any]:
+def _printed_tables_payload(page: Dict[str, Any],
+                            blocks: List[Dict[str, Any]]) -> Dict[str, Any]:
     """把页面快照里的表格整理成前端可直接渲染、且**逐格可定位**的结构。
 
     复用 OCR 已产出的 TableStruct，不改动识别结果：
@@ -530,6 +564,7 @@ def _tables_payload(page: Dict[str, Any],
         total = sum(1 for row in rows for text in row if str(text or "").strip())
         located = sum(1 for line in refs_norm for ref in line if str(ref or "").strip())
         out.append({
+            "source_type": "原书表格",
             "table_id": t.get("table_id") or f"{page.get('page_id', '')}-T{i + 1:02d}",
             "page_id": t.get("page_id") or page.get("page_id", ""),
             "rows": rows,
@@ -547,6 +582,52 @@ def _tables_payload(page: Dict[str, Any],
     elif all(t["refs_source"] == "missing" for t in out):
         note = "该页表格缺少可核验的出处字段，单元格内容照原样展示，但无法定位到原图。"
     return {"tables": out, "tables_status": "ok", "tables_note": note}
+
+
+def _tables_payload(page: Dict[str, Any], blocks: List[Dict[str, Any]],
+                    formula_extraction: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """合并原书表格及入库的正文表；旧快照无正文结果时沿用原有状态。"""
+    result = _printed_tables_payload(page, blocks)
+    if formula_extraction is None:
+        return result
+    objects = [Block.from_dict(b) if isinstance(b, dict) else b for b in blocks]
+    derived, suppressed = text_formula_tables(formula_extraction, result['tables'], objects,
+                                               bool(page.get('is_demo', True)))
+    result['tables'] += derived
+    result['duplicate_formula_tables_suppressed'] = suppressed
+    if derived:
+        if result['tables_status'] == 'none':
+            result['tables_note'] = '本页未识别到原书规整表；以下为正文抽取。'
+        elif result['tables_status'] == 'no_table_field':
+            result['tables_note'] += ' 另显示已保存的正文抽取结果。'
+        result['tables_status'] = 'ok'
+    return result
+
+
+def _unresolved_payload(page_id: str, snap: Dict[str, Any],
+                        blocks: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """把「未确认归属」审计记录整理成前端 / 核查脚本可直接用的结构。
+
+    优先读页面快照里入库时存下的记录（普通上传路径就会有）；
+    旧记录没有该字段时，用**与入库同一套确定性规则**在本页原文上重算，
+    只补审计、不改三元组、不新增关系——算出来也标 derived，不冒充入库结果。
+    """
+    raw = snap.get("unresolved") if isinstance(snap, dict) else None
+    source = "stored"
+    if raw is None:
+        source = "derived"
+        try:
+            items = [Block.from_dict(b) if isinstance(b, dict) else b for b in blocks]
+            _ents, _tris, raw = extract_all_audited(items, is_demo=bool(snap.get("is_demo", True)))
+        except Exception:
+            raw = []
+    records = [store._norm_audit(u, page_id) for u in (raw or [])]
+    note = ""
+    if source == "derived":
+        note = ("该页入库时尚未保存未确认记录（早于本功能的旧记录），"
+                "此处按同一套确定性规则基于本页原文重算，仅用于审计，未新增任何关系。")
+    return {"unresolved": records, "unresolved_count": len(records),
+            "unresolved_source": source, "unresolved_note": note}
 
 
 @app.get("/api/pages/{page_id}/ocr")
@@ -569,7 +650,11 @@ def get_ocr(page_id: str):
         "triples": snap.get("triples", []),
         "blocks": blocks,
         # 方剂表：rows + 同形 cell_refs，供步骤二「方剂表还原」渲染与定位
-        **_tables_payload(page, blocks),
+        **_tables_payload(page, blocks, snap.get("formula_extraction")),
+        "formula_continuation_hints": (snap.get("formula_extraction") or {}).get("continuation_hints", []),
+        "formula_extraction_status": "stored" if "formula_extraction" in snap else "legacy_missing",
+        # 未确认归属：普通上传即入库，这里原样返回，供步骤二核查
+        **_unresolved_payload(page_id, snap, blocks),
         "is_demo": snap.get("is_demo", True),
         "engine": page.get("engine", "stub"),
         "rec_model": rec_model_name(),
@@ -578,6 +663,20 @@ def get_ocr(page_id: str):
         **_flags_for(ocr_obj),
         "disclaimer": DISCLAIMER,
     }
+
+
+@app.get("/api/pages/{page_id}/unresolved")
+def get_page_unresolved(page_id: str):
+    """单页「未确认归属」审计记录：这些行没有产出关系，原因与坐标在此可查。"""
+    snap = store.get_page(page_id)
+    if snap is None:
+        raise HTTPException(status_code=404, detail="未找到该页面，请先在步骤一上传或加载示例数据")
+    blocks = [b.to_dict() for b in store.get_blocks(page_id)]
+    if not blocks:
+        blocks = sorted(snap.get("page", {}).get("blocks", []),
+                        key=lambda b: (b.get("reading_order", 0), b.get("line_id", "")))
+    return {"page_id": page_id, **_unresolved_payload(page_id, snap, blocks),
+            "disclaimer": DISCLAIMER}
 
 
 # ------------------------------------------------------------------

@@ -21,6 +21,7 @@ TODO（阶段三）：多模型投票、小字夹注专用识别、GPU 之外的
 from __future__ import annotations
 
 import importlib.util
+import logging
 import threading
 from dataclasses import dataclass, field
 from typing import Any, List, Tuple
@@ -31,6 +32,7 @@ from app.schemas import Block, source_hash_of
 
 _ENGINES: dict = {}
 _ENGINE_LOCK = threading.Lock()
+_LOG = logging.getLogger(__name__)
 
 
 def resolve_rec_model() -> tuple:
@@ -79,6 +81,15 @@ def _engine(rec_model: str | None = None):
     return _ENGINES[key]
 
 
+def _text_recognizer(engine: Any):
+    """Return the recognizer exposed by current or older RapidOCR releases."""
+    for name in ("text_rec", "text_recognizer"):
+        rec = getattr(engine, name, None)
+        if rec is not None:
+            return rec
+    raise AttributeError("RapidOCR exposes neither text_rec nor text_recognizer")
+
+
 def model_charset() -> set:
     """当前识别模型的字符表（供 ocr/score.py 算「合法字符率」）。
 
@@ -88,7 +99,7 @@ def model_charset() -> set:
     """
     try:
         engine = _engine()
-        rec = getattr(engine, "text_recognizer", None)
+        rec = _text_recognizer(engine)
         op = getattr(rec, "postprocess_op", None)
         chars = getattr(op, "character", None)
         if not chars:
@@ -240,13 +251,14 @@ def recognize_crop(image_array: Any, min_conf: float = 0.15) -> Tuple[str, float
     """
     try:
         engine = _engine()
-        res, _ = engine.text_recognizer([image_array])
+        res, _ = _text_recognizer(engine)([image_array])
         if res:
             text, score = res[0]
             text, score = str(text).strip(), float(score)
             if text and score >= min_conf:
                 return text, round(score, 4)
-    except Exception:
+    except Exception as exc:
+        _LOG.warning("Crop OCR failed (%s): %s", type(exc).__name__, exc)
         return "", 0.0
     return "", 0.0
 

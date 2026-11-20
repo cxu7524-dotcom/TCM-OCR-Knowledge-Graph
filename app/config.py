@@ -127,6 +127,10 @@ class OcrConfig:
     correct_enabled: bool = _env_bool("OCR_CORRECT", True)
     # 竖排逐列检测（P1）：竖排页先切列再逐列识别；=0 时完全回到整页识别，便于 A/B
     vertical_split: bool = _env_bool("OCR_VERTICAL_SPLIT", True)
+    # 实验性小字证据：默认关闭，保留原 OCR 与方剂抽取作为可回退基线。
+    small_columns_enabled: bool = _env_bool("OCR_SMALL_COLUMNS", False)
+    # 仅小字右轨低置信时使用官方 server 识别器；默认关闭，不替换整页模型。
+    small_columns_server_enabled: bool = _env_bool("OCR_SMALL_COLUMNS_SERVER", False)
     # 两路候选的取舍策略（P2）：
     #   auto     —— 默认，按 ocr/score.py 的复合无监督分择优
     #   vertical —— 强制逐列（无逐列结果时回退整页），用于 A/B 对照
@@ -255,6 +259,8 @@ class Config:
             "ocr_auto_fallback": self.ocr.auto_fallback,
             "ocr_rec_model": rec_name,
             "ocr_rec_model_source": self.ocr.rec_model_source,
+            "ocr_small_columns_enabled": self.ocr.small_columns_enabled,
+            "ocr_small_columns_server_enabled": self.ocr.small_columns_server_enabled,
             "extract_dose_strict": self.ocr.extract_dose_strict,
             "extract_fuzzy": self.ocr.extract_fuzzy,
             "llm_backend": self.llm.backend,

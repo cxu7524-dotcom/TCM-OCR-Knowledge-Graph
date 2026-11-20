@@ -9,7 +9,7 @@ app/store.py —— SQLite + JSON 幂等入库层
 改造点：
   - 旧关系型数据库及其驱动 → 标准库 sqlite3，零装机门槛；
   - 旧 loc（行号/段落号）扩展为 bbox[x1,y1,x2,y2] + line_id + col_id；
-  - 表从「办公文档五表」换成「古籍页 / 文本块 / 实体 / 三元组 / 问答日志」；
+  - 表从「办公文档五表」换成「古籍页 / 文本块 / 实体 / 三元组 / 未确认归属 / 问答日志」；
   - 同时写一份 JSON 镜像到 data/store/，便于人工核对与前端直接消费。
 
 幂等实现：run_id 默认由「来源指纹」确定性生成（同一输入 → 同一批次号），
@@ -135,6 +135,31 @@ CREATE TABLE IF NOT EXISTS triples (
 );
 CREATE INDEX IF NOT EXISTS ix_triples_page ON triples(page_id);
 
+-- 未确认归属：抽取时「找不到可确认主体」的关系，不产出三元组，但留审计记录，
+-- 供上传后核查（哪一页 / 哪一行 / 什么关系 / 什么客体 / 为什么没归）。
+CREATE TABLE IF NOT EXISTS unresolved (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    page_id       TEXT NOT NULL,
+    line_id       TEXT,
+    relation      TEXT,
+    tail          TEXT,
+    reason        TEXT,
+    bbox          TEXT,
+    quote         TEXT,
+    source_hash   TEXT,
+    reading_order INTEGER DEFAULT 0,
+    run_id        TEXT,
+    created_at    TEXT NOT NULL,
+    fingerprint   TEXT NOT NULL UNIQUE
+);
+CREATE INDEX IF NOT EXISTS ix_unresolved_page ON unresolved(page_id);
+
+-- 正文方剂候选及字段溯源：按页整体覆盖，重复处理保持幂等。
+CREATE TABLE IF NOT EXISTS formula_extractions (
+    page_id TEXT PRIMARY KEY,
+    payload TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS qa_logs (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     question      TEXT,
@@ -186,6 +211,10 @@ def init_db() -> str:
         # 列级迁移（幂等）：旧库补 is_demo，保留数据
         _ensure_column(conn, "entities", "is_demo", "INTEGER DEFAULT 1")
         _ensure_column(conn, "triples", "is_demo", "INTEGER DEFAULT 1")
+        _ensure_column(conn, "blocks", "evidence_role", "TEXT DEFAULT ''")
+        _ensure_column(conn, "blocks", "evidence_status", "TEXT DEFAULT ''")
+        _ensure_column(conn, "blocks", "parent_block_ref", "TEXT DEFAULT ''")
+        _ensure_column(conn, "blocks", "evidence_engine", "TEXT DEFAULT ''")
         conn.commit()
     finally:
         conn.close()
@@ -204,15 +233,41 @@ def _bbox_json(value: Any) -> str:
         return "[0,0,0,0]"
 
 
+AUDIT_FIELDS = ("page_id", "line_id", "relation", "tail", "reason",
+                "bbox", "quote", "source_hash", "reading_order")
+
+
+def _norm_audit(record: Any, page_id: str) -> Dict[str, Any]:
+    """把一条「未确认归属」记录整理成固定字段，快照 / 接口 / 审计三处同一形状。"""
+    u = record if isinstance(record, dict) else {}
+    try:
+        bbox = [float(v) for v in (u.get("bbox") or [0, 0, 0, 0])][:4]
+    except (TypeError, ValueError):
+        bbox = [0, 0, 0, 0]
+    if len(bbox) != 4:
+        bbox = [0, 0, 0, 0]
+    out = {key: (u.get(key) if key != "bbox" else bbox) for key in AUDIT_FIELDS}
+    out["page_id"] = str(out.get("page_id") or page_id)
+    for key in ("line_id", "relation", "tail", "reason", "quote", "source_hash"):
+        out[key] = str(out.get(key) or "")
+    out["reading_order"] = int(out.get("reading_order") or 0)
+    return out
+
+
 def save_page(
     ocr: OCRResult,
     entities: Optional[List[Entity]] = None,
     triples: Optional[List[Triple]] = None,
     run_id: Optional[str] = None,
+    unresolved: Optional[List[Dict[str, Any]]] = None,
+    formula_extraction: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """一个事务内写入 page / blocks / entities / triples，并返回写入统计。
 
     run_id 为空时按 source_hash 确定性生成；重复调用不会新增任何行。
+    unresolved 为「未确认归属」审计记录：传入即整页替换（先删后插），
+    保证同一页重复处理不堆积、也不会留下上一版 OCR 的旧记录；
+    传 None 表示本次不涉及（例如早期调用方），表内容原样保留。
     """
     init_db()
     entities = entities or []
@@ -220,7 +275,8 @@ def save_page(
     rid = run_id or make_run_id(ocr.source_hash or ocr.page_id, "ingest")
     sh = ocr.source_hash or source_hash_of(ocr.page_id, "page")
     stat = {"run_id": rid, "page_id": ocr.page_id,
-            "blocks": 0, "entities": 0, "triples": 0, "skipped": 0}
+            "blocks": 0, "entities": 0, "triples": 0, "skipped": 0,
+            "unresolved": 0}
 
     conn = connect()
     try:
@@ -234,14 +290,16 @@ def save_page(
              int(ocr.model_loaded), int(ocr.is_demo), sh, rid, _now()))
         stat["skipped"] += 1 if cur.rowcount == 0 else 0
 
+        # 子框证据与开关状态同步替换；不触碰原 OCR 块或其他页面。
+        conn.execute("DELETE FROM blocks WHERE page_id=? AND kind=?", (ocr.page_id, "small_column_evidence"))
         for b in ocr.blocks:
             cur = conn.execute(
                 "INSERT OR IGNORE INTO blocks"
-                "(page_id,block_ref,bbox,line_id,col_id,reading_order,text,text_norm,kind,conf,quote,source_hash,run_id)"
-                " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "(page_id,block_ref,bbox,line_id,col_id,reading_order,text,text_norm,kind,conf,quote,source_hash,run_id,evidence_role,evidence_status,parent_block_ref,evidence_engine)"
+                " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (ocr.page_id, b.block_ref or b.line_id, _bbox_json(b.bbox), b.line_id,
                  b.col_id, b.reading_order, b.text, b.text_norm, b.kind, b.conf,
-                 b.quote, b.source_hash, rid))
+                 b.quote, b.source_hash, rid, b.evidence_role, b.evidence_status, b.parent_block_ref, b.evidence_engine))
             stat["blocks"] += cur.rowcount
 
         for e in entities:
@@ -266,19 +324,51 @@ def save_page(
                  t.line_id, t.quote, t.source_hash, int(t.is_demo), rid, fp))
             stat["triples"] += cur.rowcount
 
+        if unresolved is not None:
+            # 整页替换：避免同一页重跑后新旧两版审计记录并存
+            conn.execute("DELETE FROM unresolved WHERE page_id=?", (ocr.page_id,))
+            for u in unresolved:
+                line_id = str(u.get("line_id") or "")
+                relation = str(u.get("relation") or "")
+                tail = str(u.get("tail") or "")
+                fp = source_hash_of("unresolved", ocr.page_id, line_id, relation, tail)
+                cur = conn.execute(
+                    "INSERT OR IGNORE INTO unresolved"
+                    "(page_id,line_id,relation,tail,reason,bbox,quote,source_hash,"
+                    "reading_order,run_id,created_at,fingerprint)"
+                    " VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (ocr.page_id, line_id, relation, tail, str(u.get("reason") or ""),
+                     _bbox_json(u.get("bbox")), str(u.get("quote") or ""),
+                     str(u.get("source_hash") or ""), int(u.get("reading_order") or 0),
+                     rid, _now(), fp))
+                stat["unresolved"] += cur.rowcount
+
+        if formula_extraction is not None:
+            conn.execute("INSERT OR REPLACE INTO formula_extractions(page_id,payload) VALUES(?,?)",
+                         (ocr.page_id, json.dumps(formula_extraction, ensure_ascii=False)))
         conn.commit()
     finally:
         conn.close()
 
     # JSON 镜像：完整快照，人工可直接核对（含 bbox / quote / source_hash）
+    audit = ([_norm_audit(u, ocr.page_id) for u in unresolved]
+             if unresolved is not None else get_unresolved(ocr.page_id))
     snapshot = {
         "page": ocr.to_dict(),
         "entities": [e.to_dict() for e in entities],
         "triples": [t.to_dict() for t in triples],
+        # 未确认归属审计：不产出关系，但入库留存，上传后可核查
+        "unresolved": audit,
         "run_id": rid,
         "is_demo": ocr.is_demo,
         "note": CONFIG.demo_badge if ocr.is_demo else "本地 OCR 真实识别（非命题单位样本）",
     }
+    if formula_extraction is not None:
+        snapshot["formula_extraction"] = formula_extraction
+    else:
+        previous = get_formula_extraction(ocr.page_id)
+        if previous is not None:
+            snapshot["formula_extraction"] = previous
     (PATHS.store_dir / "pages").mkdir(parents=True, exist_ok=True)
     (PATHS.store_dir / "pages" / f"{ocr.page_id}.json").write_text(
         json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -332,7 +422,39 @@ def get_page(page_id: str) -> Optional[Dict[str, Any]]:
     conn = connect()
     try:
         row = conn.execute("SELECT * FROM pages WHERE page_id=?", (page_id,)).fetchone()
-        return dict(row) if row else None
+        if not row:
+            return None
+        page = dict(row)
+        result = {"page": page, "entities": [], "triples": [], "is_demo": bool(page.get("is_demo", 1))}
+        saved = conn.execute("SELECT payload FROM formula_extractions WHERE page_id=?", (page_id,)).fetchone()
+        if saved:
+            try:
+                extraction = json.loads(saved[0])
+            except (TypeError, ValueError):
+                extraction = None
+            if isinstance(extraction, dict):
+                result["formula_extraction"] = extraction
+                if isinstance(extraction.get("_printed_tables"), list):
+                    page["tables"] = extraction["_printed_tables"]
+        return result
+    finally:
+        conn.close()
+
+
+
+def get_formula_extraction(page_id: str) -> Optional[Dict[str, Any]]:
+    """读取入库的正文结果；None 表示旧页没有该字段，空结果与之不同。"""
+    init_db()
+    conn = connect()
+    try:
+        row = conn.execute("SELECT payload FROM formula_extractions WHERE page_id=?", (page_id,)).fetchone()
+        if row is None:
+            return None
+        try:
+            value = json.loads(row[0])
+        except (TypeError, ValueError):
+            return None
+        return value if isinstance(value, dict) else None
     finally:
         conn.close()
 
@@ -402,8 +524,36 @@ def get_entities(page_id: str) -> List[Entity]:
         conn.close()
 
 
+def get_unresolved(page_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    """「未确认归属」审计记录：可按页过滤（不传则全库），按原文顺序返回。
+
+    这些记录**不是**三元组，不参与图谱与问答；只用于上传后核查
+    「这一行本来该归给谁、为什么没归」。
+    """
+    init_db()
+    conn = connect()
+    try:
+        sql = ("SELECT page_id,line_id,relation,tail,reason,bbox,quote,source_hash,"
+               "reading_order FROM unresolved")
+        if page_id:
+            sql += " WHERE page_id=?"
+        sql += " ORDER BY reading_order, id"
+        rows = conn.execute(sql, (page_id,) if page_id else ()).fetchall()
+        out: List[Dict[str, Any]] = []
+        for r in rows:
+            d = dict(r)
+            try:
+                d["bbox"] = json.loads(d.get("bbox") or "[0,0,0,0]")
+            except json.JSONDecodeError:
+                d["bbox"] = [0, 0, 0, 0]
+            out.append(_norm_audit(d, d.get("page_id") or page_id or ""))
+        return out
+    finally:
+        conn.close()
+
+
 def delete_page(page_id: str) -> Dict[str, Any]:
-    """删除一页及其全部派生数据（SQLite 四表 + JSON 快照 + 上传图片）。
+    """删除一页及其全部派生数据（SQLite 五表 + JSON 快照 + 上传图片）。
 
     只删本系统命名的上传文件（`P<时间戳>-<hash>.<ext>`），不碰任何其他文件。
     返回删除统计；页面不存在时 `deleted=False`。
@@ -417,7 +567,7 @@ def delete_page(page_id: str) -> Dict[str, Any]:
         if row is None:
             return stat
         image_path = row[0] or ""
-        for table in ("blocks", "entities", "triples"):
+        for table in ("blocks", "entities", "triples", "unresolved", "formula_extractions"):
             cur = conn.execute(f"DELETE FROM {table} WHERE page_id=?", (page_id,))
             stat["db"][table] = cur.rowcount
         conn.execute("DELETE FROM pages WHERE page_id=?", (page_id,))
@@ -458,7 +608,8 @@ def stats() -> Dict[str, Any]:
     conn = connect()
     try:
         out: Dict[str, Any] = {}
-        for table in ("pages", "blocks", "entities", "triples", "qa_logs", "runs"):
+        for table in ("pages", "blocks", "entities", "triples", "unresolved",
+                      "qa_logs", "runs"):
             out[table] = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
         out["db_path"] = str(PATHS.db_path)
         return out

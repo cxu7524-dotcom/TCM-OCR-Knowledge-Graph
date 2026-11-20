@@ -31,7 +31,7 @@ from typing import Any, Dict, Iterable, List
 BBox = List[float]
 EMPTY_BBOX: BBox = [0.0, 0.0, 0.0, 0.0]
 
-BLOCK_KINDS = ("paragraph", "table_cell", "title", "dose")
+BLOCK_KINDS = ("paragraph", "table_cell", "title", "dose", "small_column_evidence")
 ENTITY_TYPES = ("药材", "性味", "归经", "功效", "主治", "禁忌", "方剂", "剂量")
 
 
@@ -113,6 +113,10 @@ class Block(Provenance):
     kind: str = "paragraph"        # paragraph | table_cell | title | dose
     conf: float = 0.0              # OCR 置信度；桩数据固定 0.0 并标注示例
     block_ref: str = ""            # 页内稳定引用，形如 p001:b003
+    evidence_role: str = ""        # 小字实验：main / right / left
+    evidence_status: str = ""      # 小字裁块仅作为证据；未核实时标待核
+    parent_block_ref: str = ""     # 保留原 OCR 父块，不替换原文
+    evidence_engine: str = ""      # 对应裁块实际使用的局部识别模型
 
     def __post_init__(self) -> None:
         # 文本块自身即原文：quote 缺省时回填 text，保证溯源字段永不缺失
