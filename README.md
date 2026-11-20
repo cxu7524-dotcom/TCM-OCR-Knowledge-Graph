@@ -13,11 +13,102 @@
 1. **上传页面**：支持常见图片格式，也可加载内置示例；真实上传使用本机 OCR 推理。
 2. **识别与结构化**：查看原图与文字框、阅读顺序、实体和三元组。方剂表按行列展示，有可靠出处的单元格可定位到原图。
 3. **图谱可视化**：按当前页展示实体及关系，点击节点查看来源。
-4. **可溯源问答**：支持按症状查药材或方剂、按药材查禁忌等关系问题，并提供原文引文及回跳。其余问题使用文本检索；无可用依据或涉及个人诊疗建议时拒答。
+4. **可溯源问答**：先用**语义向量**在全库检索最相关的原文段落，再把段落交给本机大模型生成解释，答案里的 `[编号]` 可回查到「书名 / 页码 / 行范围 / bbox / 原文」；库中没有依据时明确声明并改用通用中医常识作答，涉及个人诊疗、剂量、疗效的问题一律拒答。
 
-OCR 使用本地 ONNX 模型。规则抽取和图谱问答已接入，当前答案以原文摘录为主。本地 LLM 尚未接入生成链路，语义向量检索未启用。图谱问答基于当前页已抽取的关系，适合逐页核对。
+OCR 使用本地 ONNX 模型；语义向量使用本地 ONNX 模型（bge-small-zh-v1.5，512 维）；生成使用本机 Ollama 上的大模型。三者全部本机推理，无 API 密钥、无云端调用。图谱问答基于已抽取的关系，适合逐页核对。
 
 公开医书扫描页已验证上传、识别和问答回跳。真实页的实体与关系准确性仍需人工核验，例如《思濟堂方書》`page_35` 存在主治跨段归属错误。合成集指标不能直接代表真实古籍或命题样本表现。
+
+## 语义检索与 RAG 问答
+
+问答不是"关键词命中就摘一段"，而是完整的检索增强生成（RAG）链路：
+
+```text
+用户问题
+  → 查询扩展（现代词 → 古籍用词：失眠→不寐/不得眠，腹泻→泄泻/下利 …）
+  → 语义向量编码（本地 bge-small-zh-v1.5，512 维）
+  → 全库余弦检索 top-k（知识库 = 所有已入库页面切成的语义段落）
+  → 双阈值过滤：绝对相似度 ≥ 0.49，且 ≥ 最高分 × 0.72
+  → 字面锚点校验：语义相近但一个实词二元组都对不上 → 判为无依据
+  → 专业提示词（区分「原文依据」与「中医常识补充」两种口径）
+  → 本机大模型生成（qwen2.5:7b）
+  → 解析答案中的 [编号] → 映射回 书名 / 页 / 行 / bbox / 原文
+```
+
+四个设计取舍：
+
+- **段落切分而非按行检索**：古籍 OCR 一行只有十几个字，单行做向量召回噪声极大；系统把相邻文本块合并成约 160 字的段落检索，命中后再回落到底层文本块给出精确出处。
+- **阈值是实测出来的**：在 12 条域内 + 8 条域外问题上扫描阈值，0.49 时域内召回 100%、误命中 12%，再叠加字面锚点把纯语义误命中压掉。阈值可用 `TCM_RAG_MIN_SCORE` 调整。
+- **查询扩展补古代用词**：古籍很少出现"失眠""腹泻""便秘"，内置约 30 组现代词→古籍词映射，命中后拼进检索串，并允许等价词充当锚点。实测"失眠"从"无依据"变成命中《温疫方論》「不得眠」并给出出处。
+- **检索不到不等于拒答**：库中无依据时仍作答（`TCM_RAG_ANSWER_WITHOUT_EVIDENCE=1`，默认开），但答案开头会明确写「本古籍库未检索到直接依据」，并全文不出现任何 `[编号]` 引用，避免把常识伪装成古籍原文。个人诊疗 / 剂量 / 疗效类问题仍在检索之前直接拒答。
+
+知识库规模可以用 `GET /api/rag/status` 查看，也可在首页问答区顶部看到「知识库 N 页 / M 段」徽标。
+
+### 导入古籍语料
+
+```powershell
+# 1) 下载本地语义向量模型（约 90MB，仅在首次需要）
+python tools/download_embed_model.py
+
+# 2) 导入 ModelScope 公开古籍评测集《医家类》176 页（10 部医书，约 5.6 万字）
+#    标注表缺失时会自动从 ModelScope 下载
+python tools/ingest_corpus.py --source ancientdoc
+
+# 3)（可选）下载评测子集 59 页原图并用真实 OCR 重建，
+#    使这 59 页拥有真实检测框、置信度与阅读顺序（而非推算行框）
+python tools/download_eval_pages.py      # 下载 59 张原图（约 80MB）
+python tools/reingest_eval59.py          # 走生产 OCR 链路重建同名页面
+
+# 4) 重建语义索引（也可由服务启动 / 上传新页时自动触发）
+curl -X POST http://127.0.0.1:8100/api/rag/rebuild
+```
+
+`ingest_corpus.py` 导入的是**转写文本**而非原图，因此每个块的 `bbox` 是按阅读顺序推算的行框，`engine` 记为 `dataset-transcription`，`notes` 中写明来源；不冒充真实版面检测结果。其中评测子集 59 页已用原图重跑真实 OCR（`engine=rapidocr`，bbox 为真实检测框、含置信度），其余 117 页仍为转写文本。若换成自有语料，用 `--source jsonl`，每行 `{"page_id": "...", "book": "...", "text": "整页原文"}`。
+
+测过的问题类型与典型表现：
+
+| 问题 | 表现 |
+|---|---|
+| 甘草的性味和功效是什么 | 命中 3 段，最高相似度 0.71，答案带 3 条出处 |
+| 温疫病邪伏于膜原怎么治 | 命中《温疫方論》3 段，全部标 `[1][2][3]` |
+| 脉象寸盛尺弱说明什么 | 命中《合併脉訣難經太素評林》4 段 |
+| 今天天气怎么样 | 命中最高的 0.48 未过阈值 → 声明无依据 + 常识作答 |
+| 我最近咳嗽，该吃什么药？剂量多少 | 检索前直接拒答（越界），0.0 秒返回 |
+
+## 给协作者：从克隆到跑通
+
+仓库不包含模型权重、古籍原图和运行数据（见 `.gitignore`），克隆后按下面四步即可复现全部功能：
+
+```powershell
+# 0) 环境（Python 3.10+，在项目根目录执行）
+python -m venv .venv
+.\.venv\Scripts\pip install -r requirements.txt
+
+# 1) 模型（约 110MB，全部本机推理，无 API 密钥、无云端调用）
+#    OCR 识别模型 ch_PP-OCRv5_rec_mobile.onnx 的获取方式见下文「识别模型」；
+#    语义向量模型一条命令：
+python tools/download_embed_model.py
+
+# 2) 知识库语料：导入医家类 176 页建库（标注表缺失时自动从 ModelScope 下载）
+python tools/ingest_corpus.py --source ancientdoc
+#    可选：下载 59 页评测原图并用真实 OCR 原位重建（出处可点回原图真实位置）
+python tools/download_eval_pages.py
+python tools/reingest_eval59.py
+
+# 3) 启动服务（问答生成走本机 Ollama；没装也能跑，问答降级为原文摘录）
+ollama pull qwen2.5:7b
+$env:TCM_LLM_BACKEND = "ollama"; $env:TCM_LLM_MODEL = "qwen2.5:7b"
+.\.venv\Scripts\python.exe app/main.py --port 8100
+
+# 4) 浏览器打开（改了前端后按 Ctrl+F5 强刷）
+#    首页问答（全库语义检索）：http://127.0.0.1:8100/home
+#    四步演示台：            http://127.0.0.1:8100/
+```
+
+- 问答的检索链路、阈值与出处格式见上文「语义检索与 RAG 问答」；全部环境变量见「配置」一节。
+- 改动代码前后跑回归：`python -m unittest discover -s tests -t .`（当前 135 用例）。
+- 只存在于本机、不进仓库的东西：`data/store/`（SQLite 与向量索引）、`模型权重/`、
+  `古籍评测集/`（原图）、`data/uploads/`、`data/screenshots/`。重建它们就是上面第 1–2 步。
 
 ## 快速开始
 
@@ -106,7 +197,14 @@ python eval/run_all.py --refresh
 | `DELETE /api/pages/{page_id}` | 删除页面及其派生数据 |
 | `GET /api/pages/{page_id}/ocr` | 获取文字块、实体、三元组和方剂表 |
 | `GET /api/graph?page_id=...` | 获取当前页图谱 |
-| `POST /api/qa` | 按页提问并返回答案、证据或拒答 |
+| `POST /api/qa` | 提问并返回答案、出处或拒答；支持 `history` 多轮上下文与 `scope=page\|library` |
+| `GET /api/rag/status` | 知识库规模、向量模型、索引状态与阈值参数 |
+| `POST /api/rag/rebuild` | 强制重建语义向量索引 |
+
+`POST /api/qa` 的响应除 `text` / `evidences` / `trace` 外，新增两个字段：
+
+- `sources`：答案实际引用的出处列表，每条含 `index`（对应答案里的 `[n]`）、`book`、`page_id`、`line_span`、`quote`、`bbox`、`score`（余弦相似度）、`cited`（是否被答案显式引用）；
+- `retrieval`：检索元信息，含 `mode`（`semantic-rag`）、`embed_model`、`hits`、`top_score`、`floor`（实际生效阈值）、`anchor_dropped`、`answered_without_evidence`。
 
 文本块、实体、三元组和证据使用 `page_id`、`bbox`、`line_id`、`quote`、`source_hash` 追溯来源。问答输出前会校验证据与原文，图谱关系问答还会检查关系方向和主体归属。
 
@@ -123,8 +221,19 @@ python eval/run_all.py --refresh
 | `TCM_OCR_CORRECT` | `1` | 字形纠错开关 |
 | `TCM_OCR_VERTICAL_SPLIT` | `1` | 竖排逐列处理开关 |
 | `TCM_OCR_PICK` | `auto` | 整页与逐列结果选择策略 |
-| `TCM_LLM_BACKEND` | `none` | 本地 LLM 配置，当前生成链路使用抽取式结果 |
-| `TCM_VECTOR_ENABLED` | `0` | 向量通道开关，内置 hash 索引并非语义模型 |
+| `TCM_LLM_BACKEND` | `none` | 生成后端：`none` / `ollama` / `vllm`；本机演示用 `ollama` |
+| `TCM_LLM_MODEL` | `qwen2.5:7b` | 生成模型名 |
+| `TCM_LLM_BASE_URL` | `http://127.0.0.1:11434/v1` | 仅允许 127.0.0.1 / localhost，非本机地址直接禁用 |
+| `TCM_LLM_TIMEOUT` | `120` | 生成超时（秒）；7B 模型首次推理需加载权重，过短会误判为不可用 |
+| `TCM_EMBED_BACKEND` | `local` | 向量后端：`local`（ONNX，默认）/ `ollama` / `none` |
+| `TCM_EMBED_MODEL` | `bge-small-zh-v1.5` | 向量模型名（写入索引 manifest，换模型自动重建） |
+| `TCM_EMBED_MODEL_DIR` | `模型权重/bge-small-zh-v1.5` | 本地向量模型目录 |
+| `TCM_RAG_ENABLED` | `1` | RAG 开关；关闭后回退到原有字面检索链路 |
+| `TCM_RAG_MIN_SCORE` | `0.49` | 余弦相似度绝对阈值（实测拐点） |
+| `TCM_RAG_RELATIVE_KEEP` | `0.72` | 相对阈值：只保留 ≥ 最高分 × 该值的段落 |
+| `TCM_RAG_ANSWER_WITHOUT_EVIDENCE` | `1` | 无原文依据时是否用通用常识作答并显式声明 |
+| `TCM_RAG_TOP_K` | `6` | 送给大模型的段落数上限 |
+| `TCM_VECTOR_ENABLED` | `0` | 旧哈希向量通道开关（非语义，仅自检用） |
 
 ## 项目结构
 
@@ -133,15 +242,26 @@ app/        FastAPI 接口、配置、数据契约、存储与网页
 ocr/        OCR、版面分析、竖排处理、表格还原、字形归一化
 extract/    词表、实体与关系抽取规则
 graph/      图谱构建、查询与导出
-qa/         文本检索、图谱关系问答、证据校验与拒答
+qa/         语义向量检索、RAG 生成、图谱关系问答、证据校验与拒答
 eval/       数据集校验、预测和指标计算
-tools/      合成页生成、公开古籍评测与诊断脚本
+tools/      合成页生成、古籍语料导入、向量模型下载、公开古籍评测与诊断脚本
 tests/      OCR、抽取、表格展示与问答回归测试
-data/       词表、示例、标注及本地运行数据
+data/       词表、示例、标注、向量索引及本地运行数据
 docs/       技术报告、评测说明与项目记录
 ```
 
-进一步阅读：[技术报告](docs/技术报告.md)、[阶段九完成报告](docs/阶段九完成报告.md)、[交付物清单](docs/交付物清单.md)、[交接摘要](docs/交接摘要.md)。
+RAG 相关模块：
+
+| 文件 | 职责 |
+|---|---|
+| `qa/embed_local.py` | 本地 ONNX 向量推理（tokenizers + onnxruntime，不依赖 torch） |
+| `qa/embed.py` | 向量后端统一入口（local / ollama 双后端，失败即降级不伪造） |
+| `qa/kb.py` | 知识库语料加载与段落切分（相邻块合并成 ~160 字段落） |
+| `qa/index.py` | 向量索引：持久化到 `data/store/vectors/<model>/`，语料变化自动重建 |
+| `qa/prompt.py` | RAG 提示词（区分原文依据与常识补充、禁止剂量与诊疗建议） |
+| `qa/rag.py` | RAG 主流程：检索 → 阈值 → 锚点 → 生成 → 引用回映射 → 出处 |
+
+进一步阅读：[技术报告](docs/技术报告.md)、[阶段十一 RAG 实现说明](docs/阶段十一RAG实现说明.md)、[阶段九完成报告](docs/阶段九完成报告.md)、[交付物清单](docs/交付物清单.md)、[交接摘要](docs/交接摘要.md)。
 
 ## 数据与后续工作
 

@@ -23,8 +23,21 @@ OUT_OF_SCOPE_NOTE = (
 NO_EVIDENCE_NOTE = "原文未检索到依据"
 
 
-def answer_disclaimer() -> str:
-    """答案尾部固定附加的免责文案。"""
+def answer_disclaimer(kind: str = "extractive") -> str:
+    """答案尾部固定附加的免责文案。
+
+    kind 区分四种产出性质，避免"生成式答案"被贴上"原文摘录"的错误标签：
+      extractive   —— 只列原文，未做推断（旧链路 / LLM 不可用时的降级）
+      generated    —— 本机模型依据检索到的原文整理生成（RAG 主链路）
+      generated_open —— 知识库未检索到依据，模型基于通用常识生成（不得声称引用原文）
+      refusal      —— 未作答，只作提示
+    """
+    if kind == "generated":
+        return f"{DISCLAIMER}。以上内容由本机模型依据检索到的古籍原文整理生成，不构成诊疗依据。"
+    if kind == "generated_open":
+        return f"{DISCLAIMER}。以上内容未引用古籍原文，由本机模型生成，不构成诊疗依据。"
+    if kind == "refusal":
+        return f"{DISCLAIMER}。"
     return f"{DISCLAIMER}。以上为原文摘录，未做推断。"
 
 
@@ -32,12 +45,12 @@ def out_of_scope_note() -> str:
     return OUT_OF_SCOPE_NOTE
 
 
-def wrap(text: str) -> str:
+def wrap(text: str, kind: str = "extractive") -> str:
     """保证任何对外文本都带免责声明，不重复追加。"""
     t = (text or "").strip()
     if DISCLAIMER in t:
         return t
-    return (t + " " + answer_disclaimer()).strip()
+    return (t + " " + answer_disclaimer(kind)).strip()
 
 
 def page_banner() -> dict:

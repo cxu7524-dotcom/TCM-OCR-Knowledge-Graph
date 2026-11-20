@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>中医古籍智能问答 · 首页</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='3' y='3' width='58' height='58' rx='6' fill='%23a63a24'/%3E%3Ctext x='32' y='43' font-size='30' font-family='serif' fill='%23fbe9df' text-anchor='middle'%3E%E6%9C%AC%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    --paper: #f1e8d3; --paper-2: #fbf6ea; --paper-3: #efe4ca;
+    --ink: #2b2520; --ink-soft: #5a4e44; --muted: #70634f;
+    --line: #d8c7a2; --line-soft: #e9dec4;
+    --cinnabar: #a63a24; --cinnabar-dark: #852c1a; --cinnabar-soft: #f5e1d6;
+    --qing: #2e5e5a; --qing-dark: #224744; --qing-soft: #e0ebe5;
+    --gold: #b8964e;
+    --serif: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "STSong", "SimSun", serif;
+    --sans: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+    --shadow-sm: 0 1px 2px rgba(70,50,20,.08);
+    --shadow-md: 0 8px 24px rgba(70,50,20,.12);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    font-family: var(--sans); color: var(--ink); font-size: 14px;
+    background: var(--paper);
+    background-image:
+      radial-gradient(ellipse at 12% 8%, rgba(255,255,255,.55), transparent 45%),
+      radial-gradient(ellipse at 88% 92%, rgba(184,150,78,.10), transparent 50%),
+      repeating-linear-gradient(93deg, rgba(120,90,40,.018) 0 2px, transparent 2px 7px);
+  }
+
+  /* 页头 */
+  header {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 0 24px; min-height: 64px; flex-wrap: wrap;
+    background: linear-gradient(180deg, #2f2a24, #26221d);
+    border-bottom: 3px double var(--gold); color: #f3e9d2;
+  }
+  .brand { display: flex; align-items: center; gap: 13px; min-width: 0; padding: 9px 0; }
+  .seal {
+    width: 42px; height: 42px; flex: 0 0 auto; border-radius: 4px; background: var(--cinnabar);
+    display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; padding: 4px;
+    box-shadow: inset 0 0 0 2px var(--cinnabar), inset 0 0 0 3.5px #f6dccf; transform: rotate(-2deg);
+  }
+  .seal span { font-family: var(--serif); color: #fbeee6; font-size: 14px; line-height: 1; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+  .brand b { font-family: var(--serif); font-size: 17px; display: block; letter-spacing: 2px; }
+  .brand .sub { font-size: 11px; color: #c9b993; letter-spacing: .5px; }
+  .hdr-right { display: flex; align-items: center; gap: 8px; font-size: 12px; flex-wrap: wrap; }
+  .chip { border-radius: 3px; padding: 4px 10px; background: rgba(243,233,210,.1); color: #e8dcc0; border: 1px solid rgba(232,220,192,.25); white-space: nowrap; }
+  .chat-head .chip { background: var(--paper-3); color: var(--ink-soft); border-color: var(--line); }
+  .chat-head .chip.ok { background: var(--qing-soft); color: var(--qing-dark); border-color: var(--line-soft); }
+  .chat-head .chip.warn { background: var(--cinnabar-soft); color: var(--cinnabar-dark); border-color: #e3b9a6; }
+  .chat-head .kb-chip { cursor: help; font-variant-numeric: tabular-nums; }
+  .chip.ok { background: rgba(46,94,90,.35); color: #cfe9df; border-color: rgba(160,220,200,.35); }
+  .chip.warn { background: rgba(166,58,36,.25); color: #ffd9c9; border-color: rgba(255,190,160,.4); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: #8b7d6a; display: inline-block; margin-right: 6px; }
+  .dot.on { background: #6fcf97; box-shadow: 0 0 6px #6fcf97; }
+  /* 页头导航入口链接 */
+  .home-link {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 12px; border-radius: 3px; font-size: 12.5px; font-weight: 600;
+    color: #fbeee6; text-decoration: none; letter-spacing: .5px;
+    background: var(--cinnabar); border: 1px solid rgba(255,190,160,.5);
+    box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: .16s; white-space: nowrap;
+  }
+  .home-link:hover { background: var(--cinnabar-dark); border-color: #ffd9c9; transform: translateY(-1px); }
+
+  /* 免责条 */
+  .disclaimer {
+    margin: 14px 24px 0; padding: 9px 14px; border-radius: 3px;
+    background: var(--cinnabar-soft); border: 1px solid #e3b9a6; border-left: 4px solid var(--cinnabar);
+    color: var(--cinnabar-dark); font-size: 13px;
+  }
+  .disclaimer b { font-family: var(--serif); letter-spacing: 1px; }
+
+  /* 主体两栏 */
+  main { display: grid; grid-template-columns: minmax(300px, 420px) 1fr; gap: 16px; margin: 16px 24px 0; }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; } .disclaimer, main { margin-inline: 12px; } }
+
+  .card {
+    background: var(--paper-2); border: 1px solid var(--line); border-radius: 3px; padding: 18px;
+    box-shadow: var(--shadow-sm), inset 0 0 0 4px var(--paper-2), inset 0 0 0 5px var(--line-soft);
+  }
+  .card h2 { margin: 0 0 4px; font-size: 16px; font-family: var(--serif); letter-spacing: 1.5px; display: flex; align-items: center; gap: 8px; }
+  .card h2::before { content: ""; width: 11px; height: 13px; background: var(--cinnabar); clip-path: polygon(0 0,100% 0,100% 100%,50% 62%,0 100%); flex: 0 0 auto; }
+  .card .hint { color: var(--muted); font-size: 12px; line-height: 1.7; margin: 0 0 14px; }
+
+  /* 上传区 */
+  .drop {
+    border: 1.5px dashed var(--line); border-radius: 3px; padding: 26px 16px; text-align: center;
+    background: #fffcf3; color: var(--muted); font-size: 13px; line-height: 1.8; cursor: pointer; transition: .16s;
+  }
+  .drop.hover { border-color: var(--cinnabar); background-color: var(--cinnabar-soft); }
+  .drop b { color: var(--ink); font-family: var(--serif); font-size: 14.5px; letter-spacing: 1px; }
+  .drop input[type=file] { display: none; }
+  .btn {
+    border: 1px solid var(--line); background: var(--paper-2); color: var(--ink);
+    padding: 8px 15px; border-radius: 3px; cursor: pointer; font: inherit; font-size: 13px; transition: .16s;
+  }
+  .btn:hover:not(:disabled) { border-color: var(--qing); color: var(--qing); }
+  .btn.primary { background: var(--cinnabar); border-color: var(--cinnabar); color: #fff; font-weight: 600; letter-spacing: 1px; }
+  .btn.primary:hover:not(:disabled) { background: var(--cinnabar-dark); color: #fff; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+  /* 上传后状态 */
+  .upload-done { margin-top: 14px; padding: 12px; border: 1px solid var(--qing); border-radius: 3px; background: var(--qing-soft); font-size: 12.5px; }
+  .upload-done .meta { color: var(--muted); font-size: 11.5px; margin-top: 4px; word-break: break-all; }
+  .progress { margin-top: 12px; color: var(--muted); font-size: 12px; display: none; }
+  .progress.show { display: block; }
+  .spinner { display: inline-block; width: 13px; height: 13px; border: 2px solid var(--line); border-top-color: var(--cinnabar); border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -2px; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* 对话区 */
+  .chat-panel { display: flex; flex-direction: column; min-height: 540px; }
+  .chat-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  .chat-scroll { flex: 1; overflow-y: auto; max-height: 560px; padding: 6px 2px; }
+  .msg { margin-bottom: 14px; display: flex; gap: 10px; }
+  .msg .avatar { width: 32px; height: 32px; flex: 0 0 auto; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-size: 14px; color: #fff; }
+  .msg.user { flex-direction: row-reverse; }
+  .msg.user .avatar { background: var(--qing); }
+  .msg.ai .avatar { background: var(--cinnabar); }
+  .msg .bubble {
+    max-width: 78%; padding: 10px 14px; border-radius: 6px; line-height: 1.75; font-size: 13.5px;
+    white-space: pre-wrap; overflow-wrap: anywhere;
+  }
+  .msg.user .bubble { background: var(--qing-soft); border: 1px solid var(--line-soft); }
+  .msg.ai .bubble { background: #fffdf7; border: 1px solid var(--line); }
+  .msg.ai .bubble.refused { background: var(--cinnabar-soft); border-color: #e3b9a6; color: var(--cinnabar-dark); }
+  .msg .ev { margin-top: 8px; padding: 8px 10px; border-left: 3px solid var(--gold); background: #f8f1e3; border-radius: 2px; font-size: 12px; color: var(--ink-soft); }
+  .msg .ev.cited { border-left-color: var(--cinnabar); background: #fdf3ec; }
+  .msg .ev .q { font-family: "KaiTi","STKaiti",serif; font-size: 13px; color: #2f3a2f; }
+  .msg .ev .loc { color: var(--muted); font-size: 11px; word-break: break-all; }
+  /* 出处整块：标题 + 卡片 */
+  .msg .srcs { margin-top: 10px; border-top: 1px dashed var(--line); padding-top: 8px; }
+  .msg .srcs .hd {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+    font-size: 11.5px; color: var(--muted); margin-bottom: 6px;
+  }
+  .msg .srcs .tag {
+    padding: 1px 7px; border-radius: 9px; font-size: 11px;
+    background: var(--qing-soft); color: var(--qing-dark); border: 1px solid var(--line-soft);
+  }
+  .msg .srcs .tag.warn { background: #fdf3ec; color: var(--cinnabar-dark); border-color: #e3b9a6; }
+  .msg .ev .no { font-weight: 700; color: var(--cinnabar); margin-right: 4px; }
+  .msg .ev .meta { display: flex; justify-content: space-between; gap: 8px; margin-top: 3px; }
+  .msg .ev .score { color: var(--gold-dark, #8a6d3b); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .typing { display: none; color: var(--muted); font-size: 12.5px; padding: 4px 2px; }
+  .typing.show { display: block; }
+
+  /* 输入条 */
+  .chat-input { display: flex; gap: 8px; margin-top: 12px; border-top: 1px solid var(--line-soft); padding-top: 12px; }
+  .chat-input input[type=text] {
+    flex: 1; font: inherit; font-size: 13.5px; padding: 10px 12px; border-radius: 3px;
+    border: 1px solid var(--line); background: #fffdf7; color: var(--ink); min-width: 0;
+  }
+  .chat-input input[type=text]:focus { outline: 2px solid rgba(46,94,90,.3); border-color: var(--qing); }
+  .qchips { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 10px; }
+  .qchip { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 5px 11px; font-size: 12px; cursor: pointer; color: var(--ink); }
+  .qchip:hover { border-color: var(--cinnabar); color: var(--cinnabar-dark); }
+  .qchip.refuse { border-color: #e3b9a6; color: #852c1a; background: #fbefe7; }
+
+  footer { margin: 20px 22px 0; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11.5px; line-height: 1.9; padding-bottom: 24px; }
+  .toast { position: fixed; right: 22px; bottom: 22px; background: #2b2520; color: #fff; padding: 11px 16px; border-radius: 3px; font-size: 12.5px; box-shadow: var(--shadow-md); opacity: 0; pointer-events: none; transition: .2s; z-index: 20; max-width: 380px; }
+  .toast.show { opacity: 1; }
+
+  /* ============ 上传成功后的操作按钮 ============ */
+  .upload-actions { margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn-analysis {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 9px 18px; border-radius: 3px; font-size: 13px; font-weight: 600;
+    color: var(--qing-dark); text-decoration: none; letter-spacing: .5px;
+    background: var(--qing-soft); border: 1px solid #b9d3c8; transition: .16s;
+  }
+  .btn-analysis:hover { background: #cfe9df; border-color: var(--qing); transform: translateY(-1px); }
+
+  /* ============ 四大功能入口 ============ */
+  .feature-nav { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 14px 24px 0; }
+  @media (max-width: 860px) { .feature-nav { grid-template-columns: repeat(2, 1fr); margin-inline: 12px; } }
+  .feature-card {
+    display: flex; align-items: center; gap: 11px; text-align: left; cursor: pointer;
+    padding: 14px 15px; font-family: inherit; color: var(--ink);
+    background: var(--paper-2); border: 1px solid var(--line); border-left: 4px solid var(--gold);
+    border-radius: 3px; box-shadow: var(--shadow-sm); transition: .18s;
+  }
+  .feature-card:hover { border-left-color: var(--cinnabar); background: #fffdf7; transform: translateY(-2px); box-shadow: var(--shadow-md); }
+  .feature-card.active { border-left-color: var(--cinnabar); background: var(--cinnabar-soft); }
+  .fc-icon { font-size: 22px; line-height: 1; flex: 0 0 auto; }
+  .fc-body { min-width: 0; }
+  .fc-body b { display: block; font-size: 13.5px; font-family: var(--serif); letter-spacing: 1px; margin-bottom: 3px; }
+  .fc-body small { display: block; font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+
+  /* ============ 大屏（2K / 4K）观感与 1K 屏保持一致 ============ */
+  /* 宽屏下把内容宽度锁定为 1872px（≈ 1920 屏的可视宽度）并整体居中，
+     避免 2K 屏上卡片被拉扁、留白过多；页眉背景仍通栏，只对齐内部内容。 */
+  @media (min-width: 1500px) {
+    .disclaimer, .feature-nav, main, footer {
+      margin-inline: max(24px, calc((100% - 1872px) / 2));
+    }
+    header {
+      padding-inline: max(24px, calc((100% - 1872px) / 2));
+    }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="seal" aria-hidden="true"><span>古</span><span>籍</span><span>智</span><span>问</span></div>
+    <div>
+      <b>中医古籍智能问答系统</b>
+      <span class="sub">上传古籍页 · 与 AI 助手对话</span>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <a class="home-link" href="/" title="返回四步演示台：OCR 识别 / 图谱 / 可溯源问答">🧭 四步演示台</a>
+    <span class="chip" id="llmChip"><span class="dot" id="llmDot"></span><span id="llmText">AI 助手状态检查中…</span></span>
+    <span class="chip ok" id="ocrChip">OCR 检查中…</span>
+  </div>
+</header>
+
+<div class="disclaimer">
+  <b>仅供参考、非诊疗建议</b>　本系统为赛事研发原型，问答内容不构成诊断、用药或治疗建议。
+</div>
+
+<!-- 四大功能入口 -->
+<nav class="feature-nav" aria-label="功能入口">
+  <button class="feature-card" data-feat="upload">
+    <span class="fc-icon">📤</span>
+    <span class="fc-body"><b>上传古籍页</b><small>上传扫描页 / 加载示例数据</small></span>
+  </button>
+  <button class="feature-card" data-feat="ocr">
+    <span class="fc-icon">🔍</span>
+    <span class="fc-body"><b>识别与结构化</b><small>OCR 文本块 · 实体 · 三元组</small></span>
+  </button>
+  <button class="feature-card" data-feat="graph">
+    <span class="fc-icon">🕸️</span>
+    <span class="fc-body"><b>图谱可视化</b><small>本地力导向图 · 零外部依赖</small></span>
+  </button>
+  <button class="feature-card" data-feat="qa">
+    <span class="fc-icon">💬</span>
+    <span class="fc-body"><b>可溯源问答</b><small>证据引用 · 无依据拒答</small></span>
+  </button>
+</nav>
+
+<main>
+  <!-- 左侧：上传区 -->
+  <section class="card">
+    <h2>上传古籍页</h2>
+    <p class="hint">上传古籍扫描页，系统会用本机模型识别文字并构建知识，之后即可向 AI 助手提问。</p>
+    <div class="drop" id="drop">
+      <b>点击选择图片，或拖拽到此处</b><br>
+      支持 png / jpg / jpeg / bmp / webp / tif，文件仅保存在本机
+      <input type="file" id="fileInput" accept="image/*,.tif,.tiff">
+    </div>
+    <div class="row" style="margin-top:14px">
+      <button class="btn" id="btnDemo">加载示例古籍页</button>
+      <button class="btn primary" id="btnUpload" disabled>上传并识别</button>
+    </div>
+    <div class="progress" id="progress"><span class="spinner"></span><span id="progressText">正在识别…</span></div>
+    <div class="upload-done" id="uploadDone" style="display:none">
+      <b id="doneTitle">已加载古籍页</b>
+      <div class="meta" id="doneMeta"></div>
+    </div>
+    <h2 style="margin-top:20px">关于本页</h2>
+    <p class="hint" style="margin:0">上传后，右侧 AI 助手将基于该页识别出的文字与知识回答你的问题。当前页如有方剂表、实体与关系，可直接询问「某症状用什么药材」「某药有什么禁忌」等问题。</p>
+  </section>
+
+  <!-- 右侧：对话区 -->
+  <section class="card chat-panel">
+    <div class="chat-head">
+      <h2>AI 智能问答</h2>
+      <span class="chip kb-chip" id="kbChip" title="语义向量知识库规模">知识库加载中…</span>
+      <span class="chip" id="pageBadge" style="background:var(--paper-3);color:var(--ink-soft);border-color:var(--line)">尚未加载古籍页</span>
+    </div>
+    <div class="chat-scroll" id="chatScroll">
+      <div class="msg ai">
+        <div class="avatar">AI</div>
+        <div class="bubble">你好，我是中医古籍智能问答助手。\n我会先用**语义向量检索**在古籍知识库里找到最相关的原文，再据此生成回答，并在答案后给出「书名 / 页码 / 行」级出处；库中没有依据时会明确告诉你，并用通用中医常识作答。\n你可以直接提问，也可以先在左侧上传或加载一页古籍。</div>
+      </div>
+    </div>
+    <div class="typing" id="typing"><span class="spinner"></span>AI 正在思考…</div>
+    <div class="qchips" id="qchips"></div>
+    <div class="chat-input">
+      <input type="text" id="qInput" placeholder="输入关于古籍内容的问题…" aria-label="输入问题">
+      <button class="btn primary" id="btnAsk">发送</button>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <b>仅供参考、非诊疗建议</b>。系统输出仅供研究参考，不构成诊断、用药或治疗建议。命题单位脱敏样本仅限赛事研发使用。
+</footer>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove("show"), 3200); }
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  if (!r.ok) {
+    let d = ""; try { d = (await r.json()).detail || ""; } catch (e) {}
+    const err = new Error(d || ("HTTP " + r.status)); err.status = r.status; throw err;
+  }
+  return r.json();
+}
+function errText(e) {
+  const s = e.status, m = e.message || "";
+  if (s === 400) return "文件/请求不合法：" + m;
+  if (s === 413) return "文件过大：" + m;
+  if (s === 503) return "OCR 不可用：" + m;
+  if (s === 500) return "服务端异常：" + m;
+  return "请求失败：" + m;
+}
+
+const S = { pageId: null, history: [] };
+
+/* ---------------- 初始化 ---------------- */
+async function loadKbStatus() {
+  try {
+    const s = await api("/api/rag/status");
+    const lib = s.library || {}, idx = s.index || {}, emb = s.embed || {};
+    const ok = !!idx.available;
+    $("kbChip").textContent = "知识库 " + (lib.pages || 0) + " 页 / " + (idx.vectors || 0) + " 段";
+    $("kbChip").className = "chip kb-chip " + (ok ? "ok" : "warn");
+    $("kbChip").title = "语义向量：" + (emb.model || "—") + "（" + (idx.dim || 0) + " 维）"
+      + "；段落 " + (lib.passages || 0) + "；文本块 " + (lib.blocks || 0)
+      + "；书 " + Object.keys(lib.books || {}).length + " 部"
+      + (idx.stale ? "；索引待重建" : "；索引已就绪");
+  } catch (e) {
+    $("kbChip").textContent = "知识库未就绪";
+    $("kbChip").className = "chip kb-chip warn";
+  }
+}
+async function init() {
+  try {
+    const [h, m, llm] = await Promise.all([api("/api/health"), api("/api/meta"), api("/api/llm")]);
+    // OCR 状态
+    const rec = (h.modules && h.modules.ocr && h.modules.ocr.rec_model_name) || "—";
+    $("ocrChip").textContent = "OCR:" + h.config.ocr_backend + " · " + rec;
+    // LLM 状态
+    $("llmText").textContent = llm.ready ? ("AI 助手已就绪 · " + llm.model) : "AI 助手未就绪";
+    $("llmDot").classList.toggle("on", !!llm.ready);
+    $("llmChip").className = "chip " + (llm.ready ? "ok" : "warn");
+    if (!llm.ready && llm.reachable) {
+      $("llmChip").title = llm.note;
+    }
+    // 示例问题
+    renderChips(m.questions || []);
+    loadKbStatus();
+  } catch (e) {
+    $("ocrChip").textContent = "服务未就绪";
+    $("llmText").textContent = "AI 助手未连接";
+    toast("后端未就绪：" + e.message);
+  }
+}
+function renderChips(qs) {
+  const list = qs || [];
+  $("qchips").innerHTML = list.slice(0, 4).map(q =>
+    `<button class="qchip ${q.expect === "refuse" ? "refuse" : ""}" data-q="${esc(q.q)}">${esc(q.q)}</button>`).join("");
+  $("qchips").querySelectorAll(".qchip").forEach(b => b.onclick = () => { $("qInput").value = b.dataset.q; ask(b.dataset.q); });
+}
+
+/* ---------------- 上传 ---------------- */
+let picked = null;
+const drop = $("drop");
+drop.onclick = () => $("fileInput").click();
+drop.ondragover = e => { e.preventDefault(); drop.classList.add("hover"); };
+drop.ondragleave = () => drop.classList.remove("hover");
+drop.ondrop = e => {
+  e.preventDefault(); drop.classList.remove("hover");
+  if (e.dataTransfer.files.length) { picked = e.dataTransfer.files[0]; $("btnUpload").disabled = false; toast("已选择：" + picked.name); }
+};
+$("fileInput").onchange = e => { picked = e.target.files[0] || null; $("btnUpload").disabled = !picked; if (picked) toast("已选择：" + picked.name); };
+
+function showProgress(on, text) {
+  $("progress").classList.toggle("show", on);
+  $("progressText").textContent = text || "";
+  $("btnUpload").disabled = on;
+  $("btnDemo").disabled = on;
+}
+async function ingest(fd, label) {
+  showProgress(true, "正在" + label + "…");
+  try {
+    const r = await api("/api/pages", { method: "POST", body: fd });
+    S.pageId = r.page_id;
+    $("uploadDone").style.display = "block";
+    $("doneTitle").textContent = "已加载：" + r.page_id;
+    $("doneMeta").innerHTML = [
+      "识别后端：" + esc(r.engine + "（" + (r.rec_model || "—") + "）"),
+      "文本块 " + r.blocks + " · 实体 " + r.entities + " · 三元组 " + r.triples,
+      r.is_demo ? "数据：示例数据（非命题单位样本）" : "数据：本地 OCR 真实识别",
+    ].join("<br>");
+    $("pageBadge").textContent = r.is_demo ? "示例古籍页" : "已识别古籍页";
+    addMsg("ai", "已加载古籍页「" + esc(r.page_id) + "」，识别出 " + r.blocks + " 个文本块、"
+      + r.entities + " 个实体。你可以就其中内容向我提问了。");
+    // 添加"查看完整分析"入口
+    const actions = document.createElement("div");
+    actions.className = "upload-actions";
+    actions.innerHTML = '<a class="btn-analysis" href="/?page=' + esc(r.page_id) + '" target="_blank">📊 查看完整分析（OCR / 图谱 / 证据）→</a>';
+    $("uploadDone").appendChild(actions);
+    toast("加载成功：" + r.page_id);
+  } catch (e) {
+    const msg = errText(e);
+    addMsg("ai", "⚠️ " + msg, true);
+    toast(msg);
+  } finally {
+    showProgress(false, "");
+  }
+}
+$("btnDemo").onclick = () => { const fd = new FormData(); fd.append("demo", "1"); ingest(fd, "加载示例数据"); };
+$("btnUpload").onclick = () => {
+  if (!picked) return;
+  const fd = new FormData(); fd.append("file", picked); fd.append("demo", "0");
+  ingest(fd, "上传图片（" + picked.name + "）");
+};
+
+/* ---------------- 对话 ---------------- */
+function addMsg(role, text, refused) {
+  const scroll = $("chatScroll");
+  const div = document.createElement("div");
+  div.className = "msg " + role;
+  const avatar = document.createElement("div");
+  avatar.className = "avatar";
+  avatar.textContent = role === "user" ? "我" : "AI";
+  const bubble = document.createElement("div");
+  bubble.className = "bubble" + (refused ? " refused" : "");
+  bubble.textContent = text;
+  div.appendChild(avatar);
+  div.appendChild(bubble);
+  scroll.appendChild(div);
+  scroll.scrollTop = scroll.scrollHeight;
+}
+function addSources(r) {
+  const scroll = $("chatScroll");
+  const last = scroll.querySelector(".msg.ai:last-of-type");
+  if (!last) return;
+  const srcs = r.sources || [];
+  const evs = r.evidences || [];
+  const rt = r.retrieval || {};
+  if (!srcs.length && !evs.length && !rt.mode) return;
+
+  const box = document.createElement("div");
+  box.className = "srcs";
+
+  // ① 检索元信息：让评委一眼看到"用了什么检索、命中几段、置信多少"
+  const tags = [];
+  if (rt.mode) {
+    const label = rt.mode === "semantic-rag" ? "语义向量检索" : "字面检索";
+    tags.push('<span class="tag">' + label + (rt.embed_model ? " · " + esc(rt.embed_model) : "") + "</span>");
+  }
+  if (rt.hits) tags.push('<span class="tag">命中 ' + rt.hits + " 段原文</span>");
+  if (typeof rt.top_score === "number" && rt.top_score > 0) {
+    tags.push('<span class="tag">最高相似度 ' + rt.top_score.toFixed(2) + "</span>");
+  }
+  if (rt.answered_without_evidence) {
+    tags.push('<span class="tag warn">古籍库无直接依据 · 通用常识作答</span>');
+  } else if (rt.anchor_dropped) {
+    tags.push('<span class="tag">语义相近但无实词锚点，已剔除 ' + rt.anchor_dropped + " 段</span>");
+  }
+  const hd = document.createElement("div");
+  hd.className = "hd";
+  hd.innerHTML = (srcs.length ? "📚 出处（" + srcs.length + " 条）" : "📚 检索信息") + tags.join("");
+  box.appendChild(hd);
+
+  // ② 出处卡片：书 / 页 / 行范围 / 相似度 / 原文
+  if (srcs.length) {
+    srcs.forEach(s => {
+      const e = document.createElement("div");
+      e.className = "ev" + (s.cited ? " cited" : "");
+      e.innerHTML =
+        '<div class="q"><span class="no">[' + s.index + "]</span>「" + esc(s.quote || "") + "」</div>" +
+        '<div class="meta"><span class="loc">出处：《' + esc(s.book || "") + "》 " + esc(s.page_id || "") +
+        (s.line_span ? " · " + esc(s.line_span) : "") + "</span>" +
+        '<span class="score">相似度 ' + Number(s.score || 0).toFixed(2) + "</span></div>";
+      box.appendChild(e);
+    });
+  } else if (evs.length) {
+    evs.forEach((ev, i) => {
+      const e = document.createElement("div");
+      e.className = "ev";
+      e.innerHTML = '<div class="q"><span class="no">[' + (i + 1) + "]</span>「" + esc(ev.quote || "") + "」</div>" +
+        '<div class="loc">出处：' + esc((ev.page_id || "") + " / " + (ev.line_id || "")) + "</div>";
+      box.appendChild(e);
+    });
+  }
+
+  last.appendChild(box);
+  scroll.scrollTop = scroll.scrollHeight;
+}
+async function ask(q) {
+  q = (q || $("qInput").value).trim();
+  if (!q) return;
+  $("qInput").value = "";
+  addMsg("user", q);
+  S.history.push({ role: "user", content: q });
+  $("typing").classList.add("show");
+  $("btnAsk").disabled = true;
+  try {
+    const body = { question: q, history: S.history.slice(-6) };
+    if (S.pageId) body.page_id = S.pageId;
+    const r = await api("/api/qa", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    addMsg("ai", r.text, !!r.refused);
+    addSources(r);
+    S.history.push({ role: "assistant", content: r.text || "" });
+  } catch (e) {
+    addMsg("ai", "⚠️ 提问失败：" + e.message, true);
+  } finally {
+    $("typing").classList.remove("show");
+    $("btnAsk").disabled = false;
+  }
+}
+$("btnAsk").onclick = () => ask();
+$("qInput").addEventListener("keydown", e => { if (e.key === "Enter") ask(); });
+
+/* ---------------- 四大功能入口：跳转到四步演示台对应页面 ---------------- */
+const FEATURE_STEP = { upload: 1, ocr: 2, graph: 3, qa: 4 };
+document.querySelectorAll(".feature-card").forEach(btn => {
+  btn.onclick = () => {
+    const step = FEATURE_STEP[btn.dataset.feat] || 1;
+    document.querySelectorAll(".feature-card").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    // 已加载古籍页则带上 page 参数，演示台会自动定位到该页
+    let url = "/?step=" + step;
+    if (S.pageId) url += "&page=" + encodeURIComponent(S.pageId);
+    location.href = url;
+  };
+});
+
+init();
+</script>
+</body>
+</html>

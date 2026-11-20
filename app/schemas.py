@@ -357,6 +357,11 @@ class Answer(_Record):
     backend: str = "stub"
     is_demo: bool = True
     objects: List[Dict[str, Any]] = field(default_factory=list)
+    # RAG（阶段十一）新增：引用出处与检索元信息，旧调用方无需改动
+    # sources  ：被答案实际引用的出处（书 / 页 / 行 / 原文 / bbox / 相似度）
+    # retrieval：检索模式、模型名、阈值、最高相似度、是否命中知识库
+    sources: List[Dict[str, Any]] = field(default_factory=list)
+    retrieval: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any] | None):

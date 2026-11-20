@@ -184,7 +184,7 @@ class LlmConfig:
     backend: str = _env("LLM_BACKEND", "none")
     base_url: str = _env("LLM_BASE_URL", "http://127.0.0.1:11434/v1")
     model: str = _env("LLM_MODEL", "qwen2.5:7b")
-    timeout: int = _env_int("LLM_TIMEOUT", 30)
+    timeout: int = _env_int("LLM_TIMEOUT", 120)
     max_tokens: int = _env_int("LLM_MAX_TOKENS", 512)
     temperature: float = _env_float("LLM_TEMPERATURE", 0.1)
 
@@ -203,14 +203,83 @@ class VectorConfig:
     """本地向量索引配置。
 
     backend 可选：
-      none —— 默认。仅走稀疏检索。
+      none —— 关闭向量通道，仅走稀疏检索。
       hash —— 内置哈希向量（标准库实现，零依赖，仅用于打通链路，非语义向量）。
-    TODO：接入本地 embedding 模型后替换为真实向量并记录模型名与版本。
+      ollama —— **语义向量**：调用本机 Ollama 的 embedding 模型（默认 bge-m3），
+                对应 qa/embed.py；索引持久化到 data/store/vectors/。
     """
 
     backend: str = _env("VECTOR_BACKEND", "none")
     dim: int = _env_int("VECTOR_DIM", 128)
     enabled: bool = _env_bool("VECTOR_ENABLED", False)
+
+
+@dataclass(frozen=True)
+class EmbedConfig:
+    """语义向量（embedding）配置 —— 纯本地，禁止任何云端调用。
+
+    backend 可选：
+      local  —— 默认。本地 ONNX 模型（bge-small-zh-v1.5，512 维），
+                用 onnxruntime + tokenizers 推理，见 qa/embed_local.py；
+      ollama —— 走本机 Ollama 的 embedding 接口（需先 ollama pull 向量模型）；
+      none   —— 关闭语义向量，问答退化为字面检索。
+    """
+
+    backend: str = _env("EMBED_BACKEND", "local")           # local | ollama | none
+    model: str = _env("EMBED_MODEL", "bge-small-zh-v1.5")
+    model_dir: str = _env("EMBED_MODEL_DIR", "模型权重/bge-small-zh-v1.5")
+    base_url: str = _env("EMBED_BASE_URL", "")              # 仅 ollama 后端使用
+    timeout: int = _env_int("EMBED_TIMEOUT", 120)
+    batch_size: int = _env_int("EMBED_BATCH", 16)
+    max_length: int = _env_int("EMBED_MAX_LENGTH", 512)
+    threads: int = _env_int("EMBED_THREADS", 4)
+
+    def resolved_base_url(self) -> str:
+        return (self.base_url or LlmConfig().base_url or "").rstrip("/")
+
+    @property
+    def enabled(self) -> bool:
+        mode = (self.backend or "").lower()
+        if mode == "local":
+            try:
+                from pathlib import Path as _P
+                root = _P(__file__).resolve().parents[1]
+                base = _P(self.model_dir)
+                base = base if base.is_absolute() else root / base
+                return (base / "model.onnx").exists() and (base / "tokenizer.json").exists()
+            except Exception:
+                return False
+        if mode == "ollama":
+            url = self.resolved_base_url().lower()
+            return url.startswith("http://127.0.0.1") or url.startswith("http://localhost")
+        return False
+
+    @property
+    def is_local_onnx(self) -> bool:
+        return (self.backend or "").lower() == "local"
+
+
+@dataclass(frozen=True)
+class RagConfig:
+    """RAG（检索增强生成）参数。
+
+    min_score 是**余弦相似度**的绝对阈值（0~1），与旧稀疏检索的分数尺度无关。
+    answer_without_evidence=True 时，即使没有超过阈值的证据，也会让大模型基于
+    自身知识作答，但会明确标注"古籍库未检索到直接依据"，避免"检索不到就拒答"。
+    """
+
+    enabled: bool = _env_bool("RAG_ENABLED", True)
+    top_k: int = _env_int("RAG_TOP_K", 6)
+    # 0.49 是在 12 条域内 + 8 条域外问题上的实测拐点（域内召回 100%，误命中 12%），
+    # 再叠加"字面锚点"校验把纯语义误命中压掉
+    min_score: float = _env_float("RAG_MIN_SCORE", 0.49)
+    relative_keep: float = _env_float("RAG_RELATIVE_KEEP", 0.72)
+    answer_without_evidence: bool = _env_bool("RAG_ANSWER_WITHOUT_EVIDENCE", True)
+    max_context_chars: int = _env_int("RAG_MAX_CONTEXT_CHARS", 3600)
+    passage_chars: int = _env_int("RAG_PASSAGE_CHARS", 160)
+    max_citations: int = _env_int("RAG_MAX_CITATIONS", 4)
+    # 是否启用「多轮历史」上下文（前端可传 history）
+    max_history: int = _env_int("RAG_MAX_HISTORY", 6)
 
 
 @dataclass(frozen=True)
@@ -242,6 +311,8 @@ class Config:
     ocr: OcrConfig = OcrConfig()
     llm: LlmConfig = LlmConfig()
     vector: VectorConfig = VectorConfig()
+    embed: EmbedConfig = EmbedConfig()
+    rag: RagConfig = RagConfig()
     qa: QaConfig = QaConfig()
     server: ServerConfig = ServerConfig()
     demo_mode: bool = _env_bool("DEMO_MODE", True)
@@ -267,6 +338,12 @@ class Config:
             "llm_enabled": self.llm.enabled,
             "llm_base_url": self.llm.base_url if self.llm.enabled else "",
             "vector_backend": self.vector.backend,
+            "embed_backend": self.embed.backend,
+            "embed_model": self.embed.model,
+            "embed_enabled": self.embed.enabled,
+            "rag_enabled": self.rag.enabled,
+            "rag_min_score": self.rag.min_score,
+            "rag_top_k": self.rag.top_k,
             "demo_mode": self.demo_mode,
             "disclaimer": self.disclaimer,
             "demo_badge": self.demo_badge,

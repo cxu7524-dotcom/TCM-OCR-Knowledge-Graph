@@ -57,6 +57,15 @@
   .chip.ok { background: rgba(46,94,90,.35); color: #cfe9df; border-color: rgba(160,220,200,.35); }
   .dot { width: 7px; height: 7px; border-radius: 50%; background: #8b7d6a; display: inline-block; margin-right: 6px; }
   .dot.on { background: #6fcf97; box-shadow: 0 0 6px #6fcf97; }
+  /* 对话首页入口：页头右侧的醒目链接 */
+  .home-link {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 12px; border-radius: 3px; font-size: 12.5px; font-weight: 600;
+    color: #fbeee6; text-decoration: none; letter-spacing: .5px;
+    background: var(--cinnabar); border: 1px solid rgba(255,190,160,.5);
+    box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: .16s; white-space: nowrap;
+  }
+  .home-link:hover { background: var(--cinnabar-dark); border-color: #ffd9c9; transform: translateY(-1px); }
 
   /* ============ 评测概览 ============ */
   .metrics { margin: 14px 24px 0; }
@@ -83,6 +92,25 @@
   .disclaimer-bar .mini-seal { font-family: var(--serif); border: 1.5px solid var(--cinnabar); color: var(--cinnabar); padding: 1px 5px; font-size: 13px; font-weight: 700; letter-spacing: 1px; transform: rotate(-4deg); }
   .disclaimer-bar b { font-weight: 700; letter-spacing: 1px; font-family: var(--serif); }
   .disclaimer-bar .grow { flex: 1 1 240px; }
+
+  /* ============ 智能问答首页入口横幅 ============ */
+  .home-banner {
+    margin: 14px 24px 0; padding: 16px 20px; border-radius: 3px;
+    background: linear-gradient(135deg, #fffaf0 0%, #f8f1e3 100%);
+    border: 1.5px solid var(--cinnabar); border-left: 5px solid var(--cinnabar);
+    box-shadow: var(--shadow-sm); display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+  }
+  .home-banner-inner { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex: 1; flex-wrap: wrap; }
+  .home-banner-text b { display: block; font-size: 15px; color: var(--cinnabar-dark); font-family: var(--serif); letter-spacing: 1px; margin-bottom: 4px; }
+  .home-banner-text span { font-size: 12.5px; color: var(--ink-soft); line-height: 1.6; }
+  .home-banner-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 10px 22px; border-radius: 3px; font-size: 13.5px; font-weight: 700;
+    color: #fff; text-decoration: none; letter-spacing: .5px; white-space: nowrap;
+    background: var(--cinnabar); border: 1px solid var(--cinnabar);
+    box-shadow: 0 2px 6px rgba(166,58,36,.3); transition: .16s;
+  }
+  .home-banner-btn:hover { background: var(--cinnabar-dark); border-color: var(--cinnabar-dark); transform: translateY(-1px); box-shadow: 0 4px 10px rgba(166,58,36,.4); }
 
   /* ============ 四卷书签式步骤导航 ============ */
   .steps { display: flex; gap: 10px; margin: 16px 24px 0; flex-wrap: wrap; }
@@ -307,6 +335,19 @@
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
   }
+
+  /* ============ 大屏（2K / 4K）观感与 1K 屏保持一致 ============ */
+  /* 流式布局在 2560px 的 2K 屏上会把卡片横向拉宽、留白变多，显得"稀"。
+     这里在宽屏下把内容宽度锁定为 1872px（≈ 1920 屏的可视宽度）并整体居中，
+     页面密度、栏宽、字号与 1K 屏完全一致；页眉背景仍通栏，只对齐内部内容。 */
+  @media (min-width: 1500px) {
+    .disclaimer-bar, .home-banner, .steps, main, .metrics, footer {
+      margin-inline: max(24px, calc((100% - 1872px) / 2));
+    }
+    header {
+      padding-inline: max(24px, calc((100% - 1872px) / 2));
+    }
+  }
 </style>
 </head>
 <body>
@@ -329,6 +370,17 @@
 <div class="disclaimer-bar">
   <b>仅供参考、非诊疗建议</b>
   <span class="grow" id="bannerText">本系统为赛事研发原型，所有内容不构成诊断、用药或治疗建议，不得用于临床决策。</span>
+</div>
+
+<!-- 智能问答首页入口横幅 -->
+<div class="home-banner">
+  <div class="home-banner-inner">
+    <div class="home-banner-text">
+      <b>🏠 想体验 AI 大模型智能问答？</b>
+      <span>前往全新对话界面：支持古籍页上传 + 与本地大模型自然对话，答案更流畅、可溯源。</span>
+    </div>
+    <a class="home-banner-btn" href="/home">进入智能问答首页 →</a>
+  </div>
 </div>
 
 <nav class="steps" aria-label="演示步骤">
@@ -561,7 +613,14 @@ async function init() {
     $("healthText").textContent = "服务正常";
     $("healthDot").classList.add("on");
     renderChips(m.questions || []);
-    loadPages();
+    await loadPages();
+    // 处理 URL 参数 ?page=PAGE_ID&step=N：自动切换页面并跳到指定步骤（step 可单独使用）
+    const params = new URLSearchParams(location.search);
+    const urlPage = params.get("page");
+    const rawStep = parseInt(params.get("step"), 10);
+    if (urlPage) switchPage(urlPage);
+    if (rawStep >= 1 && rawStep <= 4) goto(rawStep);
+    else if (urlPage) goto(2);
   } catch (e) {
     $("healthText").textContent = "服务未就绪";
     $("cfgChip").textContent = "无法读取配置";
@@ -1189,12 +1248,19 @@ async function ask(q) {
     }
     $("traceBox").textContent = (r.trace || []).join("\n") + "\n\n免责声明：" + r.disclaimer;
     const evs = r.evidences || [];
+    const srcs = r.sources || [];
     const objs = r.objects || [];
-    $("evHint").textContent = r.refused
+    const rt = r.retrieval || {};
+    const rtNote = rt.mode
+      ? " · 语义检索：命中 " + (rt.hits || 0) + " 段"
+        + (rt.top_score ? "，最高相似度 " + Number(rt.top_score).toFixed(2) : "")
+        + (rt.index && rt.index.vectors ? "，知识库 " + rt.index.vectors + " 段向量" : "")
+      : "";
+    $("evHint").textContent = (r.refused
       ? "已拒答（" + (r.refuse_reason || "") + "），无可用证据；不引用其他页，不做补答。仅供参考、非诊疗建议。"
       : (objs.length
           ? "共 " + objs.length + " 条关系、 " + evs.length + " 条证据（关系引文 + 主体引文），quote 已逐条回原文校验。"
-          : "共 " + evs.length + " 条证据，quote 已逐条回原文校验。");
+          : "共 " + (srcs.length || evs.length) + " 条出处，quote 已逐条回原文校验。")) + rtNote;
     // 图谱关系题的结论：每条都标明主体、关系方向与两处引文
     $("objList").innerHTML = objs.length ? (
       `<div class="obj-head">关系结论 · ${objs.length} 条（方向：主体 —关系→ 客体，均来自当前页原文）</div>` +
@@ -1213,7 +1279,17 @@ async function ask(q) {
       S.pendingHighlight = el.dataset.line;
       goto(2);
     });
-    $("evList").innerHTML = evs.length ? evs.map((e, i) => {
+    // 出处：优先展示语义检索命中的段落（书 / 页 / 行范围 / 相似度），
+    // 没有段落级出处时回退到逐条证据。
+    const srcCards = srcs.length ? srcs.map(s => {
+      const tag = s.cited ? "答案引用" : "备选出处";
+      return `<div class="ev-card" data-line="${esc(s.line_id)}" data-page="${esc(s.page_id)}" style="cursor:pointer" title="点击定位到步骤二的原文块">
+       <div class="q">[${s.index}] 「${esc(s.quote)}」<span class="ev-badge">${tag}</span></div>
+       <div class="loc">出处：《${esc(s.book)}》 ${esc(s.page_id)} · ${esc(s.line_span || s.line_id)}<br>
+       相似度: ${Number(s.score || 0).toFixed(2)} · bbox: ${esc(fmt(s.bbox))} · source_hash: ${esc(s.source_hash)}<br>
+       <span style="color:var(--ink)">点击此卡片可高亮对应原文块</span></div></div>`;
+    }).join("") : "";
+    const evCards = evs.map((e, i) => {
       const isGraph = e.channel === "graph";
       const role = e.role === "subject" ? "主体引文" : (isGraph ? "关系引文" : "文本证据");
       const badge = `<span class="ev-badge ${e.role === "subject" ? "subj" : (isGraph ? "rel" : "")}">${role}</span>`;
@@ -1222,8 +1298,9 @@ async function ask(q) {
        <div class="loc">page_id: ${esc(e.page_id)} · line_id: ${esc(e.line_id)} · bbox: ${esc(fmt(e.bbox))}<br>
        检索得分: ${esc(e.score)} · 通道: ${esc(e.channel)}${isGraph ? " · 角色: " + role : ""} · block_ref: ${esc(e.block_ref)}<br>
        source_hash: ${esc(e.source_hash)}<br><span style="color:var(--ink)">点击此卡片可高亮对应原文块</span></div></div>`;
-    }).join("")
-      : `<div class="empty">${r.refused ? "无依据，按约定拒答，不提供任何推断性内容。" : "暂无证据"}</div>`;
+    }).join("");
+    $("evList").innerHTML = (srcCards || evCards)
+      || `<div class="empty">${r.refused ? "无依据，按约定拒答，不提供任何推断性内容。" : "暂无证据"}</div>`;
     $("evList").querySelectorAll(".ev-card").forEach(el => el.onclick = () => {
       if (el.dataset.page !== S.pageId) switchPage(el.dataset.page);
       S.pendingHighlight = el.dataset.line;

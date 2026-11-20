@@ -70,9 +70,13 @@ from ocr.pipeline import new_page_id, run_demo, run_ocr                    # noq
 from ocr import table as table_mod                                         # noqa: E402
 from ocr.recognize import get_adapter, rec_model_name, resolve_rec_model   # noqa: E402
 from qa.disclaimer import DISCLAIMER, page_banner                          # noqa: E402
+from qa.disclaimer import out_of_scope_note, wrap                          # noqa: E402
 from qa.generate import answer as qa_answer                                # noqa: E402
 from qa.graph_qa import detect_intent, graph_answer as graph_qa_answer     # noqa: E402
 from qa.index import build_index                                           # noqa: E402
+from qa.index import kick_rebuild, rebuild_now                             # noqa: E402
+from qa.rag import rag_answer, rag_status                                  # noqa: E402
+from qa.refuse import is_out_of_scope                                      # noqa: E402
 
 logger = logging.getLogger("tcm.app")
 if not logger.handlers:
@@ -159,6 +163,12 @@ def _ingest(ocr: OCRResult) -> Dict[str, Any]:
     stat = store.save_page(ocr, entities, triples, unresolved=unresolved,
                            formula_extraction=formula_extraction)
     export_graph_json(graph)
+
+    # 新页面入库 → 语义索引后台增量重建（不阻塞本次请求）
+    try:
+        kick_rebuild()
+    except Exception:
+        pass
 
     _STATE.update({
         "page_id": ocr.page_id,
@@ -275,6 +285,12 @@ def index_page():
     return FileResponse(CONFIG.paths.web_dir / "index.html", media_type="text/html; charset=utf-8")
 
 
+@app.get("/home", include_in_schema=False)
+def home_page():
+    """简洁主页：古籍页上传 + AI 大模型对话。"""
+    return FileResponse(CONFIG.paths.web_dir / "home.html", media_type="text/html; charset=utf-8")
+
+
 CONFIG.paths.uploads_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=str(CONFIG.paths.uploads_dir)), name="uploads")
 app.mount("/static", StaticFiles(directory=str(CONFIG.paths.web_dir)), name="static")
@@ -283,6 +299,66 @@ app.mount("/static", StaticFiles(directory=str(CONFIG.paths.web_dir)), name="sta
 # ------------------------------------------------------------------
 # 元信息
 # ------------------------------------------------------------------
+
+@app.get("/api/llm")
+def llm_status():
+    """本机大模型（Ollama）状态探活，供主页展示「AI 助手是否就绪」。
+
+    只读探测，不触发推理；任一步失败都返回 enabled=False，前端据此提示。
+    """
+    import urllib.request
+
+    cfg = {
+        "backend": CONFIG.llm.backend,
+        "model": CONFIG.llm.model,
+        "enabled": CONFIG.llm.enabled,
+    }
+    if not CONFIG.llm.enabled:
+        return {**cfg, "reachable": False, "models": [],
+                "ready": False, "note": "本机 LLM 未启用（TCM_LLM_BACKEND 未设置为 ollama/vllm）"}
+
+    base = (CONFIG.llm.base_url or "").rstrip("/")
+    if base.endswith("/v1"):
+        tags_url = base[:-3] + "/api/tags"
+    else:
+        tags_url = base + "/api/tags"
+    try:
+        req = urllib.request.Request(tags_url, headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        models = [m.get("name", "") for m in data.get("models", [])]
+        target_ready = any((m == CONFIG.llm.model or m.startswith(CONFIG.llm.model + ":"))
+                           for m in models)
+        return {
+            **cfg, "reachable": True, "models": models,
+            "ready": target_ready,
+            "note": "AI 助手已就绪" if target_ready else
+                    f"可连接 Ollama，但模型 {CONFIG.llm.model} 尚未就绪（现有：{', '.join(models) or '无'}）",
+        }
+    except Exception as exc:
+        return {**cfg, "reachable": False, "models": [],
+                "ready": False,
+                "note": f"无法连接本机 Ollama：{type(exc).__name__}"}
+
+
+@app.get("/api/rag/status")
+def rag_state():
+    """知识库与语义索引状态：多少页 / 多少段 / 多少向量 / 模型 / 是否需重建。"""
+    try:
+        return rag_status()
+    except Exception as exc:
+        return {"enabled": False, "error": f"{type(exc).__name__}: {exc}"}
+
+
+@app.post("/api/rag/rebuild")
+def rag_rebuild(payload: Dict[str, Any] = Body(default={})):
+    """强制重建语义索引（同步）。语料大时请留足时间，前端应显示进度提示。"""
+    try:
+        force = bool((payload or {}).get("force", True))
+        return {"ok": True, "index": rebuild_now(force=force)}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"重建失败：{type(exc).__name__}: {exc}")
+
 
 @app.get("/api/health")
 def health():
@@ -714,12 +790,15 @@ def get_graph(page_id: Optional[str] = None):
 
 @app.post("/api/qa")
 def ask(payload: Dict[str, Any] = Body(default={})):
-    """可溯源问答。无证据 / 越界一律拒答，所有输出带免责声明。
+    """可溯源问答（阶段十一：语义 RAG 为主链路）。
 
-    入口分两路（阶段十）：
-      1. 图谱关系题（症状→药材 / 症状→方剂 / 药材→禁忌）：走 qa.graph_qa，
-         只引用当前页三元组，逐条校验出处与主体归属；
-      2. 其他题：沿用原有文本混合检索（qa.generate.answer），口径不变。
+    链路优先级：
+      0. 越界题（个人诊疗 / 剂量 / 疗效）→ 直接拒答，不检索不生成；
+      1. **RAG 主链路**：语义向量检索知识库 → 阈值过滤 → 专业提示词 → 本机大模型生成
+         → 解析 [编号] 回映射到 书/页/行/bbox，输出可点击的出处；
+         检索不到时按配置给「通用中医常识」回答并显式声明无原文依据；
+      2. 图谱关系题的结构化结果（qa.graph_qa）作为 objects 附带透出，不覆盖 RAG 答案；
+      3. RAG 不可用（未启用 / 索引缺失）时，回退到原有字面检索链路，口径不变。
     """
     payload = payload or {}
     question = str(payload.get("question") or payload.get("q") or "").strip()
@@ -737,15 +816,47 @@ def ask(payload: Dict[str, Any] = Body(default={})):
             disclaimer=DISCLAIMER, trace=["空问题直接拒答"],
             backend="stub", is_demo=flags["is_demo"],
         )
+    elif is_out_of_scope(question):
+        # 输出边界优先于一切检索：个人诊疗 / 剂量 / 疗效一律拒答
+        note = out_of_scope_note()
+        ans = Answer(
+            text=wrap(note, "refusal"), evidences=[], refused=True, refuse_reason=note,
+            disclaimer=DISCLAIMER,
+            trace=["命中越界规则（个人诊疗 / 疗效 / 用药剂量）→ 拒答，未进入检索与生成"],
+            backend="boundary", is_demo=flags["is_demo"],
+        )
     else:
         blocks = _blocks_for(page_id)
         entities, triples = _objects_for(page_id, blocks, is_demo=flags["is_demo"])
-        ans = graph_qa_answer(
+        graph_ans = graph_qa_answer(
             question, blocks, triples, entities=entities, page_id=page_id or "",
             is_demo=flags["is_demo"],
             page_exists=bool(page_id) and store.get_page(page_id) is not None,
             other_page_hits=_cross_page_hits(page_id, question) if page_id else 0,
         )
+        ans = graph_ans
+
+        # 只有在"没有指定当前页"或"当前页确实有文本"时才走全库 RAG；
+        # 请求一个不存在 / 空白的页时不做全库作答，避免答非所问。
+        if CONFIG.rag.enabled and (not page_id or bool(blocks)):
+            # 演示台选定了页 → 页内检索（出处只来自该页）；首页聊天 → 全库检索
+            scope = str(payload.get("scope") or ("page" if page_id else "library")).strip().lower()
+            history = payload.get("history")
+            if not isinstance(history, list):
+                history = None
+            rag_ans = rag_answer(question, history=history, page_id=page_id,
+                                 scope=scope, is_demo=flags["is_demo"])
+            has_ev = bool(rag_ans.sources or rag_ans.evidences)
+            # 页内模式：检索到该页原文才采纳（保住"页内无依据 → 正确拒答"的评测语义）；
+            # 全库模式：无依据也可用常识作答（rag-open，显式声明）
+            if not rag_ans.refused and (has_ev or scope == "library"):
+                # RAG 答案更完整：优先采用；图谱关系只作为结构化对象附带
+                if graph_ans is not None and graph_ans.objects:
+                    rag_ans.objects = list(graph_ans.objects)
+                    rag_ans.trace = list(rag_ans.trace) + ["已附带图谱关系结构化结果"]
+                ans = rag_ans
+            # RAG 拒答时不覆盖已有答案，留给下面的字面检索兜底
+
         if ans is None:
             index = _STATE["vector_index"] if page_id and page_id == _STATE["page_id"] else None
             ans = qa_answer(question, blocks, vector_index=index, is_demo=flags["is_demo"])

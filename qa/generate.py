@@ -27,6 +27,7 @@ from .disclaimer import DISCLAIMER, answer_disclaimer, out_of_scope_note, wrap
 from .index import VectorIndex
 from .refuse import NO_EVIDENCE_NOTE, should_refuse
 from .retrieve import hybrid_retrieve, retrieve_with_trace
+from . import llm_client
 
 
 def verify_evidences(evidences: List[Evidence],
@@ -107,17 +108,41 @@ def generate_answer(query: str, evidences: List[Evidence], blocks: List[Block],
                 backend=backend_name, is_demo=is_demo, objects=[],
             )
 
-        if CONFIG.llm.enabled:
-            trace.append("本机 LLM 已配置，但生成链路未实现；本阶段使用抽取式规则桩（不伪造模型输出）")
+        # 尝试用本机 LLM 生成自然语言回答（仅在有证据、未拒答时）。
+        # 模型不可用或输出不合规时，一律回退到抽取式原文摘录，不伪造输出。
+        llm_text = None
+        if CONFIG.llm.enabled and verified and not answer_text:
+            if llm_client.llm_available():
+                try:
+                    llm_text = llm_client.chat(query, verified)
+                    if llm_text:
+                        trace.append(f"本机 LLM 已生成答案（后端 {backend_name}，模型 {CONFIG.llm.model}）")
+                    else:
+                        trace.append("本机 LLM 返回为空，回退抽取式原文摘录")
+                except Exception as exc:
+                    trace.append(f"本机 LLM 生成异常，回退抽取式：{type(exc).__name__}")
+                    llm_text = None
+            else:
+                trace.append("本机 LLM 未启用，使用抽取式原文摘录")
+
+        if llm_text:
+            # LLM 输出需要再包一层免责声明，且仍保留全部证据供前端溯源。
+            final_text = wrap(llm_text)
+            trace.append("输出边界：已附免责声明；证据仍按 quote 回原文校验通过")
         else:
-            trace.append("生成后端 none：抽取式原文摘录，未调用任何模型")
+            if CONFIG.llm.enabled:
+                trace.append("生成后端 none：抽取式原文摘录（本机 LLM 未参与）")
+            else:
+                trace.append("生成后端 none：抽取式原文摘录，未调用任何模型")
+            final_text = answer_text or _extractive_text(query, verified)
+            trace.append("输出边界：仅原文摘录，未做推断；已附免责声明")
 
         return Answer(
-            text=answer_text or _extractive_text(query, verified),
+            text=final_text,
             evidences=verified,
             refused=False, refuse_reason="", disclaimer=DISCLAIMER,
-            trace=trace + ["输出边界：仅原文摘录，未做推断；已附免责声明"],
-            backend="stub" if not CONFIG.llm.enabled else f"{backend_name}(stub)",
+            trace=trace,
+            backend="stub" if not CONFIG.llm.enabled else backend_name,
             is_demo=is_demo, objects=list(objects or []),
         )
     except Exception as exc:

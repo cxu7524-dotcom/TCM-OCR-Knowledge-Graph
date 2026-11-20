@@ -51,6 +51,9 @@ data/samples/*.pdf
 data/samples/synthetic/pages/
 data/annotation/official/
 data/annotation/*.jsonl.tmp
+# 公开数据集标注表（11MB）与本机向量索引：可一条命令重下 / 重建，不进仓库
+data/annotation/official_label.csv
+data/store/vectors/
 
 # ---------- 备份与编辑器 ----------
 *.bak
@@ -68,6 +71,8 @@ data/reports/bbox_check/
 data/reports/guji_*.json
 data/reports/_ab_*.json
 data/reports/_probe_*.json
+# 页面截图含公开古籍画面，同样不进仓库
+data/screenshots/
 
 # 本地交付文件包含公开古籍画面
 /output/
