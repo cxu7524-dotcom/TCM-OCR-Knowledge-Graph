@@ -1,0 +1,839 @@
+[
+  {
+    "page_id": "EVAL3-思濟-page_33",
+    "candidates": [
+      {
+        "page_id": "EVAL3-思濟-page_33",
+        "name_status": "有名方",
+        "name": {
+          "normalized_range": [
+            210,
+            213
+          ],
+          "text_norm": "稀诞散",
+          "text": "稀诞散",
+          "sources": [
+            {
+              "block_ref": "EVAL3-思濟-page_33:R002",
+              "line_id": "R002",
+              "bbox": [
+                238,
+                217,
+                269,
+                327
+              ],
+              "normalized_range": [
+                210,
+                213
+              ],
+              "block_raw_range": [
+                0,
+                3
+              ],
+              "raw_range": [
+                210,
+                213
+              ],
+              "text": "稀诞散",
+              "mapping_precision": "exact"
+            }
+          ]
+        },
+        "start_cue": {
+          "normalized_range": [
+            210,
+            213
+          ],
+          "text_norm": "稀诞散",
+          "text": "稀诞散",
+          "sources": [
+            {
+              "block_ref": "EVAL3-思濟-page_33:R002",
+              "line_id": "R002",
+              "bbox": [
+                238,
+                217,
+                269,
+                327
+              ],
+              "normalized_range": [
+                210,
+                213
+              ],
+              "block_raw_range": [
+                0,
+                3
+              ],
+              "raw_range": [
+                210,
+                213
+              ],
+              "text": "稀诞散",
+              "mapping_precision": "exact"
+            }
+          ]
+        },
+        "composition": {
+          "normalized_range": [
+            213,
+            220
+          ],
+          "text_norm": "白礬生用牙皂角",
+          "text": "白礬生用牙皂角",
+          "sources": [
+            {
+              "block_ref": "EVAL3-思濟-page_33:R015",
+              "line_id": "R015",
+              "bbox": [
+                186,
+                242,
+                228,
+                495
+              ],
+              "normalized_range": [
+                213,
+                220
+              ],
+              "block_raw_range": [
+                0,
+                7
+              ],
+              "raw_range": [
+                213,
+                220
+              ],
+              "text": "白礬生用牙皂角",
+              "mapping_precision": "exact"
+            }
+          ]
+        },
+        "passage": {
+          "normalized_range": [
+            210,
+            220
+          ],
+          "text_norm": "稀诞散白礬生用牙皂角",
+          "text": "稀诞散白礬生用牙皂角",
+          "sources": [
+            {
+              "block_ref": "EVAL3-思濟-page_33:R002",
+              "line_id": "R002",
+              "bbox": [
+                238,
+                217,
+                269,
+                327
+              ],
+              "normalized_range": [
+                210,
+                213
+              ],
+              "block_raw_range": [
+                0,
+                3
+              ],
+              "raw_range": [
+                210,
+                213
+              ],
+              "text": "稀诞散",
+              "mapping_precision": "exact"
+            },
+            {
+              "block_ref": "EVAL3-思濟-page_33:R015",
+              "line_id": "R015",
+              "bbox": [
+                186,
+                242,
+                228,
+                495
+              ],
+              "normalized_range": [
+                213,
+                220
+              ],
+              "block_raw_range": [
+                0,
+                7
+              ],
+              "raw_range": [
+                213,
+                220
+              ],
+              "text": "白礬生用牙皂角",
+              "mapping_precision": "exact"
+            }
+          ]
+        },
+        "continuation": "未见续页迹象",
+        "end_reason": "制法服法"
+      }
+    ],
+    "continuation_hints": [
+      {
+        "status": "可能续页",
+        "reason": "页首有配伍文字但没有本页起方",
+        "passage": {
+          "normalized_range": [
+            5,
+            44
+          ],
+          "text_norm": "朴硝連翹去心，甘草各一钱川大黄汇強半薄荷叶入分荆芥穗自术社炒柜子仁各五务生墓一",
+          "text": "朴硝連翹去心，甘草各一錢川大黄汇強半薄荷葉入分荆芥穗自术社炒柜子仁各五务生墓一",
+          "sources": [
+            {
+              "block_ref": "EVAL3-思濟-page_33:R018",
+              "line_id": "R018",
+              "bbox": [
+                947,
+                236,
+                993,
+                711
+              ],
+              "normalized_range": [
+                5,
+                17
+              ],
+              "block_raw_range": [
+                0,
+                12
+              ],
+              "raw_range": [
+                5,
+                17
+              ],
+              "text": "朴硝連翹去心，甘草各一錢",
+              "mapping_precision": "aligned"
+            },
+            {
+              "block_ref": "EVAL3-思濟-page_33:R012",
+              "line_id": "R012",
+              "bbox": [
+                889,
+                232,
+                947,
+                663
+              ],
+              "normalized_range": [
+                17,
+                31
+              ],
+              "block_raw_range": [
+                0,
+                14
+              ],
+              "raw_range": [
+                17,
+                31
+              ],
+              "text": "川大黄汇強半薄荷葉入分荆芥穗",
+              "mapping_precision": "aligned"
+            },
+            {
+              "block_ref": "EVAL3-思濟-page_33:R011",
+              "line_id": "R011",
+              "bbox": [
+                846,
+                235,
+                899,
+                687
+              ],
+              "normalized_range": [
+                31,
+                44
+              ],
+              "block_raw_range": [
+                0,
+                13
+              ],
+              "raw_range": [
+                31,
+                44
+              ],
+              "text": "自术社炒柜子仁各五务生墓一",
+              "mapping_precision": "exact"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "page_id": "EVAL3-专项-page_35",
+    "candidates": [
+      {
+        "page_id": "EVAL3-专项-page_35",
+        "name_status": "有名方",
+        "name": {
+          "normalized_range": [
+            40,
+            43
+          ],
+          "text_norm": "三化汤",
+          "text": "三化湯",
+          "sources": [
+            {
+              "block_ref": "EVAL3-专项-page_35:R003",
+              "line_id": "R003",
+              "bbox": [
+                801,
+                212,
+                836,
+                303
+              ],
+              "normalized_range": [
+                40,
+                43
+              ],
+              "block_raw_range": [
+                0,
+                3
+              ],
+              "raw_range": [
+                40,
+                43
+              ],
+              "text": "三化湯",
+              "mapping_precision": "aligned"
+            }
+          ]
+        },
+        "start_cue": {
+          "normalized_range": [
+            40,
+            43
+          ],
+          "text_norm": "三化汤",
+          "text": "三化湯",
+          "sources": [
+            {
+              "block_ref": "EVAL3-专项-page_35:R003",
+              "line_id": "R003",
+              "bbox": [
+                801,
+                212,
+                836,
+                303
+              ],
+              "normalized_range": [
+                40,
+                43
+              ],
+              "block_raw_range": [
+                0,
+                3
+              ],
+              "raw_range": [
+                40,
+                43
+              ],
+              "text": "三化湯",
+              "mapping_precision": "aligned"
+            }
+          ]
+        },
+        "composition": {
+          "normalized_range": [
+            78,
+            95
+          ],
+          "text_norm": "羌活枳实厚朴川大黄洛三钱芒硝一钱牛",
+          "text": "羌活枳實厚朴川大黄洛三錢芒硝一錢牛",
+          "sources": [
+            {
+              "block_ref": "EVAL3-专项-page_35:R014",
+              "line_id": "R014",
+              "bbox": [
+                652,
+                241,
+                686,
+                628
+              ],
+              "normalized_range": [
+                78,
+                84
+              ],
+              "block_raw_range": [
+                0,
+                6
+              ],
+              "raw_range": [
+                78,
+                84
+              ],
+              "text": "羌活枳實厚朴",
+              "mapping_precision": "aligned"
+            },
+            {
+              "block_ref": "EVAL3-专项-page_35:R013",
+              "line_id": "R013",
+              "bbox": [
+                603,
+                236,
+                645,
+                552
+              ],
+              "normalized_range": [
+                84,
+                95
+              ],
+              "block_raw_range": [
+                0,
+                11
+              ],
+              "raw_range": [
+                84,
+                95
+              ],
+              "text": "川大黄洛三錢芒硝一錢牛",
+              "mapping_precision": "aligned"
+            }
+          ]
+        },
+        "passage": {
+          "normalized_range": [
+            40,
+            95
+          ],
+          "text_norm": "三化汤治中风不省人事痰延壅盛胸膈不寬饮食不不大便不通小水赤脉來沉滑有力者服之羌活枳实厚朴川大黄洛三钱芒硝一钱牛",
+          "text": "三化湯治中風不省人事痰延壅盛胸膈不寬飲食不不大便不通小水赤脉來沉滑有力者服之羌活枳實厚朴川大黄洛三錢芒硝一錢牛",
+          "sources": [
+            {
+              "block_ref": "EVAL3-专项-page_35:R003",
+              "line_id": "R003",
+              "bbox": [
+                801,
+                212,
+                836,
+                303
+              ],
+              "normalized_range": [
+                40,
+                43
+              ],
+              "block_raw_range": [
+                0,
+                3
+              ],
+              "raw_range": [
+                40,
+                43
+              ],
+              "text": "三化湯",
+              "mapping_precision": "aligned"
+            },
+            {
+              "block_ref": "EVAL3-专项-page_35:R016",
+              "line_id": "R016",
+              "bbox": [
+                747,
+                239,
+                788,
+                735
+              ],
+              "normalized_range": [
+                43,
+                61
+              ],
+              "block_raw_range": [
+                0,
+                18
+              ],
+              "raw_range": [
+                43,
+                61
+              ],
+              "text": "治中風不省人事痰延壅盛胸膈不寬飲食不",
+              "mapping_precision": "aligned"
+            },
+            {
+              "block_ref": "EVAL3-专项-page_35:R015",
+              "line_id": "R015",
+              "bbox": [
+                698,
+                240,
+                739,
+                732
+              ],
+              "normalized_range": [
+                61,
+                78
+              ],
+              "block_raw_range": [
+                0,
+                17
+              ],
+              "raw_range": [
+                61,
+                78
+              ],
+              "text": "不大便不通小水赤脉來沉滑有力者服之",
+              "mapping_precision": "exact"
+            },
+            {
+              "block_ref": "EVAL3-专项-page_35:R014",
+              "line_id": "R014",
+              "bbox": [
+                652,
+                241,
+                686,
+                628
+              ],
+              "normalized_range": [
+                78,
+                84
+              ],
+              "block_raw_range": [
+                0,
+                6
+              ],
+              "raw_range": [
+                78,
+                84
+              ],
+              "text": "羌活枳實厚朴",
+              "mapping_precision": "aligned"
+            },
+            {
+              "block_ref": "EVAL3-专项-page_35:R013",
+              "line_id": "R013",
+              "bbox": [
+                603,
+                236,
+                645,
+                552
+              ],
+              "normalized_range": [
+                84,
+                95
+              ],
+              "block_raw_range": [
+                0,
+                11
+              ],
+              "raw_range": [
+                84,
+                95
+              ],
+              "text": "川大黄洛三錢芒硝一錢牛",
+              "mapping_precision": "aligned"
+            }
+          ]
+        },
+        "continuation": "未见续页迹象",
+        "end_reason": "制法服法"
+      },
+      {
+        "page_id": "EVAL3-专项-page_35",
+        "name_status": "有名方",
+        "name": {
+          "normalized_range": [
+            144,
+            148
+          ],
+          "text_norm": "六君子汤",
+          "text": "六君子湯",
+          "sources": [
+            {
+              "block_ref": "EVAL3-专项-page_35:R002",
+              "line_id": "R002",
+              "bbox": [
+                333,
+                216,
+                369,
+                350
+              ],
+              "normalized_range": [
+                144,
+                148
+              ],
+              "block_raw_range": [
+                0,
+                4
+              ],
+              "raw_range": [
+                144,
+                148
+              ],
+              "text": "六君子湯",
+              "mapping_precision": "aligned"
+            }
+          ]
+        },
+        "start_cue": {
+          "normalized_range": [
+            144,
+            148
+          ],
+          "text_norm": "六君子汤",
+          "text": "六君子湯",
+          "sources": [
+            {
+              "block_ref": "EVAL3-专项-page_35:R002",
+              "line_id": "R002",
+              "bbox": [
+                333,
+                216,
+                369,
+                350
+              ],
+              "normalized_range": [
+                144,
+                148
+              ],
+              "block_raw_range": [
+                0,
+                4
+              ],
+              "raw_range": [
+                144,
+                148
+              ],
+              "text": "六君子湯",
+              "mapping_precision": "aligned"
+            }
+          ]
+        },
+        "composition": {
+          "normalized_range": [
+            189,
+            212
+          ],
+          "text_norm": "人参上白术城黄正白芬甘草天广皮V心甘装半夏各钱",
+          "text": "人参上白术城黄正白芬甘草天廣皮V心甘装半夏各錢",
+          "sources": [
+            {
+              "block_ref": "EVAL3-专项-page_35:R006",
+              "line_id": "R006",
+              "bbox": [
+                122,
+                238,
+                189,
+                724
+              ],
+              "normalized_range": [
+                189,
+                199
+              ],
+              "block_raw_range": [
+                0,
+                10
+              ],
+              "raw_range": [
+                189,
+                199
+              ],
+              "text": "人参上白术城黄正白芬",
+              "mapping_precision": "exact"
+            },
+            {
+              "block_ref": "EVAL3-专项-page_35:R005",
+              "line_id": "R005",
+              "bbox": [
+                80,
+                242,
+                131,
+                741
+              ],
+              "normalized_range": [
+                199,
+                212
+              ],
+              "block_raw_range": [
+                0,
+                13
+              ],
+              "raw_range": [
+                199,
+                212
+              ],
+              "text": "甘草天廣皮V心甘装半夏各錢",
+              "mapping_precision": "aligned"
+            }
+          ]
+        },
+        "passage": {
+          "normalized_range": [
+            144,
+            212
+          ],
+          "text_norm": "六君子汤治面目萎黄或光白色气少言微四肢无力饮食難化吐泻等证脉必濡弱微而无力者服之无有不效顺人参上白术城黄正白芬甘草天广皮V心甘装半夏各钱",
+          "text": "六君子湯治面目萎黄或光白色氣少言微四肢無力飲食難化吐瀉等證脉必濡弱微而無力者服之無有不效顺人参上白术城黄正白芬甘草天廣皮V心甘装半夏各錢",
+          "sources": [
+            {
+              "block_ref": "EVAL3-专项-page_35:R002",
+              "line_id": "R002",
+              "bbox": [
+                333,
+                216,
+                369,
+                350
+              ],
+              "normalized_range": [
+                144,
+                148
+              ],
+              "block_raw_range": [
+                0,
+                4
+              ],
+              "raw_range": [
+                144,
+                148
+              ],
+              "text": "六君子湯",
+              "mapping_precision": "aligned"
+            },
+            {
+              "block_ref": "EVAL3-专项-page_35:R009",
+              "line_id": "R009",
+              "bbox": [
+                284,
+                241,
+                319,
+                739
+              ],
+              "normalized_range": [
+                148,
+                166
+              ],
+              "block_raw_range": [
+                0,
+                18
+              ],
+              "raw_range": [
+                148,
+                166
+              ],
+              "text": "治面目萎黄或光白色氣少言微四肢無力飲",
+              "mapping_precision": "aligned"
+            },
+            {
+              "block_ref": "EVAL3-专项-page_35:R008",
+              "line_id": "R008",
+              "bbox": [
+                234,
+                241,
+                269,
+                735
+              ],
+              "normalized_range": [
+                166,
+                184
+              ],
+              "block_raw_range": [
+                0,
+                18
+              ],
+              "raw_range": [
+                166,
+                184
+              ],
+              "text": "食難化吐瀉等證脉必濡弱微而無力者服之",
+              "mapping_precision": "aligned"
+            },
+            {
+              "block_ref": "EVAL3-专项-page_35:R007",
+              "line_id": "R007",
+              "bbox": [
+                184,
+                241,
+                220,
+                358
+              ],
+              "normalized_range": [
+                184,
+                188
+              ],
+              "block_raw_range": [
+                0,
+                4
+              ],
+              "raw_range": [
+                184,
+                188
+              ],
+              "text": "無有不效",
+              "mapping_precision": "aligned"
+            },
+            {
+              "block_ref": "EVAL3-专项-page_35:R026",
+              "line_id": "R026",
+              "bbox": [
+                194,
+                571,
+                216,
+                607
+              ],
+              "normalized_range": [
+                188,
+                189
+              ],
+              "block_raw_range": [
+                0,
+                1
+              ],
+              "raw_range": [
+                188,
+                189
+              ],
+              "text": "顺",
+              "mapping_precision": "exact"
+            },
+            {
+              "block_ref": "EVAL3-专项-page_35:R006",
+              "line_id": "R006",
+              "bbox": [
+                122,
+                238,
+                189,
+                724
+              ],
+              "normalized_range": [
+                189,
+                199
+              ],
+              "block_raw_range": [
+                0,
+                10
+              ],
+              "raw_range": [
+                189,
+                199
+              ],
+              "text": "人参上白术城黄正白芬",
+              "mapping_precision": "exact"
+            },
+            {
+              "block_ref": "EVAL3-专项-page_35:R005",
+              "line_id": "R005",
+              "bbox": [
+                80,
+                242,
+                131,
+                741
+              ],
+              "normalized_range": [
+                199,
+                212
+              ],
+              "block_raw_range": [
+                0,
+                13
+              ],
+              "raw_range": [
+                199,
+                212
+              ],
+              "text": "甘草天廣皮V心甘装半夏各錢",
+              "mapping_precision": "aligned"
+            }
+          ]
+        },
+        "continuation": "未见续页迹象",
+        "end_reason": "制法服法"
+      }
+    ],
+    "continuation_hints": []
+  }
+]

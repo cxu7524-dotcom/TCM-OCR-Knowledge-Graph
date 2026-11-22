@@ -26,6 +26,8 @@ from __future__ import annotations
 import argparse
 import json
 import sqlite3
+import threading
+from functools import wraps
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -37,6 +39,15 @@ from .schemas import (
 )
 
 PATHS = CONFIG.paths
+_PAGE_LOCK = threading.RLock()
+
+
+def _page_locked(fn):
+    @wraps(fn)
+    def wrapped(*args, **kwargs):
+        with _PAGE_LOCK:
+            return fn(*args, **kwargs)
+    return wrapped
 
 
 def _now() -> str:
@@ -215,6 +226,11 @@ def init_db() -> str:
         _ensure_column(conn, "blocks", "evidence_status", "TEXT DEFAULT ''")
         _ensure_column(conn, "blocks", "parent_block_ref", "TEXT DEFAULT ''")
         _ensure_column(conn, "blocks", "evidence_engine", "TEXT DEFAULT ''")
+        _ensure_column(conn, "entities", "llm_metadata", "TEXT DEFAULT ''")
+        _ensure_column(conn, "triples", "llm_metadata", "TEXT DEFAULT ''")
+        _ensure_column(conn, "unresolved", "llm_metadata", "TEXT DEFAULT ''")
+        _ensure_column(conn, "pages", "extraction_meta", "TEXT DEFAULT ''")
+        _ensure_column(conn, "pages", "ocr_payload", "TEXT DEFAULT ''")
         conn.commit()
     finally:
         conn.close()
@@ -235,6 +251,9 @@ def _bbox_json(value: Any) -> str:
 
 AUDIT_FIELDS = ("page_id", "line_id", "relation", "tail", "reason",
                 "bbox", "quote", "source_hash", "reading_order")
+AUDIT_EXTRA_FIELDS = ("block_ref", "entry_id", "evidence", "candidate_entry_ids", "candidate_anchor",
+                      "subject", "subject_evidence", "object_evidence", "anchor_evidence", "qualifier", "condition_evidence",
+                      "scope_evidence", "reason_detail")
 
 
 def _norm_audit(record: Any, page_id: str) -> Dict[str, Any]:
@@ -251,9 +270,13 @@ def _norm_audit(record: Any, page_id: str) -> Dict[str, Any]:
     for key in ("line_id", "relation", "tail", "reason", "quote", "source_hash"):
         out[key] = str(out.get(key) or "")
     out["reading_order"] = int(out.get("reading_order") or 0)
+    for key in AUDIT_EXTRA_FIELDS:
+        if key in u:
+            out[key] = u[key]
     return out
 
 
+@_page_locked
 def save_page(
     ocr: OCRResult,
     entities: Optional[List[Entity]] = None,
@@ -261,6 +284,7 @@ def save_page(
     run_id: Optional[str] = None,
     unresolved: Optional[List[Dict[str, Any]]] = None,
     formula_extraction: Optional[Dict[str, Any]] = None,
+    extraction_meta: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """一个事务内写入 page / blocks / entities / triples，并返回写入统计。
 
@@ -290,6 +314,13 @@ def save_page(
              int(ocr.model_loaded), int(ocr.is_demo), sh, rid, _now()))
         stat["skipped"] += 1 if cur.rowcount == 0 else 0
 
+        if extraction_meta is not None:
+            conn.execute("UPDATE pages SET image_path=?,width=?,height=?,engine=?,model_loaded=?,is_demo=?,source_hash=?,run_id=?,extraction_meta=?,ocr_payload=? WHERE page_id=?",
+                         (ocr.image_path, ocr.width, ocr.height, ocr.engine, int(ocr.model_loaded), int(ocr.is_demo), sh, rid,
+                          json.dumps(extraction_meta, ensure_ascii=False), json.dumps(ocr.to_dict(), ensure_ascii=False), ocr.page_id))
+            for table in ("blocks", "entities", "triples"):
+                conn.execute(f"DELETE FROM {table} WHERE page_id=?", (ocr.page_id,))
+
         # 子框证据与开关状态同步替换；不触碰原 OCR 块或其他页面。
         conn.execute("DELETE FROM blocks WHERE page_id=? AND kind=?", (ocr.page_id, "small_column_evidence"))
         for b in ocr.blocks:
@@ -304,24 +335,30 @@ def save_page(
 
         for e in entities:
             # 唯一键只由「页 + 内容」决定，与批次 / 来源指纹无关，重复跑不膨胀
-            fp = source_hash_of("entity", ocr.page_id, e.name, e.type, e.value, e.quote)
+            fp = (source_hash_of("entity-llm", ocr.page_id, e.entry_id, e.name, e.type, e.value)
+                  if e.entry_id else source_hash_of("entity", ocr.page_id, e.name, e.type, e.value, e.quote))
             cur = conn.execute(
                 "INSERT OR IGNORE INTO entities"
-                "(page_id,name,etype,value,block_ref,bbox,line_id,quote,source_hash,extractor,is_demo,run_id,fingerprint)"
-                " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "(page_id,name,etype,value,block_ref,bbox,line_id,quote,source_hash,extractor,is_demo,run_id,fingerprint,llm_metadata)"
+                " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (ocr.page_id, e.name, e.type, e.value, e.block_ref, _bbox_json(e.bbox),
-                 e.line_id, e.quote, e.source_hash, e.extractor, int(e.is_demo), rid, fp))
+                 e.line_id, e.quote, e.source_hash, e.extractor, int(e.is_demo), rid, fp,
+                 json.dumps({"entry_id": e.entry_id, "evidence": e.evidence}, ensure_ascii=False)))
             stat["entities"] += cur.rowcount
 
         for t in triples:
-            fp = source_hash_of("triple", ocr.page_id, t.head, t.relation, t.tail)
+            fp = (source_hash_of("triple-llm", ocr.page_id, t.entry_id, t.head, t.relation, t.tail, t.qualifier)
+                  if t.entry_id else source_hash_of("triple", ocr.page_id, t.head, t.relation, t.tail))
             cur = conn.execute(
                 "INSERT OR IGNORE INTO triples"
-                "(page_id,head,relation,tail,evidence_refs,bbox,line_id,quote,source_hash,is_demo,run_id,fingerprint)"
-                " VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                "(page_id,head,relation,tail,evidence_refs,bbox,line_id,quote,source_hash,is_demo,run_id,fingerprint,llm_metadata)"
+                " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (ocr.page_id, t.head, t.relation, t.tail,
                  json.dumps(t.evidence_refs, ensure_ascii=False), _bbox_json(t.bbox),
-                 t.line_id, t.quote, t.source_hash, int(t.is_demo), rid, fp))
+                 t.line_id, t.quote, t.source_hash, int(t.is_demo), rid, fp,
+                 json.dumps({"entry_id": t.entry_id, "qualifier": t.qualifier,
+                             "subject_evidence": t.subject_evidence, "relation_evidence": t.relation_evidence,
+                             "condition_evidence": t.condition_evidence}, ensure_ascii=False)))
             stat["triples"] += cur.rowcount
 
         if unresolved is not None:
@@ -331,16 +368,19 @@ def save_page(
                 line_id = str(u.get("line_id") or "")
                 relation = str(u.get("relation") or "")
                 tail = str(u.get("tail") or "")
-                fp = source_hash_of("unresolved", ocr.page_id, line_id, relation, tail)
+                metadata = {key: u[key] for key in AUDIT_EXTRA_FIELDS if key in u}
+                fp = (source_hash_of("unresolved-llm", ocr.page_id, line_id, relation, tail,
+                                     str(u.get("reason") or ""), json.dumps(metadata, ensure_ascii=False, sort_keys=True))
+                      if metadata else source_hash_of("unresolved", ocr.page_id, line_id, relation, tail))
                 cur = conn.execute(
                     "INSERT OR IGNORE INTO unresolved"
                     "(page_id,line_id,relation,tail,reason,bbox,quote,source_hash,"
-                    "reading_order,run_id,created_at,fingerprint)"
-                    " VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                    "reading_order,run_id,created_at,fingerprint,llm_metadata)"
+                    " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     (ocr.page_id, line_id, relation, tail, str(u.get("reason") or ""),
                      _bbox_json(u.get("bbox")), str(u.get("quote") or ""),
                      str(u.get("source_hash") or ""), int(u.get("reading_order") or 0),
-                     rid, _now(), fp))
+                     rid, _now(), fp, json.dumps(metadata, ensure_ascii=False)))
                 stat["unresolved"] += cur.rowcount
 
         if formula_extraction is not None:
@@ -363,15 +403,21 @@ def save_page(
         "is_demo": ocr.is_demo,
         "note": CONFIG.demo_badge if ocr.is_demo else "本地 OCR 真实识别（非命题单位样本）",
     }
+    if extraction_meta is not None:
+        snapshot["extraction"] = extraction_meta
     if formula_extraction is not None:
         snapshot["formula_extraction"] = formula_extraction
     else:
         previous = get_formula_extraction(ocr.page_id)
         if previous is not None:
             snapshot["formula_extraction"] = previous
-    (PATHS.store_dir / "pages").mkdir(parents=True, exist_ok=True)
-    (PATHS.store_dir / "pages" / f"{ocr.page_id}.json").write_text(
-        json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8")
+    try:
+        (PATHS.store_dir / "pages").mkdir(parents=True, exist_ok=True)
+        (PATHS.store_dir / "pages" / f"{ocr.page_id}.json").write_text(
+            json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8")
+    except OSError:
+        if extraction_meta is None:
+            raise
     return stat
 
 
@@ -410,9 +456,46 @@ def list_pages() -> List[Dict[str, Any]]:
         conn.close()
 
 
+@_page_locked
 def get_page(page_id: str) -> Optional[Dict[str, Any]]:
     """优先读 JSON 快照（结构完整），缺失时回退 SQLite 页面表。"""
     init_db()
+    conn = connect()
+    try:
+        conn.execute("BEGIN")
+        managed = conn.execute("SELECT extraction_meta,ocr_payload,is_demo FROM pages WHERE page_id=?", (page_id,)).fetchone()
+        if managed and managed["extraction_meta"]:
+            entities = []
+            for row in conn.execute("SELECT * FROM entities WHERE page_id=? ORDER BY id", (page_id,)):
+                data = dict(row)
+                data.update(json.loads(data.get("llm_metadata") or "{}"))
+                data["bbox"] = json.loads(data.get("bbox") or "[0,0,0,0]")
+                data["type"] = data.pop("etype", "")
+                data["is_demo"] = bool(data.get("is_demo", 1))
+                entities.append(Entity.from_dict(data).to_dict())
+            triples = []
+            for row in conn.execute("SELECT * FROM triples WHERE page_id=? ORDER BY id", (page_id,)):
+                data = dict(row)
+                data.update(json.loads(data.get("llm_metadata") or "{}"))
+                data["bbox"] = json.loads(data.get("bbox") or "[0,0,0,0]")
+                data["evidence_refs"] = json.loads(data.get("evidence_refs") or "[]")
+                data["is_demo"] = bool(data.get("is_demo", 1))
+                triples.append(Triple.from_dict(data).to_dict())
+            unresolved = []
+            for row in conn.execute("SELECT * FROM unresolved WHERE page_id=? ORDER BY reading_order,id", (page_id,)):
+                data = dict(row)
+                data.update(json.loads(data.get("llm_metadata") or "{}"))
+                data["bbox"] = json.loads(data.get("bbox") or "[0,0,0,0]")
+                unresolved.append(_norm_audit(data, page_id))
+            formula = conn.execute("SELECT payload FROM formula_extractions WHERE page_id=?", (page_id,)).fetchone()
+            return {"page": json.loads(managed["ocr_payload"]), "extraction": json.loads(managed["extraction_meta"]),
+                    "entities": entities, "triples": triples, "unresolved": unresolved,
+                    "formula_extraction": json.loads(formula[0]) if formula else None,
+                    "is_demo": bool(managed["is_demo"])}
+    except (TypeError, ValueError):
+        return None
+    finally:
+        conn.close()
     snap = PATHS.store_dir / "pages" / f"{page_id}.json"
     if snap.exists():
         try:
@@ -490,6 +573,10 @@ def get_triples(page_id: Optional[str] = None) -> List[Triple]:
         for r in rows:
             d = dict(r)
             try:
+                d.update(json.loads(d.get("llm_metadata") or "{}"))
+            except (json.JSONDecodeError, TypeError, ValueError):
+                pass
+            try:
                 d["evidence_refs"] = json.loads(d.get("evidence_refs") or "[]")
                 d["bbox"] = json.loads(d.get("bbox") or "[0,0,0,0]")
             except json.JSONDecodeError:
@@ -511,6 +598,10 @@ def get_entities(page_id: str) -> List[Entity]:
         out: List[Entity] = []
         for r in rows:
             d = dict(r)
+            try:
+                d.update(json.loads(d.get("llm_metadata") or "{}"))
+            except (json.JSONDecodeError, TypeError, ValueError):
+                pass
             try:
                 d["bbox"] = json.loads(d.get("bbox") or "[0,0,0,0]")
             except json.JSONDecodeError:
@@ -534,7 +625,7 @@ def get_unresolved(page_id: Optional[str] = None) -> List[Dict[str, Any]]:
     conn = connect()
     try:
         sql = ("SELECT page_id,line_id,relation,tail,reason,bbox,quote,source_hash,"
-               "reading_order FROM unresolved")
+               "reading_order,llm_metadata FROM unresolved")
         if page_id:
             sql += " WHERE page_id=?"
         sql += " ORDER BY reading_order, id"
@@ -542,6 +633,10 @@ def get_unresolved(page_id: Optional[str] = None) -> List[Dict[str, Any]]:
         out: List[Dict[str, Any]] = []
         for r in rows:
             d = dict(r)
+            try:
+                d.update(json.loads(d.get("llm_metadata") or "{}"))
+            except (json.JSONDecodeError, TypeError, ValueError):
+                pass
             try:
                 d["bbox"] = json.loads(d.get("bbox") or "[0,0,0,0]")
             except json.JSONDecodeError:

@@ -262,10 +262,13 @@ python eval/run_all.py --refresh
 | `TCM_OCR_CORRECT` | `1` | 字形纠错开关 |
 | `TCM_OCR_VERTICAL_SPLIT` | `1` | 竖排逐列处理开关 |
 | `TCM_OCR_PICK` | `auto` | 整页与逐列结果选择策略 |
-| `TCM_LLM_BACKEND` | `none` | 生成后端：`none` / `ollama` / `vllm`；本机演示用 `ollama` |
+| `TCM_LLM_BACKEND` | `none` | 生成后端：`none` / `ollama` / `vllm` / `cloud`；本机演示用 `ollama`，云端抽取用 `cloud` |
 | `TCM_LLM_MODEL` | `qwen2.5:7b` | 生成模型名 |
-| `TCM_LLM_BASE_URL` | `http://127.0.0.1:11434/v1` | 仅允许 127.0.0.1 / localhost，非本机地址直接禁用 |
+| `TCM_LLM_BASE_URL` | `http://127.0.0.1:11434/v1` | 本机后端仅允许 127.0.0.1 / localhost；`cloud` 后端要求 HTTPS 地址 |
 | `TCM_LLM_TIMEOUT` | `120` | 生成超时（秒）；7B 模型首次推理需加载权重，过短会误判为不可用 |
+| `TCM_LLM_RESPONSE_FORMAT` | `json_object` | 云端返回格式，可选 `json_schema`（调用 `chat_result` 时需同时提供 schema） |
+| `TCM_LLM_API_KEY` | 无 | 云端服务凭据，只从服务端环境变量读取，不写入仓库 |
+| `TCM_EXTRACT_BACKEND` | `auto` | 上传抽取后端：`auto` / `rules` / `cloud`；选 `cloud` 需同时把 `TCM_LLM_BACKEND` 设为 `cloud` |
 | `TCM_EMBED_BACKEND` | `local` | 向量后端：`local`（ONNX，默认）/ `ollama` / `none` |
 | `TCM_EMBED_MODEL` | `bge-small-zh-v1.5` | 向量模型名（写入索引 manifest，换模型自动重建） |
 | `TCM_EMBED_MODEL_DIR` | `模型权重/bge-small-zh-v1.5` | 本地向量模型目录 |
@@ -275,6 +278,37 @@ python eval/run_all.py --refresh
 | `TCM_RAG_ANSWER_WITHOUT_EVIDENCE` | `1` | 无原文依据时是否用通用常识作答并显式声明 |
 | `TCM_RAG_TOP_K` | `6` | 送给大模型的段落数上限 |
 | `TCM_VECTOR_ENABLED` | `0` | 旧哈希向量通道开关（非语义，仅自检用） |
+
+云端调用需在服务端进程环境中配置 `TCM_LLM_BASE_URL`（HTTPS，包含服务商要求的版本路径）、`TCM_LLM_MODEL` 和 `TCM_LLM_API_KEY`，凭据不落盘、不进仓库。云端抽取默认由 `TCM_EXTRACT_BACKEND=auto` 在 `TCM_LLM_BACKEND=cloud` 时启用，否则走规则；每页的抽取状态与提示词 / 协议版本会随页面 OCR 接口返回，调用失败时返回错误而不是静默降级。
+
+配置后可在仓库根目录做一次人工短样本联通检查（输出状态、错误类别与结构化内容，凭据自动脱敏）：
+
+```powershell
+@'
+import json
+import os
+from extract.llm_local import LocalLLMExtractor
+
+client = LocalLLMExtractor()
+schema = {"type": "object", "properties": {"entities": {"type": "array", "items": {"type": "string"}}}, "required": ["entities"], "additionalProperties": False}
+result = client.chat_result([{"role": "user", "content": "Return a JSON object with an entities array for: \u7518\u8349\u4e09\u94b1"}], schema)
+secret = os.environ.get("TCM_LLM_API_KEY", "")
+def redact(value):
+    return value.replace(secret, "[redacted]") if secret else value
+print(json.dumps({"model": redact(client.cfg.model), "status": result.status, "error": redact(result.error), "result": redact(result.content)}, ensure_ascii=False))
+'@ | .\.venv\Scripts\python.exe -
+```
+
+第 2 步六个人工短样本语义验证入口为 `tools/llm_extraction_six_cases.py`，每行输出一个 JSON 对象（输入、模型输出、预期、自动判定、模型与协议版本），自动判定仅供人工复核：
+
+```powershell
+$env:TCM_LLM_BACKEND = 'cloud'
+$env:TCM_LLM_BASE_URL = 'https://www.autodl.art/api/v1'
+$env:TCM_LLM_MODEL = 'DeepSeek-V4.1-Flash-1017'
+$env:TCM_LLM_RESPONSE_FORMAT = 'json_object'
+$env:TCM_LLM_MAX_TOKENS = '4096'
+.\.venv\Scripts\python.exe tools/llm_extraction_six_cases.py
+```
 
 ## 项目结构
 

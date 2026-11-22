@@ -220,6 +220,8 @@ class Entity(Provenance):
     block_ref: str = ""
     extractor: str = "rules"       # rules | llm_local | stub
     is_demo: bool = True
+    entry_id: str = ""
+    evidence: List[Dict[str, Any]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if not self.quote:
@@ -251,6 +253,11 @@ class Triple(Provenance):
     evidence_refs: List[str] = field(default_factory=list)  # Block.block_ref / Evidence.quote
     subject_rule: str = ""         # same_line | carry | formula_scope
     is_demo: bool = True
+    entry_id: str = ""
+    qualifier: str = ""
+    subject_evidence: List[Dict[str, Any]] = field(default_factory=list)
+    relation_evidence: List[Dict[str, Any]] = field(default_factory=list)
+    condition_evidence: List[Dict[str, Any]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if not self.quote and self.evidence_refs:
@@ -274,6 +281,7 @@ class GraphNode(_Record):
     page_id: str = ""
     source_hash: str = ""
     is_demo: bool = True
+    entry_id: str = ""
 
 
 @dataclass
@@ -285,6 +293,11 @@ class GraphEdge(_Record):
     page_id: str = ""
     source_hash: str = ""
     is_demo: bool = True
+    entry_id: str = ""
+    qualifier: str = ""
+    subject_evidence: List[Dict[str, Any]] = field(default_factory=list)
+    relation_evidence: List[Dict[str, Any]] = field(default_factory=list)
+    condition_evidence: List[Dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -308,10 +321,13 @@ class GraphData(_Record):
     def to_vis_payload(self) -> Dict[str, Any]:
         """输出 {nodes:[{id,label,type,value}], links:[{source,target,relation}]}。"""
         return {
-            "nodes": [{"id": n.id, "label": n.label, "type": n.type, "value": n.weight}
+            "nodes": [{"id": n.id, "label": n.label, "type": n.type, "value": n.weight,
+                       **({"entry_id": n.entry_id} if n.entry_id else {})}
                       for n in self.nodes],
             "links": [{"source": e.source, "target": e.target, "relation": e.relation,
-                       "evidence_refs": e.evidence_refs} for e in self.edges],
+                       "evidence_refs": e.evidence_refs,
+                       **({"entry_id": e.entry_id, "qualifier": e.qualifier,
+                           "condition_evidence": e.condition_evidence} if e.entry_id else {})} for e in self.edges],
             "is_demo": self.is_demo,
             "stats": self.stats,
         }

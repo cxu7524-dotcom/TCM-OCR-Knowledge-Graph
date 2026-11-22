@@ -281,3 +281,50 @@ def extract_formula_candidates(blocks: Iterable[Block]) -> dict[str, Any]:
             hints.append({'status': '可能续页', 'reason': '页首有配伍文字但没有本页起方',
                           'passage': stream.source(a, b)})
     return {'page_id': stream.page_id, 'candidates': candidates, 'continuation_hints': hints}
+
+
+def extract_entry_scopes(blocks: Iterable[Block]) -> dict[str, Any]:
+    """返回可定位的页首续文与明确起方线索，供入图校验复用。"""
+    items = list(blocks)
+    result = extract_formula_candidates(items)
+    continuation = [h['passage'] for h in result['continuation_hints']
+                    if h.get('reason') == '页首有配伍文字但没有本页起方']
+    entries = [c['name'] for c in result['candidates'] if c.get('name')]
+    # 同一 OCR 块中的句末后明确标题，保留块内字符范围。
+    stream = _Stream(items)
+    starts = _starts(stream)
+    start_positions = [start['start'] for start in starts]
+    for start in starts:
+        if start.get('name_status') == '有名方':
+            entry = stream.source(start['start'], start['end'])
+            if entry not in entries:
+                entries.append(entry)
+    for part in stream.parts:
+        text = stream.norm[part['start']:part['end']]
+        for pos, name in _formula_hits(text):
+            if not pos or not re.search(r'[。；;]\s*$', text[:pos]):
+                continue
+            begin = part['start'] + pos
+            if not _composition(stream, begin + len(name), len(stream.norm), allow_single=True):
+                continue
+            entry = stream.source(begin, begin + len(name))
+            if entry not in entries:
+                entries.append(entry)
+            # 在先的明确起方已经确立正文范围，不能把该方的配伍当成页首续文。
+            has_prior_start = any(position < begin for position in start_positions)
+            start_positions.append(begin)
+            if has_prior_start:
+                continue
+            head = _composition(stream, 0, begin)
+            if not head or not stream.parts or head[0] > stream.parts[min(1, len(stream.parts) - 1)]['end']:
+                continue
+            continuation = [hint for hint in continuation if not any(
+                left['block_ref'] == right['block_ref']
+                and left['block_raw_range'][0] < right['block_raw_range'][1]
+                and right['block_raw_range'][0] < left['block_raw_range'][1]
+                for left in hint['sources'] for right in entry['sources'])]
+            continuation.append(stream.source(head[0], head[1]))
+    entry_passages = [{'title': candidate['name'], 'passage': candidate['passage']}
+                      for candidate in result['candidates'] if candidate.get('name')]
+    return {'continuation': continuation, 'entries': entries,
+            'entry_passages': entry_passages, 'segmentation_hints': result}

@@ -23,34 +23,39 @@ from collections import defaultdict
 from typing import Dict, Iterable, List, Tuple
 
 from app.schemas import (
-    Block, Entity, GraphData, GraphEdge, GraphNode, Triple,
+    Block, Entity, GraphData, GraphEdge, GraphNode, Triple, source_hash_of,
 )
 
 
 def dedup_triples(triples: Iterable[Triple]) -> List[Triple]:
     """按 (head, relation, tail) 去重，合并证据引用。"""
-    bucket: Dict[Tuple[str, str, str], Triple] = {}
+    bucket: Dict[tuple, Triple] = {}
     for t in triples:
         if not isinstance(t, Triple):
             continue
-        key = (t.head, t.relation, t.tail)
+        key = (t.head, t.relation, t.tail, t.entry_id, t.qualifier)
         if key not in bucket:
-            bucket[key] = Triple(**{**t.to_dict(), "evidence_refs": list(t.evidence_refs)})
+            bucket[key] = Triple(**t.to_dict())
         else:
             for ref in t.evidence_refs:
                 if ref not in bucket[key].evidence_refs:
                     bucket[key].evidence_refs.append(ref)
+            for field in ("subject_evidence", "relation_evidence", "condition_evidence"):
+                for item in getattr(t, field):
+                    if item not in getattr(bucket[key], field):
+                        getattr(bucket[key], field).append(item)
     return list(bucket.values())
 
 
 def find_conflicts(triples: Iterable[Triple]) -> List[Dict[str, str]]:
     """列出同一 (head, relation) 的多值冲突，只报告不裁决。"""
-    grouped: Dict[Tuple[str, str], set] = defaultdict(set)
+    grouped: Dict[tuple, set] = defaultdict(set)
     for t in triples:
         if isinstance(t, Triple):
-            grouped[(t.head, t.relation)].add(t.tail)
-    return [{"head": h, "relation": r, "tails": " / ".join(sorted(v))}
-            for (h, r), v in grouped.items() if len(v) > 1]
+            grouped[(t.head, t.relation, t.entry_id, t.qualifier)].add(t.tail)
+    return [{"head": h, "relation": r, "tails": " / ".join(sorted(v)),
+             **({"entry_id": entry, "qualifier": qualifier} if entry else {})}
+            for (h, r, entry, qualifier), v in grouped.items() if len(v) > 1]
 
 
 def build_triples(entities: Iterable[Entity], blocks: Iterable[Block] | None = None,
@@ -101,18 +106,23 @@ def build_graph(triples: Iterable[Triple],
             entity_demo.setdefault(e.name, bool(e.is_demo))
 
     for t in triples:
+        node_ids = {}
         for name in (t.head, t.tail):
-            if name not in nodes:
-                nodes[name] = GraphNode(
-                    id=name, label=name, type=infer_node_type(name, entities),
+            node_id = "scoped-" + source_hash_of(t.entry_id, name) if t.entry_id else name
+            node_ids[name] = node_id
+            if node_id not in nodes:
+                nodes[node_id] = GraphNode(
+                    id=node_id, label=name, type=infer_node_type(name, entities), entry_id=t.entry_id,
                     page_id=t.page_id, source_hash=t.source_hash,
                     is_demo=bool(t.is_demo and entity_demo.get(name, t.is_demo)),
                 )
-            nodes[name].weight += 1
+            nodes[node_id].weight += 1
         edges.append(GraphEdge(
-            source=t.head, target=t.tail, relation=t.relation,
+            source=node_ids[t.head], target=node_ids[t.tail], relation=t.relation,
             evidence_refs=list(t.evidence_refs), page_id=t.page_id,
-            source_hash=t.source_hash, is_demo=bool(t.is_demo),
+            source_hash=t.source_hash, is_demo=bool(t.is_demo), entry_id=t.entry_id, qualifier=t.qualifier,
+            subject_evidence=list(t.subject_evidence), relation_evidence=list(t.relation_evidence),
+            condition_evidence=list(t.condition_evidence),
         ))
 
     relations: Dict[str, int] = defaultdict(int)

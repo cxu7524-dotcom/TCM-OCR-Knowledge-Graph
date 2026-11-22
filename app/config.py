@@ -5,8 +5,7 @@ app/config.py —— 全项目唯一配置入口
 设计约定：
   1. 所有路径、后端开关、阈值集中在本文件；其他模块一律 `from app.config import CONFIG`。
   2. 不写死绝对路径：一切以 PROJECT_ROOT（本文件上一级）为基准推导。
-  3. 零密钥、零公网：默认不读取任何 API Key，不访问任何公网地址。
-     LLM 只指向本机 127.0.0.1 的 OpenAI 兼容服务（Ollama / vLLM），且默认后端为 none。
+  3. LLM 默认关闭。cloud 模式使用服务端环境变量中的 API Key 和 HTTPS 地址。
   4. 环境变量覆盖：统一前缀 TCM_，便于不改动源码即可切换后端 / 端口。
      例如：TCM_LLM_BACKEND=ollama、TCM_OCR_BACKEND=rapidocr、TCM_PORT=8100。
   5. 兜底原则：声明的重型依赖缺失时自动降级为可运行的规则 + 桩，
@@ -22,6 +21,7 @@ from __future__ import annotations
 import os
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from urllib.parse import urlsplit
 
 # 项目根目录：app/config.py → 上一级即仓库根
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -171,14 +171,14 @@ class OcrConfig:
 
 @dataclass(frozen=True)
 class LlmConfig:
-    """本地大模型配置。
+    """大模型配置。
 
     backend 可选：
       none   —— 默认。不加载模型、不联网，用规则 + 桩完成端到端演示。
       ollama —— 本机 Ollama 的 OpenAI 兼容接口（默认 http://127.0.0.1:11434/v1）。
       vllm   —— 本机 vLLM 的 OpenAI 兼容接口（自行设置 TCM_LLM_BASE_URL）。
     切换示例：set TCM_LLM_BACKEND=ollama && set TCM_LLM_MODEL=qwen2.5:7b
-    安全约束：base_url 只允许指向 127.0.0.1 / localhost，见 validate()。
+      cloud  —— HTTPS OpenAI 兼容服务，凭据从服务端环境变量读取。
     """
 
     backend: str = _env("LLM_BACKEND", "none")
@@ -187,15 +187,27 @@ class LlmConfig:
     timeout: int = _env_int("LLM_TIMEOUT", 120)
     max_tokens: int = _env_int("LLM_MAX_TOKENS", 512)
     temperature: float = _env_float("LLM_TEMPERATURE", 0.1)
+    response_format: str = _env("LLM_RESPONSE_FORMAT", "json_object")
+    thinking: str = _env("LLM_THINKING", "")
+    extract_backend: str = _env("EXTRACT_BACKEND", "auto")
 
     @property
     def enabled(self) -> bool:
+        if self.backend.lower() == "cloud":
+            try:
+                url = urlsplit(self.base_url)
+                return bool(url.scheme == "https" and url.hostname and not url.username and not url.password and not url.query and not url.fragment and self.model.strip() and os.environ.get("TCM_LLM_API_KEY", "").strip())
+            except ValueError:
+                return False
         return self.backend.lower() in {"ollama", "vllm"} and self.is_local()
 
     def is_local(self) -> bool:
         """仅允许本机地址，杜绝任何云端在线推理。"""
-        url = self.base_url.lower()
-        return url.startswith("http://127.0.0.1") or url.startswith("http://localhost")
+        try:
+            url = urlsplit(self.base_url)
+            return url.scheme == "http" and url.hostname in {"127.0.0.1", "localhost"} and not url.username and not url.password and not url.query and not url.fragment
+        except ValueError:
+            return False
 
 
 @dataclass(frozen=True)
@@ -336,7 +348,7 @@ class Config:
             "extract_fuzzy": self.ocr.extract_fuzzy,
             "llm_backend": self.llm.backend,
             "llm_enabled": self.llm.enabled,
-            "llm_base_url": self.llm.base_url if self.llm.enabled else "",
+            "llm_base_url": self.llm.base_url if self.llm.enabled and self.llm.is_local() else "",
             "vector_backend": self.vector.backend,
             "embed_backend": self.embed.backend,
             "embed_model": self.embed.model,

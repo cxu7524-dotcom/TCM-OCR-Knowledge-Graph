@@ -1,14 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-extract/llm_local.py —— 本地 LLM 抽取适配层（默认关闭）
+extract/llm_local.py —— LLM HTTP 适配层（默认关闭）
 
 用途：后期用本机 Ollama / vLLM 补足规则抽取搞不定的部分（跨行主语、隐含关系、
       异文考据）。本阶段**默认后端 none，不加载模型、不发任何请求**。
 
-安全约束：
-  - 只接受 127.0.0.1 / localhost 的 OpenAI 兼容地址；非本机直接拒绝；
-  - 不读取任何密钥，不访问公网；调用失败一律降级，不抛异常、不伪造抽取结果；
-  - 模型输出必须经 app/schemas.py 校验并保留原文 quote，否则丢弃该条。
+cloud 模式通过 HTTPS 调用兼容接口。抽取入口仍为桩。
 
 TODO（下一阶段）：
   - 设计抽取 prompt 与 JSON Schema 约束输出（含 page_id / line_id / quote）；
@@ -19,6 +16,9 @@ TODO（下一阶段）：
 from __future__ import annotations
 
 import json
+import os
+import socket
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
@@ -40,6 +40,24 @@ class ExtractionResult:
     notes: List[str] = field(default_factory=list)
 
 
+@dataclass
+class ChatResult:
+    content: str = ""
+    error: str = ""
+    status: int = 0
+    attempts: int = 0
+    finish_reason: str | None = None
+    response_model: str | None = None
+    completion_tokens: int | None = None
+    reasoning_tokens: int | None = None
+    content_length: int | None = None
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 class LocalLLMExtractor:
     """本地 OpenAI 兼容 HTTP 客户端（本阶段仅提供骨架，不默认启用）。"""
 
@@ -48,33 +66,113 @@ class LocalLLMExtractor:
 
     def available(self) -> bool:
         """后端启用 + 地址为本机，才认为可用。"""
-        return self.cfg.enabled and self.cfg.is_local()
+        return self.cfg.enabled
 
     def chat(self, messages: List[Dict[str, str]]) -> str:
         """调用本机 /chat/completions；任何异常返回空串，绝不向外抛。
 
         注意：本阶段 extract() 不会调用它，仅作为下一阶段的接口占位。
         """
+        return self.chat_result(messages).content
+
+    def chat_result(self, messages: List[Dict[str, str]], schema: dict | None = None) -> ChatResult:
+        """调用兼容接口并返回安全的错误类别。"""
         if not self.available():
-            return ""
-        if not self.cfg.is_local():
-            return ""  # 硬性拦截非本机地址
-        payload = json.dumps({
+            return ChatResult(error="configuration")
+        cloud = self.cfg.backend.lower() == "cloud"
+        body = {
             "model": self.cfg.model,
             "messages": messages,
             "temperature": self.cfg.temperature,
             "max_tokens": self.cfg.max_tokens,
             "stream": False,
-        }, ensure_ascii=False).encode("utf-8")
+        }
+        headers = {"Content-Type": "application/json"}
+        if cloud:
+            thinking = self.cfg.thinking.strip().lower()
+            if thinking not in ("", "enabled", "disabled"):
+                return ChatResult(error="configuration")
+            if thinking:
+                body["thinking"] = {"type": thinking}
+            if self.cfg.response_format == "json_schema" and schema is not None:
+                body["response_format"] = {"type": "json_schema", "json_schema": {"name": "extraction", "strict": True, "schema": schema}}
+            elif self.cfg.response_format == "json_object":
+                body["response_format"] = {"type": "json_object"}
+            else:
+                return ChatResult(error="configuration")
+            headers["Authorization"] = "Bearer " + os.environ.get("TCM_LLM_API_KEY", "")
+        payload = json.dumps(body, ensure_ascii=False).encode("utf-8")
+        base = self.cfg.base_url.rstrip("/")
+        url = base if base.endswith("/chat/completions") else base + "/chat/completions"
         req = urllib.request.Request(
-            self.cfg.base_url.rstrip("/") + "/chat/completions",
-            data=payload, headers={"Content-Type": "application/json"}, method="POST")
-        try:
-            with urllib.request.urlopen(req, timeout=self.cfg.timeout) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-            return str(data.get("choices", [{}])[0].get("message", {}).get("content", ""))
-        except (urllib.error.URLError, OSError, ValueError, KeyError, IndexError, TimeoutError):
-            return ""
+            url, data=payload, headers=headers, method="POST")
+        for attempt in range(1, 4):
+            status = 0
+            result = ChatResult(attempts=attempt)
+            try:
+                send = urllib.request.build_opener(_NoRedirect()).open if cloud else urllib.request.urlopen
+                with send(req, timeout=self.cfg.timeout) as resp:
+                    status = resp.status
+                    data = json.loads(resp.read().decode("utf-8"))
+                result.status = status
+                if isinstance(data, dict):
+                    model = data.get("model")
+                    secret = os.environ.get("TCM_LLM_API_KEY", "")
+                    if isinstance(model, str) and len(model) <= 256 and not (secret and secret in model):
+                        result.response_model = model
+                    usage = data.get("usage")
+                    if isinstance(usage, dict):
+                        completion = usage.get("completion_tokens")
+                        details = usage.get("completion_tokens_details")
+                        reasoning = details.get("reasoning_tokens") if isinstance(details, dict) else None
+                        if type(completion) is int and completion >= 0:
+                            result.completion_tokens = completion
+                        if type(reasoning) is int and reasoning >= 0:
+                            result.reasoning_tokens = reasoning
+                choice = data["choices"][0]
+                reason = choice.get("finish_reason")
+                if reason in ("stop", "length", "content_filter", "tool_calls", "insufficient_system_resource"):
+                    result.finish_reason = reason
+                message = choice.get("message")
+                content = message.get("content") if isinstance(message, dict) else None
+                if isinstance(content, str):
+                    result.content_length = len(content)
+                if choice.get("finish_reason") == "length":
+                    result.error = "truncated"
+                    return result
+                if not isinstance(content, str):
+                    raise ValueError
+                if cloud and not isinstance(json.loads(content), dict):
+                    raise ValueError
+                result.content = content
+                return result
+            except urllib.error.HTTPError as exc:
+                status = exc.code
+                if status in (401, 403):
+                    error = "authentication"
+                elif status == 404:
+                    error = "model_unavailable"
+                elif status == 429:
+                    error = "rate_limit"
+                elif status >= 500:
+                    error = "server_error"
+                else:
+                    error = "http_error"
+                retry = status in (429, 500, 502, 503, 504)
+            except (TimeoutError, socket.timeout):
+                error, retry = "timeout", True
+            except urllib.error.URLError as exc:
+                error = "timeout" if isinstance(exc.reason, (TimeoutError, socket.timeout)) else "connection_error"
+                retry = True
+            except (ValueError, KeyError, IndexError, TypeError, AttributeError, UnicodeError):
+                error, retry = "invalid_response", False
+            except OSError:
+                error, retry = "connection_error", True
+            if not retry or attempt == 3:
+                result.error = error
+                result.status = status
+                return result
+            time.sleep(0.2 * attempt)
 
     def extract(self, blocks: List[Block]) -> ExtractionResult:
         """抽取入口（桩）。

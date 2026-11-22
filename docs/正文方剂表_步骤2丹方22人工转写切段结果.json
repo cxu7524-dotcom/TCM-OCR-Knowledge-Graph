@@ -1,0 +1,229 @@
+{
+  "input": "步骤1标注D22-1与D22-2人工转写，非OCR；按段构造Block",
+  "result": {
+    "page_id": "丹方彚编-0022",
+    "candidates": [
+      {
+        "page_id": "丹方彚编-0022",
+        "name_status": "无名方",
+        "name": null,
+        "start_cue": {
+          "normalized_range": [
+            0,
+            2
+          ],
+          "text_norm": "心痛",
+          "text": "心痛",
+          "sources": [
+            {
+              "block_ref": "丹方彚编-0022:GT001",
+              "line_id": "GT001",
+              "bbox": [
+                250,
+                165,
+                335,
+                820
+              ],
+              "normalized_range": [
+                0,
+                2
+              ],
+              "block_raw_range": [
+                0,
+                2
+              ],
+              "raw_range": [
+                0,
+                2
+              ],
+              "text": "心痛",
+              "mapping_precision": "exact"
+            }
+          ]
+        },
+        "start_kind": "病证标题与药量串",
+        "composition": {
+          "normalized_range": [
+            3,
+            12
+          ],
+          "text_norm": "山梔子七枚炒焦黄 ",
+          "text": "山梔子七枚炒焦黃 ",
+          "sources": [
+            {
+              "block_ref": "丹方彚编-0022:GT001",
+              "line_id": "GT001",
+              "bbox": [
+                250,
+                165,
+                335,
+                820
+              ],
+              "normalized_range": [
+                3,
+                12
+              ],
+              "block_raw_range": [
+                3,
+                12
+              ],
+              "raw_range": [
+                3,
+                12
+              ],
+              "text": "山梔子七枚炒焦黃 ",
+              "mapping_precision": "aligned"
+            }
+          ]
+        },
+        "passage": {
+          "normalized_range": [
+            0,
+            12
+          ],
+          "text_norm": "心痛 山梔子七枚炒焦黄 ",
+          "text": "心痛 山梔子七枚炒焦黃 ",
+          "sources": [
+            {
+              "block_ref": "丹方彚编-0022:GT001",
+              "line_id": "GT001",
+              "bbox": [
+                250,
+                165,
+                335,
+                820
+              ],
+              "normalized_range": [
+                0,
+                12
+              ],
+              "block_raw_range": [
+                0,
+                12
+              ],
+              "raw_range": [
+                0,
+                12
+              ],
+              "text": "心痛 山梔子七枚炒焦黃 ",
+              "mapping_precision": "aligned"
+            }
+          ]
+        },
+        "continuation": "未见续页迹象",
+        "end_reason": "制法服法"
+      },
+      {
+        "page_id": "丹方彚编-0022",
+        "name_status": "无名方",
+        "name": null,
+        "start_cue": {
+          "normalized_range": [
+            28,
+            30
+          ],
+          "text_norm": "寒痛",
+          "text": "寒痛",
+          "sources": [
+            {
+              "block_ref": "丹方彚编-0022:GT002",
+              "line_id": "GT002",
+              "bbox": [
+                275,
+                200,
+                320,
+                820
+              ],
+              "normalized_range": [
+                28,
+                30
+              ],
+              "block_raw_range": [
+                0,
+                2
+              ],
+              "raw_range": [
+                28,
+                30
+              ],
+              "text": "寒痛",
+              "mapping_precision": "exact"
+            }
+          ]
+        },
+        "start_kind": "病证标题与药量串",
+        "composition": {
+          "normalized_range": [
+            31,
+            47
+          ],
+          "text_norm": "陈皮香附吳茱萸良姜石菖蒲各等分 ",
+          "text": "陳皮香附吳茱萸良薑石菖蒲各等分 ",
+          "sources": [
+            {
+              "block_ref": "丹方彚编-0022:GT002",
+              "line_id": "GT002",
+              "bbox": [
+                275,
+                200,
+                320,
+                820
+              ],
+              "normalized_range": [
+                31,
+                47
+              ],
+              "block_raw_range": [
+                3,
+                19
+              ],
+              "raw_range": [
+                31,
+                47
+              ],
+              "text": "陳皮香附吳茱萸良薑石菖蒲各等分 ",
+              "mapping_precision": "aligned"
+            }
+          ]
+        },
+        "passage": {
+          "normalized_range": [
+            28,
+            47
+          ],
+          "text_norm": "寒痛 陈皮香附吳茱萸良姜石菖蒲各等分 ",
+          "text": "寒痛 陳皮香附吳茱萸良薑石菖蒲各等分 ",
+          "sources": [
+            {
+              "block_ref": "丹方彚编-0022:GT002",
+              "line_id": "GT002",
+              "bbox": [
+                275,
+                200,
+                320,
+                820
+              ],
+              "normalized_range": [
+                28,
+                47
+              ],
+              "block_raw_range": [
+                0,
+                19
+              ],
+              "raw_range": [
+                28,
+                47
+              ],
+              "text": "寒痛 陳皮香附吳茱萸良薑石菖蒲各等分 ",
+              "mapping_precision": "aligned"
+            }
+          ]
+        },
+        "continuation": "未见续页迹象",
+        "end_reason": "制法服法"
+      }
+    ],
+    "continuation_hints": []
+  }
+}

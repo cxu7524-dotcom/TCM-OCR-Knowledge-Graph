@@ -210,7 +210,8 @@ def _answer_text(intent: str, term: str, objects: List[Dict[str, Any]], page_id:
     lines = [f"【{title}】本页原文记载（page_id：{page_id}）："
              f"与「{term}」相关的关系 {len(objects)} 条，涉及{noun} {len(heads)} 个。"]
     for i, o in enumerate(objects, start=1):
-        lines.append(f"[{i}] {o['head']}（{o['subject_type']}）—{o['relation']}→ {o['tail']}")
+        suffix = f"（条件：{o['qualifier']}）" if o.get("qualifier") else ""
+        lines.append(f"[{i}] {o['head']}（{o['subject_type']}）—{o['relation']}→ {o['tail']}{suffix}")
         lines.append(f"    关系引文 {o['relation_line']}：「{o['relation_quote']}」")
         if o["support"] == "carry":
             lines.append(f"    主体引文 {o['subject_line']}：「{o['subject_quote']}」"
@@ -269,6 +270,47 @@ def graph_answer(question: str, blocks: List[Block],
     seen_ev = set()
     dropped: List[str] = []
     for raw, t in pairs:
+        if t.entry_id:
+            by_ref = {b.block_ref: b for b in blocks}
+            def checked(items):
+                verified = []
+                for loc in items:
+                    if not isinstance(loc, dict):
+                        return []
+                    block = by_ref.get(loc.get("block_ref"))
+                    start, end, quote = loc.get("start"), loc.get("end"), loc.get("quote")
+                    if (not block or block.page_id != pid or loc.get("page_id") != pid
+                            or loc.get("line_id") != block.line_id or loc.get("source_hash") != block.source_hash
+                            or not _same_bbox(loc.get("bbox"), block.bbox)
+                            or isinstance(start, bool) or not isinstance(start, int) or not isinstance(end, int)
+                            or start < 0 or end <= start or not isinstance(quote, str)
+                            or block.text[start:end] != quote):
+                        return []
+                    verified.append(block)
+                return verified
+            subject_blocks = checked(t.subject_evidence)
+            relation_blocks = checked(t.relation_evidence)
+            if (not subject_blocks or not relation_blocks or t.page_id != pid
+                    or _norm(t.head) not in _norm("".join(x["quote"] for x in t.subject_evidence))
+                    or _norm(t.tail) not in _norm("".join(x["quote"] for x in t.relation_evidence))):
+                dropped.append("云端关系的主体或关系证据无法核验")
+                continue
+            if len(objects) >= MAX_OBJECTS:
+                continue
+            b, sb = relation_blocks[0], subject_blocks[0]
+            objects.append({"kind": intent, "head": t.head, "relation": t.relation, "tail": t.tail,
+                            "subject_type": str(raw.get("subject_type") or ""), "page_id": pid,
+                            "relation_line": b.line_id, "relation_quote": b.text, "relation_bbox": list(b.bbox),
+                            "subject_line": sb.line_id, "subject_quote": sb.text, "support": "carry",
+                            "entry_id": t.entry_id, "qualifier": t.qualifier,
+                            "subject_evidence": t.subject_evidence, "relation_evidence": t.relation_evidence})
+            for role, sources in (("relation", relation_blocks), ("subject", subject_blocks)):
+                for source in sources:
+                    key = (source.block_ref, role)
+                    if key not in seen_ev:
+                        seen_ev.add(key)
+                        evidences.append(_ev(source, role, 92.0, is_demo))
+            continue
         pair = by_line.get(t.line_id)
         if pair is None:
             dropped.append(f"{t.head}—{t.relation}→{t.tail}：line_id {t.line_id or '（空）'} 不在本页")

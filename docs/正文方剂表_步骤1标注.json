@@ -1,0 +1,2929 @@
+{
+  "schema_version": "1.2",
+  "coordinate_system": "原图像素左上原点，矩形[x1,y1,x2,y2]；框为人工指定原文块，允许包含邻字，不保证字符级紧贴",
+  "review": "五张验收页全页逐面逐列检查；开发页仍为指定片段；矩形为人工原文块，非字级框。",
+  "pages": [
+    {
+      "id": "思濟堂方書-0031",
+      "book": "思濟堂方書",
+      "page_no": 31,
+      "image": "古籍评测集/医家类/思濟堂方書/page_31.png",
+      "image_size": [
+        1024,
+        804
+      ],
+      "split": "开发",
+      "scope": "指定片段",
+      "instances": [],
+      "negative_spans": [
+        {
+          "quote": "宜補氣如四君六君之類",
+          "bbox": [
+            70,
+            530,
+            190,
+            735
+          ],
+          "reason": "提及方名而无配伍段；不产生完整方表"
+        }
+      ],
+      "unreviewed_regions": [
+        "其余全页未做穷尽标注"
+      ],
+      "sha256": "947055588d867425c0ee8eabf5f7e5505ac572539bd23eed673416a1a5e7a3be"
+    },
+    {
+      "id": "思濟堂方書-0032",
+      "book": "思濟堂方書",
+      "page_no": 32,
+      "image": "古籍评测集/医家类/思濟堂方書/page_32.png",
+      "image_size": [
+        1024,
+        804
+      ],
+      "split": "开发",
+      "scope": "通關散及指定反例",
+      "instances": [
+        {
+          "id": "S32-1",
+          "name_verbatim": "通關散",
+          "name_bbox": [
+            552,
+            213,
+            593,
+            305
+          ],
+          "quote": "天南星 牙皂角 生半夏各二錢 細辛一錢 冰片三分",
+          "quote_bbox": [
+            324,
+            235,
+            430,
+            740
+          ],
+          "status": "完整配伍段",
+          "note": "",
+          "ingredients": [
+            {
+              "herb_verbatim": "天南星",
+              "dose_verbatim": "各二錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                369,
+                222,
+                415,
+                350
+              ],
+              "dose_bbox": [
+                375,
+                622,
+                423,
+                755
+              ],
+              "role": "基本组成"
+            },
+            {
+              "herb_verbatim": "牙皂角",
+              "dose_verbatim": "各二錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                369,
+                386,
+                419,
+                525
+              ],
+              "dose_bbox": [
+                375,
+                622,
+                423,
+                755
+              ],
+              "role": "基本组成"
+            },
+            {
+              "herb_verbatim": "生半夏",
+              "dose_verbatim": "各二錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                369,
+                549,
+                419,
+                672
+              ],
+              "dose_bbox": [
+                375,
+                622,
+                423,
+                755
+              ],
+              "role": "基本组成"
+            },
+            {
+              "herb_verbatim": "細辛",
+              "dose_verbatim": "一錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                322,
+                222,
+                365,
+                324
+              ],
+              "dose_bbox": [
+                339,
+                284,
+                380,
+                385
+              ],
+              "role": "基本组成"
+            },
+            {
+              "herb_verbatim": "冰片",
+              "dose_verbatim": "三分",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                321,
+                385,
+                369,
+                495
+              ],
+              "dose_bbox": [
+                339,
+                455,
+                381,
+                555
+              ],
+              "role": "基本组成"
+            }
+          ]
+        }
+      ],
+      "negative_spans": [
+        {
+          "quote": "先天真陽不足者宜人參附子湯",
+          "bbox": [
+            930,
+            220,
+            1000,
+            735
+          ],
+          "reason": "仅提及方名及用途"
+        }
+      ],
+      "unreviewed_regions": [
+        "防風通聖散在左面下部开始并续下页，尚未穷尽标注"
+      ],
+      "sha256": "1c17700a8a96cfa8efd883b8a2c2bab33200dfcbd4b50242a8d4aded028c209c"
+    },
+    {
+      "id": "思濟堂方書-0033",
+      "book": "思濟堂方書",
+      "page_no": 33,
+      "image": "古籍评测集/医家类/思濟堂方書/page_33.png",
+      "image_size": [
+        1024,
+        803
+      ],
+      "split": "开发",
+      "scope": "稀涎散",
+      "instances": [
+        {
+          "id": "S33-1",
+          "name_verbatim": "稀涎散",
+          "name_bbox": [
+            235,
+            215,
+            275,
+            307
+          ],
+          "quote": "白礬生用 牙皂角 共為細末每服二錢",
+          "quote_bbox": [
+            120,
+            240,
+            220,
+            735
+          ],
+          "status": "完整配伍段",
+          "note": "配伍段至共為細末为止；每服二錢为服用量，不是逐味剂量。",
+          "ingredients": [
+            {
+              "herb_verbatim": "白礬",
+              "dose_verbatim": null,
+              "dose_status": "原文未载",
+              "herb_bbox": [
+                185,
+                225,
+                225,
+                355
+              ],
+              "dose_bbox": null,
+              "role": "基本组成"
+            },
+            {
+              "herb_verbatim": "牙皂角",
+              "dose_verbatim": null,
+              "dose_status": "原文未载",
+              "herb_bbox": [
+                185,
+                385,
+                225,
+                515
+              ],
+              "dose_bbox": null,
+              "role": "基本组成"
+            }
+          ]
+        }
+      ],
+      "negative_spans": [],
+      "unreviewed_regions": [
+        "右面为前页防風通聖散续方，未穷尽标注"
+      ],
+      "sha256": "08f13058529519806c4652152d1f449028c6da575ce2bb03a9ae16f91a07602e"
+    },
+    {
+      "id": "思濟堂方書-0035",
+      "book": "思濟堂方書",
+      "page_no": 35,
+      "image": "古籍评测集/医家类/思濟堂方書/page_35.png",
+      "image_size": [
+        1024,
+        804
+      ],
+      "split": "开发",
+      "scope": "两个指定配伍段",
+      "instances": [
+        {
+          "id": "S35-1",
+          "name_verbatim": "三化湯",
+          "name_bbox": [
+            795,
+            213,
+            835,
+            311
+          ],
+          "quote": "羌活 枳實 厚朴 川大黃各三錢 芒硝一錢半",
+          "quote_bbox": [
+            600,
+            235,
+            692,
+            640
+          ],
+          "status": "完整配伍段",
+          "note": "",
+          "ingredients": [
+            {
+              "herb_verbatim": "羌活",
+              "dose_verbatim": "各三錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                645,
+                220,
+                692,
+                330
+              ],
+              "dose_bbox": [
+                602,
+                317,
+                650,
+                430
+              ],
+              "role": "基本组成"
+            },
+            {
+              "herb_verbatim": "枳實",
+              "dose_verbatim": "各三錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                645,
+                384,
+                692,
+                495
+              ],
+              "dose_bbox": [
+                602,
+                317,
+                650,
+                430
+              ],
+              "role": "基本组成"
+            },
+            {
+              "herb_verbatim": "厚朴",
+              "dose_verbatim": "各三錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                645,
+                543,
+                692,
+                655
+              ],
+              "dose_bbox": [
+                602,
+                317,
+                650,
+                430
+              ],
+              "role": "基本组成"
+            },
+            {
+              "herb_verbatim": "川大黃",
+              "dose_verbatim": "各三錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                595,
+                220,
+                645,
+                350
+              ],
+              "dose_bbox": [
+                602,
+                317,
+                650,
+                430
+              ],
+              "role": "基本组成"
+            },
+            {
+              "herb_verbatim": "芒硝",
+              "dose_verbatim": "一錢半",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                595,
+                385,
+                645,
+                495
+              ],
+              "dose_bbox": [
+                602,
+                455,
+                650,
+                570
+              ],
+              "role": "基本组成"
+            }
+          ]
+        },
+        {
+          "id": "S35-2",
+          "name_verbatim": "六君子湯",
+          "name_bbox": [
+            327,
+            213,
+            365,
+            320
+          ],
+          "quote": "人參二錢 白朮五錢黃土拌炒 正白苓二錢 甘草 廣皮 製半夏各一錢 引加生薑一錢半 紅棗肉三枚",
+          "quote_bbox": [
+            31,
+            237,
+            170,
+            735
+          ],
+          "status": "完整配伍段",
+          "note": "各一錢的范围依版面判断，建议第二人复核。",
+          "ingredients": [
+            {
+              "herb_verbatim": "人參",
+              "dose_verbatim": "二錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                130,
+                220,
+                175,
+                320
+              ],
+              "dose_bbox": [
+                135,
+                280,
+                176,
+                376
+              ],
+              "role": "基本组成"
+            },
+            {
+              "herb_verbatim": "白朮",
+              "dose_verbatim": "五錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                130,
+                385,
+                175,
+                485
+              ],
+              "dose_bbox": [
+                135,
+                445,
+                176,
+                540
+              ],
+              "role": "基本组成"
+            },
+            {
+              "herb_verbatim": "正白苓",
+              "dose_verbatim": "二錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                130,
+                545,
+                175,
+                670
+              ],
+              "dose_bbox": [
+                135,
+                630,
+                176,
+                730
+              ],
+              "role": "基本组成"
+            },
+            {
+              "herb_verbatim": "甘草",
+              "dose_verbatim": "各一錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                80,
+                220,
+                125,
+                326
+              ],
+              "dose_bbox": [
+                88,
+                632,
+                129,
+                755
+              ],
+              "role": "基本组成"
+            },
+            {
+              "herb_verbatim": "廣皮",
+              "dose_verbatim": "各一錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                80,
+                385,
+                125,
+                490
+              ],
+              "dose_bbox": [
+                88,
+                632,
+                129,
+                755
+              ],
+              "role": "基本组成"
+            },
+            {
+              "herb_verbatim": "製半夏",
+              "dose_verbatim": "各一錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                80,
+                545,
+                130,
+                672
+              ],
+              "dose_bbox": [
+                88,
+                632,
+                129,
+                755
+              ],
+              "role": "基本组成"
+            },
+            {
+              "herb_verbatim": "生薑",
+              "dose_verbatim": "一錢半",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                30,
+                270,
+                80,
+                376
+              ],
+              "dose_bbox": [
+                30,
+                336,
+                80,
+                455
+              ],
+              "role": "引药"
+            },
+            {
+              "herb_verbatim": "紅棗肉",
+              "dose_verbatim": "三枚",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                30,
+                415,
+                80,
+                550
+              ],
+              "dose_bbox": [
+                30,
+                510,
+                80,
+                610
+              ],
+              "role": "引药"
+            }
+          ]
+        }
+      ],
+      "negative_spans": [],
+      "unreviewed_regions": [
+        "页首为前方制法续文"
+      ],
+      "sha256": "3e81213ad9751a85c8e3209387cf65bc9693e5cfdabc55d1a4d53d6a3fc04f85"
+    },
+    {
+      "id": "思濟堂方書-0036",
+      "book": "思濟堂方書",
+      "page_no": 36,
+      "image": "古籍评测集/医家类/思濟堂方書/page_36.png",
+      "image_size": [
+        1024,
+        807
+      ],
+      "split": "开发",
+      "scope": "乌药顺气汤及加减反例",
+      "instances": [
+        {
+          "id": "S36-1",
+          "name_verbatim": "烏藥順氣湯",
+          "name_bbox": [
+            435,
+            213,
+            470,
+            330
+          ],
+          "quote": "正嫩烏藥二錢 廣皮一錢半 麻黃 川芎 殭蠶 枳殼 桔梗各一錢 乾薑五分 甘草三分 引加生薑一錢紅棗肉二枚",
+          "quote_bbox": [
+            32,
+            237,
+            220,
+            735
+          ],
+          "status": "完整配伍段",
+          "note": "",
+          "ingredients": [
+            {
+              "herb_verbatim": "正嫩烏藥",
+              "dose_verbatim": "二錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                180,
+                220,
+                225,
+                380
+              ],
+              "dose_bbox": [
+                189,
+                340,
+                230,
+                428
+              ],
+              "role": "基本组成"
+            },
+            {
+              "herb_verbatim": "廣皮",
+              "dose_verbatim": "一錢半",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                180,
+                388,
+                225,
+                495
+              ],
+              "dose_bbox": [
+                189,
+                455,
+                230,
+                570
+              ],
+              "role": "基本组成"
+            },
+            {
+              "herb_verbatim": "麻黃",
+              "dose_verbatim": "各一錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                180,
+                550,
+                225,
+                650
+              ],
+              "dose_bbox": [
+                86,
+                310,
+                130,
+                400
+              ],
+              "role": "基本组成"
+            },
+            {
+              "herb_verbatim": "川芎",
+              "dose_verbatim": "各一錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                130,
+                220,
+                175,
+                325
+              ],
+              "dose_bbox": [
+                86,
+                310,
+                130,
+                400
+              ],
+              "role": "基本组成"
+            },
+            {
+              "herb_verbatim": "殭蠶",
+              "dose_verbatim": "各一錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                130,
+                385,
+                175,
+                495
+              ],
+              "dose_bbox": [
+                86,
+                310,
+                130,
+                400
+              ],
+              "role": "基本组成"
+            },
+            {
+              "herb_verbatim": "枳殼",
+              "dose_verbatim": "各一錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                130,
+                550,
+                175,
+                655
+              ],
+              "dose_bbox": [
+                86,
+                310,
+                130,
+                400
+              ],
+              "role": "基本组成"
+            },
+            {
+              "herb_verbatim": "桔梗",
+              "dose_verbatim": "各一錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                80,
+                220,
+                125,
+                325
+              ],
+              "dose_bbox": [
+                86,
+                310,
+                130,
+                400
+              ],
+              "role": "基本组成"
+            },
+            {
+              "herb_verbatim": "乾薑",
+              "dose_verbatim": "五分",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                80,
+                385,
+                125,
+                490
+              ],
+              "dose_bbox": [
+                86,
+                450,
+                130,
+                545
+              ],
+              "role": "基本组成"
+            },
+            {
+              "herb_verbatim": "甘草",
+              "dose_verbatim": "三分",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                80,
+                550,
+                125,
+                650
+              ],
+              "dose_bbox": [
+                86,
+                610,
+                130,
+                710
+              ],
+              "role": "基本组成"
+            },
+            {
+              "herb_verbatim": "生薑",
+              "dose_verbatim": "一錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                30,
+                250,
+                77,
+                355
+              ],
+              "dose_bbox": [
+                30,
+                315,
+                77,
+                410
+              ],
+              "role": "引药"
+            },
+            {
+              "herb_verbatim": "紅棗肉",
+              "dose_verbatim": "二枚",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                30,
+                370,
+                77,
+                505
+              ],
+              "dose_bbox": [
+                30,
+                465,
+                77,
+                560
+              ],
+              "role": "引药"
+            }
+          ]
+        }
+      ],
+      "negative_spans": [
+        {
+          "quote": "去廣皮半夏名四君子湯",
+          "bbox": [
+            935,
+            240,
+            990,
+            735
+          ],
+          "reason": "前方加减说明，非本段逐味配伍"
+        }
+      ],
+      "unreviewed_regions": [
+        "本页余下论述未穷尽标注"
+      ],
+      "sha256": "192908d70c068a8b3511a3759357734b2cf29576b22227e255c12f4c624fd99f"
+    },
+    {
+      "id": "思濟堂方書-0037",
+      "book": "思濟堂方書",
+      "page_no": 37,
+      "image": "古籍评测集/医家类/思濟堂方書/page_37.png",
+      "image_size": [
+        1024,
+        807
+      ],
+      "split": "验收",
+      "scope": "全页逐面逐列",
+      "instances": [
+        {
+          "id": "S37-0",
+          "name_verbatim": null,
+          "name_bbox": null,
+          "quote": "發熱無汗加蔥白二寸；遍身瘙癢加薄荷葉防風各一錢；手足拘攣加石斛木香各一錢；濕氣加白朮蒼朮正〔?〕榔各一錢打碎；足浮腫加木瓜五加皮各一錢半獨活一錢；遍身疼痛加當歸桂枝乳香沒藥各八分",
+          "quote_bbox": [
+            690,
+            220,
+            990,
+            740
+          ],
+          "status": "可能续页",
+          "note": "页首按症加减，承接前页乌药顺气汤；其各条件的加味可读，但不是同一无条件基础方，也不是六个独立新方。上页方名不作为本页可定位题名。",
+          "ingredients": [
+            {
+              "herb_verbatim": "蔥白",
+              "dose_verbatim": "二寸",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                945,
+                230,
+                990,
+                735
+              ],
+              "dose_bbox": [
+                945,
+                230,
+                990,
+                735
+              ],
+              "role": "按症加味",
+              "condition_verbatim": "發熱無汗",
+              "observation_status": "可计分",
+              "display_status": "留在原文的加减／转引"
+            },
+            {
+              "herb_verbatim": "薄荷葉",
+              "dose_verbatim": "各一錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                895,
+                230,
+                940,
+                735
+              ],
+              "dose_bbox": [
+                895,
+                230,
+                940,
+                735
+              ],
+              "role": "按症加味",
+              "condition_verbatim": "遍身瘙癢",
+              "observation_status": "可计分",
+              "display_status": "留在原文的加减／转引"
+            },
+            {
+              "herb_verbatim": "防風",
+              "dose_verbatim": "各一錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                895,
+                230,
+                940,
+                735
+              ],
+              "dose_bbox": [
+                895,
+                230,
+                940,
+                735
+              ],
+              "role": "按症加味",
+              "condition_verbatim": "遍身瘙癢",
+              "observation_status": "可计分",
+              "display_status": "留在原文的加减／转引"
+            },
+            {
+              "herb_verbatim": "石斛",
+              "dose_verbatim": "各一錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                845,
+                230,
+                890,
+                735
+              ],
+              "dose_bbox": [
+                845,
+                230,
+                890,
+                735
+              ],
+              "role": "按症加味",
+              "condition_verbatim": "手足拘攣",
+              "observation_status": "可计分",
+              "display_status": "留在原文的加减／转引"
+            },
+            {
+              "herb_verbatim": "木香",
+              "dose_verbatim": "各一錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                845,
+                230,
+                890,
+                735
+              ],
+              "dose_bbox": [
+                845,
+                230,
+                890,
+                735
+              ],
+              "role": "按症加味",
+              "condition_verbatim": "手足拘攣",
+              "observation_status": "可计分",
+              "display_status": "留在原文的加减／转引"
+            },
+            {
+              "herb_verbatim": "白朮",
+              "dose_verbatim": "各一錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                795,
+                230,
+                840,
+                735
+              ],
+              "dose_bbox": [
+                795,
+                230,
+                840,
+                735
+              ],
+              "role": "按症加味",
+              "condition_verbatim": "濕氣",
+              "observation_status": "可计分",
+              "display_status": "留在原文的加减／转引"
+            },
+            {
+              "herb_verbatim": "蒼朮",
+              "dose_verbatim": "各一錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                795,
+                230,
+                840,
+                735
+              ],
+              "dose_bbox": [
+                795,
+                230,
+                840,
+                735
+              ],
+              "role": "按症加味",
+              "condition_verbatim": "濕氣",
+              "observation_status": "可计分",
+              "display_status": "留在原文的加减／转引"
+            },
+            {
+              "herb_verbatim": "正〔?〕榔",
+              "dose_verbatim": "各一錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                795,
+                230,
+                840,
+                735
+              ],
+              "dose_bbox": [
+                795,
+                230,
+                840,
+                735
+              ],
+              "role": "按症加味",
+              "condition_verbatim": "濕氣",
+              "herb_status": "待核",
+              "review_reason": "中间字形疑似枳／檳，暂不以常用药名代认；剂量各一錢清楚。",
+              "observation_status": "待核",
+              "display_status": "待核"
+            },
+            {
+              "herb_verbatim": "木瓜",
+              "dose_verbatim": "各一錢半",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                745,
+                230,
+                790,
+                735
+              ],
+              "dose_bbox": [
+                745,
+                230,
+                790,
+                735
+              ],
+              "role": "按症加味",
+              "condition_verbatim": "足浮腫",
+              "observation_status": "可计分",
+              "display_status": "留在原文的加减／转引"
+            },
+            {
+              "herb_verbatim": "五加皮",
+              "dose_verbatim": "各一錢半",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                745,
+                230,
+                790,
+                735
+              ],
+              "dose_bbox": [
+                745,
+                230,
+                790,
+                735
+              ],
+              "role": "按症加味",
+              "condition_verbatim": "足浮腫",
+              "observation_status": "可计分",
+              "display_status": "留在原文的加减／转引"
+            },
+            {
+              "herb_verbatim": "獨活",
+              "dose_verbatim": "一錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                745,
+                230,
+                790,
+                735
+              ],
+              "dose_bbox": [
+                745,
+                230,
+                790,
+                735
+              ],
+              "role": "按症加味",
+              "condition_verbatim": "足浮腫",
+              "observation_status": "可计分",
+              "display_status": "留在原文的加减／转引"
+            },
+            {
+              "herb_verbatim": "當歸",
+              "dose_verbatim": "各八分",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                695,
+                230,
+                740,
+                735
+              ],
+              "dose_bbox": [
+                695,
+                230,
+                740,
+                735
+              ],
+              "role": "按症加味",
+              "condition_verbatim": "遍身疼痛",
+              "observation_status": "可计分",
+              "display_status": "留在原文的加减／转引"
+            },
+            {
+              "herb_verbatim": "桂枝",
+              "dose_verbatim": "各八分",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                695,
+                230,
+                740,
+                735
+              ],
+              "dose_bbox": [
+                695,
+                230,
+                740,
+                735
+              ],
+              "role": "按症加味",
+              "condition_verbatim": "遍身疼痛",
+              "observation_status": "可计分",
+              "display_status": "留在原文的加减／转引"
+            },
+            {
+              "herb_verbatim": "乳香",
+              "dose_verbatim": "各八分",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                695,
+                230,
+                740,
+                735
+              ],
+              "dose_bbox": [
+                695,
+                230,
+                740,
+                735
+              ],
+              "role": "按症加味",
+              "condition_verbatim": "遍身疼痛",
+              "observation_status": "可计分",
+              "display_status": "留在原文的加减／转引"
+            },
+            {
+              "herb_verbatim": "沒藥",
+              "dose_verbatim": "各八分",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                695,
+                230,
+                740,
+                735
+              ],
+              "dose_bbox": [
+                695,
+                230,
+                740,
+                735
+              ],
+              "role": "按症加味",
+              "condition_verbatim": "遍身疼痛",
+              "observation_status": "可计分",
+              "display_status": "留在原文的加减／转引"
+            }
+          ],
+          "display_status": "留在原文的加减／转引",
+          "continuation_flag": "可能续页",
+          "display_reason": "页首承接前页，并且仅为按症加减；保留原文及可能续页提示，不产生方表行。"
+        },
+        {
+          "id": "S37-1",
+          "name_verbatim": "四物湯",
+          "name_bbox": [
+            650,
+            212,
+            687,
+            310
+          ],
+          "quote": "當歸五錢 揀芍二錢半 大熟地三錢 川芎一錢半",
+          "quote_bbox": [
+            550,
+            238,
+            650,
+            735
+          ],
+          "status": "完整配伍段",
+          "note": "",
+          "ingredients": [
+            {
+              "herb_verbatim": "當歸",
+              "dose_verbatim": "五錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                595,
+                220,
+                640,
+                325
+              ],
+              "dose_bbox": [
+                602,
+                285,
+                645,
+                375
+              ],
+              "role": "基本组成",
+              "observation_status": "可计分",
+              "display_status": "应出表"
+            },
+            {
+              "herb_verbatim": "揀芍",
+              "dose_verbatim": "二錢半",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                595,
+                385,
+                640,
+                490
+              ],
+              "dose_bbox": [
+                602,
+                450,
+                645,
+                560
+              ],
+              "role": "基本组成",
+              "observation_status": "可计分",
+              "display_status": "应出表"
+            },
+            {
+              "herb_verbatim": "大熟地",
+              "dose_verbatim": "三錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                595,
+                545,
+                640,
+                670
+              ],
+              "dose_bbox": [
+                602,
+                630,
+                645,
+                720
+              ],
+              "role": "基本组成",
+              "observation_status": "可计分",
+              "display_status": "应出表"
+            },
+            {
+              "herb_verbatim": "川芎",
+              "dose_verbatim": "一錢半",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                545,
+                220,
+                590,
+                325
+              ],
+              "dose_bbox": [
+                552,
+                285,
+                595,
+                400
+              ],
+              "role": "基本组成",
+              "observation_status": "可计分",
+              "display_status": "应出表"
+            }
+          ],
+          "display_status": "应出表"
+        }
+      ],
+      "negative_spans": [],
+      "unreviewed_regions": [],
+      "sha256": "b470523e5324b2fa319f1f6146a70b546c052d0e57ca528ef5e04f7835a7d7dc",
+      "coverage_regions": [
+        {
+          "bbox": [
+            690,
+            220,
+            990,
+            740
+          ],
+          "kind": "前方续页按症加减",
+          "details": "六段条件加味，逐味入 S37-0；不作为六个新方。"
+        },
+        {
+          "bbox": [
+            540,
+            205,
+            690,
+            740
+          ],
+          "kind": "完整方及配伍",
+          "details": "四物湯及四味，见 S37-1。"
+        },
+        {
+          "bbox": [
+            425,
+            230,
+            480,
+            735
+          ],
+          "kind": "煎服法",
+          "details": "不加引水煎溫服，不作为药味剂量。",
+          "display_status": "制服法"
+        },
+        {
+          "bbox": [
+            25,
+            220,
+            425,
+            740
+          ],
+          "kind": "引文及方论",
+          "details": "韻栢柯氏曰四物湯乃肝經調血之主劑……如遇；仅论述、提名，不重复生成方表，文意续下一页。"
+        },
+        {
+          "bbox": [
+            0,
+            180,
+            25,
+            750
+          ],
+          "kind": "版口页眉",
+          "details": "书名卷次和版口，不作为正文。"
+        }
+      ],
+      "full_page_review": {
+        "status": "全页正文已检查",
+        "base_rows": 4,
+        "conditional_rows": 14,
+        "revision": "新增页首按症加味 S37-0；保留四物湯。",
+        "pending_detail": "湿气加味之正〔?〕榔：药名中间字待核，剂量可读。",
+        "observation_readable_rows": 18,
+        "observation_pending_rows": 1,
+        "output_table_rows": 4,
+        "count_note": "观察行保留全部可读条目；出表分母只统计 display_status=应出表 的当前页药味。"
+      }
+    },
+    {
+      "id": "思濟堂方書-0039",
+      "book": "思濟堂方書",
+      "page_no": 39,
+      "image": "古籍评测集/医家类/思濟堂方書/page_39.png",
+      "image_size": [
+        1024,
+        805
+      ],
+      "split": "验收",
+      "scope": "全页逐面逐列",
+      "instances": [
+        {
+          "id": "S39-0",
+          "name_verbatim": null,
+          "name_bbox": null,
+          "quote": "人參 川附子製各二錢 白朮四錢黃土拌炒 白茯苓 揀白芍酒炒各三錢",
+          "quote_bbox": [
+            890,
+            225,
+            990,
+            740
+          ],
+          "status": "可能续页",
+          "note": "页首配伍承接前页题名人參附子湯；名称在 page_38 左面末栏，当前页没有可点击方名。各字作用范围依版面排列。",
+          "ingredients": [
+            {
+              "herb_verbatim": "人參",
+              "dose_verbatim": "各二錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                945,
+                225,
+                990,
+                735
+              ],
+              "dose_bbox": [
+                945,
+                225,
+                990,
+                735
+              ],
+              "role": "基本组成",
+              "observation_status": "可计分",
+              "display_status": "疑似续页提示"
+            },
+            {
+              "herb_verbatim": "川附子",
+              "dose_verbatim": "各二錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                945,
+                225,
+                990,
+                735
+              ],
+              "dose_bbox": [
+                945,
+                225,
+                990,
+                735
+              ],
+              "role": "基本组成",
+              "observation_status": "可计分",
+              "display_status": "疑似续页提示"
+            },
+            {
+              "herb_verbatim": "白朮",
+              "dose_verbatim": "四錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                945,
+                225,
+                990,
+                735
+              ],
+              "dose_bbox": [
+                945,
+                225,
+                990,
+                735
+              ],
+              "role": "基本组成",
+              "observation_status": "可计分",
+              "display_status": "疑似续页提示"
+            },
+            {
+              "herb_verbatim": "白茯苓",
+              "dose_verbatim": "各三錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                895,
+                225,
+                940,
+                735
+              ],
+              "dose_bbox": [
+                895,
+                225,
+                940,
+                735
+              ],
+              "role": "基本组成",
+              "observation_status": "可计分",
+              "display_status": "疑似续页提示"
+            },
+            {
+              "herb_verbatim": "揀白芍",
+              "dose_verbatim": "各三錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                895,
+                225,
+                940,
+                735
+              ],
+              "dose_bbox": [
+                895,
+                225,
+                940,
+                735
+              ],
+              "role": "基本组成",
+              "observation_status": "可计分",
+              "display_status": "疑似续页提示"
+            }
+          ],
+          "display_status": "疑似续页提示",
+          "continuation_flag": "可能续页",
+          "display_reason": "页首无本页起方，五味承接前页，只作可能续页提示。"
+        },
+        {
+          "id": "S39-1",
+          "name_verbatim": "六味地黃湯",
+          "name_bbox": [
+            375,
+            215,
+            415,
+            355
+          ],
+          "quote": "大熟地自六錢可以加至一二三兩 淮山藥自三錢可以加至五七九錢 山萸肉自二錢半可以加至五七九錢",
+          "quote_bbox": [
+            35,
+            240,
+            175,
+            735
+          ],
+          "status": "可能续页",
+          "note": "本页方剂配伍末端被页边截断，余味不得从下页补入。",
+          "ingredients": [
+            {
+              "herb_verbatim": "大熟地",
+              "dose_verbatim": "自六錢可以加至一二三兩",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                130,
+                220,
+                175,
+                365
+              ],
+              "dose_bbox": [
+                130,
+                325,
+                180,
+                740
+              ],
+              "role": "基本组成",
+              "observation_status": "可计分",
+              "display_status": "应出表"
+            },
+            {
+              "herb_verbatim": "淮山藥",
+              "dose_verbatim": "自三錢可以加至五七九錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                80,
+                220,
+                125,
+                365
+              ],
+              "dose_bbox": [
+                80,
+                325,
+                130,
+                740
+              ],
+              "role": "基本组成",
+              "observation_status": "可计分",
+              "display_status": "应出表"
+            },
+            {
+              "herb_verbatim": "山萸肉",
+              "dose_verbatim": "自二錢半可以加至五七九錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                30,
+                220,
+                75,
+                365
+              ],
+              "dose_bbox": [
+                30,
+                325,
+                80,
+                740
+              ],
+              "role": "基本组成",
+              "observation_status": "可计分",
+              "display_status": "应出表"
+            }
+          ],
+          "display_status": "应出表",
+          "continuation_flag": "可能续页",
+          "display_reason": "本页有明确题名及可见配伍，三味应出表；配伍可能续至后页。"
+        }
+      ],
+      "negative_spans": [],
+      "unreviewed_regions": [],
+      "sha256": "0b2127c3a4d61a91cdfe07ba1209275a7c3a7281809141089f47dc7c3eb3eab1",
+      "coverage_regions": [
+        {
+          "bbox": [
+            890,
+            220,
+            990,
+            740
+          ],
+          "kind": "页首续方配伍",
+          "details": "人參附子湯五味，名称在前页；见 S39-0。"
+        },
+        {
+          "bbox": [
+            840,
+            225,
+            890,
+            735
+          ],
+          "kind": "煎服法",
+          "details": "水四鍾煎一鍾大溫服隨即落渣；非单味剂量。",
+          "display_status": "制服法"
+        },
+        {
+          "bbox": [
+            535,
+            220,
+            840,
+            740
+          ],
+          "kind": "主治及方论",
+          "details": "此方不但治真陽虛損……故仲景一部傷寒；承前方的主治及论述。"
+        },
+        {
+          "bbox": [
+            425,
+            220,
+            480,
+            740
+          ],
+          "kind": "续接论述",
+          "details": "論全重在扶陽建中四字最是着眼，不是配伍。"
+        },
+        {
+          "bbox": [
+            185,
+            210,
+            425,
+            740
+          ],
+          "kind": "题名及主治",
+          "details": "六味地黃湯及此方專治腎精不足……並皆治之；无额外药味。"
+        },
+        {
+          "bbox": [
+            25,
+            225,
+            175,
+            740
+          ],
+          "kind": "配伍",
+          "details": "大熟地、淮山藥、山萸肉，剂量见 S39-1；方药在下页继续。"
+        },
+        {
+          "bbox": [
+            0,
+            180,
+            25,
+            750
+          ],
+          "kind": "版口页眉",
+          "details": "书名卷次和版口，不作为正文。"
+        }
+      ],
+      "full_page_review": {
+        "status": "全页正文已检查",
+        "base_rows": 8,
+        "conditional_rows": 0,
+        "revision": "新增页首五味续方 S39-0；保留六味地黃湯本页三味。",
+        "observation_readable_rows": 8,
+        "observation_pending_rows": 0,
+        "output_table_rows": 3,
+        "count_note": "观察行保留全部可读条目；出表分母只统计 display_status=应出表 的当前页药味。"
+      }
+    },
+    {
+      "id": "思濟堂方書-0040",
+      "book": "思濟堂方書",
+      "page_no": 40,
+      "image": "古籍评测集/医家类/思濟堂方書/page_40.png",
+      "image_size": [
+        1024,
+        806
+      ],
+      "split": "验收",
+      "scope": "全页逐面逐列",
+      "instances": [
+        {
+          "id": "S40-1",
+          "name_verbatim": null,
+          "name_bbox": null,
+          "quote": "正白茯苓自一錢八分可以加至五七錢 牡丹皮自二錢可以加至四錢 澤瀉一錢二分",
+          "quote_bbox": [
+            845,
+            240,
+            990,
+            735
+          ],
+          "status": "可能续页",
+          "note": "页首无方名；前页为六味地黃湯，仍不将跨页题名作为本页可定位文字。",
+          "ingredients": [
+            {
+              "herb_verbatim": "正白茯苓",
+              "dose_verbatim": "自一錢八分可以加至五七錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                940,
+                220,
+                990,
+                375
+              ],
+              "dose_bbox": [
+                940,
+                335,
+                990,
+                735
+              ],
+              "role": "基本组成",
+              "observation_status": "可计分",
+              "display_status": "疑似续页提示"
+            },
+            {
+              "herb_verbatim": "牡丹皮",
+              "dose_verbatim": "自二錢可以加至四錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                890,
+                220,
+                940,
+                350
+              ],
+              "dose_bbox": [
+                890,
+                310,
+                940,
+                610
+              ],
+              "role": "基本组成",
+              "observation_status": "可计分",
+              "display_status": "疑似续页提示"
+            },
+            {
+              "herb_verbatim": "澤瀉",
+              "dose_verbatim": "一錢二分",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                840,
+                220,
+                890,
+                325
+              ],
+              "dose_bbox": [
+                840,
+                285,
+                890,
+                410
+              ],
+              "role": "基本组成",
+              "observation_status": "可计分",
+              "display_status": "疑似续页提示"
+            }
+          ],
+          "display_status": "疑似续页提示",
+          "continuation_flag": "可能续页",
+          "display_reason": "页首仅为承接前页的三味，本页无起方，只作可能续页提示。"
+        }
+      ],
+      "negative_spans": [
+        {
+          "quote": "景岳張氏曰腎虛不能藏精",
+          "bbox": [
+            740,
+            240,
+            795,
+            735
+          ],
+          "reason": "药理说明而非配伍段"
+        }
+      ],
+      "unreviewed_regions": [],
+      "sha256": "dbb220b5bfe9b12880eefffed8f86073e952a01f76ce63f16a25aaa6b6e27f4e",
+      "coverage_regions": [
+        {
+          "bbox": [
+            840,
+            220,
+            990,
+            735
+          ],
+          "kind": "页首续方配伍",
+          "details": "正白茯苓、牡丹皮、澤瀉三味，见 S40-1；承接 page_39。"
+        },
+        {
+          "bbox": [
+            790,
+            220,
+            840,
+            735
+          ],
+          "kind": "煎服法",
+          "details": "不加引水煎溫服，无额外药味。",
+          "display_status": "制服法"
+        },
+        {
+          "bbox": [
+            535,
+            220,
+            790,
+            740
+          ],
+          "kind": "引文方论",
+          "details": "景岳張氏曰腎虛不能藏精……不知一；药理阐述，药名提及不等于另列处方。"
+        },
+        {
+          "bbox": [
+            25,
+            220,
+            480,
+            740
+          ],
+          "kind": "引文方论续",
+          "details": "陰一陽者天地之道……丹皮辛寒以清少；解释前方药性，非新的配伍段。"
+        },
+        {
+          "bbox": [
+            0,
+            180,
+            25,
+            750
+          ],
+          "kind": "版口页眉",
+          "details": "书名卷次和版口，不作为正文。"
+        }
+      ],
+      "full_page_review": {
+        "status": "全页正文已检查",
+        "base_rows": 3,
+        "conditional_rows": 0,
+        "revision": "保留页首三味及可能续页标记，补齐全页论述分类。",
+        "observation_readable_rows": 3,
+        "observation_pending_rows": 0,
+        "output_table_rows": 0,
+        "count_note": "观察行保留全部可读条目；出表分母只统计 display_status=应出表 的当前页药味。"
+      }
+    },
+    {
+      "id": "思濟堂方書-0041",
+      "book": "思濟堂方書",
+      "page_no": 41,
+      "image": "古籍评测集/医家类/思濟堂方書/page_41.png",
+      "image_size": [
+        1024,
+        803
+      ],
+      "split": "验收",
+      "scope": "全页逐面逐列",
+      "instances": [
+        {
+          "id": "S41-1",
+          "name_verbatim": "理中湯",
+          "name_bbox": [
+            850,
+            212,
+            885,
+            305
+          ],
+          "quote": "人參 白朮土炒 干薑各二錢 炙草一錢半",
+          "quote_bbox": [
+            645,
+            240,
+            740,
+            735
+          ],
+          "status": "完整配伍段",
+          "note": "",
+          "ingredients": [
+            {
+              "herb_verbatim": "人參",
+              "dose_verbatim": "各二錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                695,
+                220,
+                740,
+                325
+              ],
+              "dose_bbox": [
+                700,
+                620,
+                745,
+                735
+              ],
+              "role": "基本组成",
+              "observation_status": "可计分",
+              "display_status": "应出表"
+            },
+            {
+              "herb_verbatim": "白朮",
+              "dose_verbatim": "各二錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                695,
+                385,
+                740,
+                490
+              ],
+              "dose_bbox": [
+                700,
+                620,
+                745,
+                735
+              ],
+              "role": "基本组成",
+              "observation_status": "可计分",
+              "display_status": "应出表"
+            },
+            {
+              "herb_verbatim": "干薑",
+              "dose_verbatim": "各二錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                695,
+                545,
+                740,
+                650
+              ],
+              "dose_bbox": [
+                700,
+                620,
+                745,
+                735
+              ],
+              "role": "基本组成",
+              "observation_status": "可计分",
+              "display_status": "应出表"
+            },
+            {
+              "herb_verbatim": "炙草",
+              "dose_verbatim": "一錢半",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                645,
+                220,
+                690,
+                325
+              ],
+              "dose_bbox": [
+                650,
+                285,
+                695,
+                390
+              ],
+              "role": "基本组成",
+              "observation_status": "可计分",
+              "display_status": "应出表"
+            }
+          ],
+          "display_status": "应出表"
+        },
+        {
+          "id": "S41-2",
+          "name_verbatim": "附子理中湯",
+          "name_bbox": [
+            550,
+            212,
+            590,
+            355
+          ],
+          "quote": "即前方加川附子製一錢半",
+          "quote_bbox": [
+            435,
+            240,
+            480,
+            555
+          ],
+          "status": "加味方",
+          "note": "前方药味以引用关系表示，不在本实例复制其文字位置。",
+          "ingredients": [
+            {
+              "herb_verbatim": "川附子",
+              "dose_verbatim": "一錢半",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                430,
+                330,
+                480,
+                465
+              ],
+              "dose_bbox": [
+                430,
+                455,
+                480,
+                570
+              ],
+              "role": "加味",
+              "observation_status": "可计分",
+              "display_status": "留在原文的加减／转引"
+            }
+          ],
+          "display_status": "留在原文的加减／转引",
+          "display_reason": "虽有本页方名，但正文仅称即前方加川附子，没有独立列出完整基本配伍，留在原文核对。"
+        },
+        {
+          "id": "S41-3",
+          "name_verbatim": "生脈飲",
+          "name_bbox": [
+            135,
+            212,
+            170,
+            305
+          ],
+          "quote": "治熱傷元氣氣短倦怠口乾出汗脈虛小無力者",
+          "quote_bbox": [
+            35,
+            240,
+            135,
+            735
+          ],
+          "status": "可能续页",
+          "note": "本页只有题名和主治，未见组成；不视为完整空方。",
+          "ingredients": [],
+          "display_status": "疑似续页提示",
+          "continuation_flag": "可能续页",
+          "display_reason": "本页只有题名和主治，未出现可见配伍，提示可能续页，不产生方表行。"
+        }
+      ],
+      "negative_spans": [],
+      "unreviewed_regions": [],
+      "sha256": "c72a12011936433c4b442b98211ed8695fd176af735d2fd06c404ce5c16b9a9f",
+      "coverage_regions": [
+        {
+          "bbox": [
+            890,
+            220,
+            990,
+            740
+          ],
+          "kind": "页首论述续文",
+          "details": "陰之火還以奉少陽之氣……壯水制火特其一端耳；承前页方论。"
+        },
+        {
+          "bbox": [
+            745,
+            210,
+            890,
+            740
+          ],
+          "kind": "题名和主治",
+          "details": "理中湯及其主治，不重复当作配伍。"
+        },
+        {
+          "bbox": [
+            645,
+            225,
+            745,
+            735
+          ],
+          "kind": "配伍",
+          "details": "人參、白朮、干薑、炙草，见 S41-1。"
+        },
+        {
+          "bbox": [
+            595,
+            225,
+            645,
+            735
+          ],
+          "kind": "煎服法",
+          "details": "水煎熱服，不是药味剂量。",
+          "display_status": "制服法"
+        },
+        {
+          "bbox": [
+            540,
+            210,
+            595,
+            400
+          ],
+          "kind": "加味方标题",
+          "details": "附子理中湯，见 S41-2。"
+        },
+        {
+          "bbox": [
+            425,
+            225,
+            480,
+            590
+          ],
+          "kind": "加味关系",
+          "details": "即前方加川附子製一錢半，只记录本页新增一味，不复制基本方。"
+        },
+        {
+          "bbox": [
+            180,
+            220,
+            425,
+            740
+          ],
+          "kind": "引文与方论",
+          "details": "鄒倩程氏曰陽之動始於溫……飲食培化矣，不另造配伍。"
+        },
+        {
+          "bbox": [
+            25,
+            210,
+            180,
+            740
+          ],
+          "kind": "题名与主治",
+          "details": "生脈飲及主治，本页未见配伍，方名和组成可能跨页；见 S41-3。"
+        },
+        {
+          "bbox": [
+            0,
+            180,
+            25,
+            750
+          ],
+          "kind": "版口页眉",
+          "details": "书名卷次和版口，不作为正文。"
+        }
+      ],
+      "full_page_review": {
+        "status": "全页正文已检查",
+        "base_rows": 4,
+        "conditional_rows": 1,
+        "revision": "保留理中湯、附子理中湯及生脈飲续页状态，补齐全页段落分类。",
+        "observation_readable_rows": 5,
+        "observation_pending_rows": 0,
+        "output_table_rows": 4,
+        "count_note": "观察行保留全部可读条目；出表分母只统计 display_status=应出表 的当前页药味。"
+      }
+    },
+    {
+      "id": "思濟堂方書-0050",
+      "book": "思濟堂方書",
+      "page_no": 50,
+      "image": "古籍评测集/医家类/思濟堂方書/page_50.png",
+      "image_size": [
+        1024,
+        809
+      ],
+      "split": "验收",
+      "scope": "全页逐面逐列",
+      "instances": [
+        {
+          "id": "S50-1",
+          "name_verbatim": "桂枝湯",
+          "name_bbox": [
+            945,
+            212,
+            985,
+            305
+          ],
+          "quote": "桂枝 芍藥 生薑各三錢 甘草二錢 大棗二枚",
+          "quote_bbox": [
+            645,
+            240,
+            745,
+            735
+          ],
+          "status": "完整配伍段",
+          "note": "",
+          "ingredients": [
+            {
+              "herb_verbatim": "桂枝",
+              "dose_verbatim": "各三錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                695,
+                220,
+                740,
+                325
+              ],
+              "dose_bbox": [
+                700,
+                620,
+                745,
+                735
+              ],
+              "role": "基本组成",
+              "observation_status": "可计分",
+              "display_status": "应出表"
+            },
+            {
+              "herb_verbatim": "芍藥",
+              "dose_verbatim": "各三錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                695,
+                385,
+                740,
+                490
+              ],
+              "dose_bbox": [
+                700,
+                620,
+                745,
+                735
+              ],
+              "role": "基本组成",
+              "observation_status": "可计分",
+              "display_status": "应出表"
+            },
+            {
+              "herb_verbatim": "生薑",
+              "dose_verbatim": "各三錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                695,
+                545,
+                740,
+                650
+              ],
+              "dose_bbox": [
+                700,
+                620,
+                745,
+                735
+              ],
+              "role": "基本组成",
+              "observation_status": "可计分",
+              "display_status": "应出表"
+            },
+            {
+              "herb_verbatim": "甘草",
+              "dose_verbatim": "二錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                645,
+                220,
+                690,
+                325
+              ],
+              "dose_bbox": [
+                650,
+                285,
+                695,
+                375
+              ],
+              "role": "基本组成",
+              "observation_status": "可计分",
+              "display_status": "应出表"
+            },
+            {
+              "herb_verbatim": "大棗",
+              "dose_verbatim": "二枚",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                645,
+                385,
+                690,
+                490
+              ],
+              "dose_bbox": [
+                650,
+                450,
+                695,
+                540
+              ],
+              "role": "基本组成",
+              "observation_status": "可计分",
+              "display_status": "应出表"
+            }
+          ],
+          "display_status": "应出表"
+        },
+        {
+          "id": "S50-2",
+          "name_verbatim": "九味羌活湯",
+          "name_bbox": [
+            435,
+            212,
+            475,
+            355
+          ],
+          "quote": "羌活三錢 防風 黃芩各一錢半 白芷 川芎各一錢 蒼朮 生地各一錢半 細辛 甘草各五分 引加生薑二錢蔥白二寸",
+          "quote_bbox": [
+            135,
+            240,
+            375,
+            735
+          ],
+          "status": "完整配伍段",
+          "note": "",
+          "ingredients": [
+            {
+              "herb_verbatim": "羌活",
+              "dose_verbatim": "三錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                330,
+                220,
+                375,
+                325
+              ],
+              "dose_bbox": [
+                335,
+                285,
+                380,
+                375
+              ],
+              "role": "基本组成",
+              "observation_status": "可计分",
+              "display_status": "应出表"
+            },
+            {
+              "herb_verbatim": "防風",
+              "dose_verbatim": "各一錢半",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                330,
+                385,
+                375,
+                490
+              ],
+              "dose_bbox": [
+                335,
+                620,
+                380,
+                755
+              ],
+              "role": "基本组成",
+              "observation_status": "可计分",
+              "display_status": "应出表"
+            },
+            {
+              "herb_verbatim": "黃芩",
+              "dose_verbatim": "各一錢半",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                330,
+                545,
+                375,
+                650
+              ],
+              "dose_bbox": [
+                335,
+                620,
+                380,
+                755
+              ],
+              "role": "基本组成",
+              "observation_status": "可计分",
+              "display_status": "应出表"
+            },
+            {
+              "herb_verbatim": "白芷",
+              "dose_verbatim": "各一錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                280,
+                220,
+                325,
+                325
+              ],
+              "dose_bbox": [
+                285,
+                450,
+                330,
+                550
+              ],
+              "role": "基本组成",
+              "observation_status": "可计分",
+              "display_status": "应出表"
+            },
+            {
+              "herb_verbatim": "川芎",
+              "dose_verbatim": "各一錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                280,
+                385,
+                325,
+                490
+              ],
+              "dose_bbox": [
+                285,
+                450,
+                330,
+                550
+              ],
+              "role": "基本组成",
+              "observation_status": "可计分",
+              "display_status": "应出表"
+            },
+            {
+              "herb_verbatim": "蒼朮",
+              "dose_verbatim": "各一錢半",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                280,
+                545,
+                325,
+                650
+              ],
+              "dose_bbox": [
+                235,
+                280,
+                280,
+                425
+              ],
+              "role": "基本组成",
+              "observation_status": "可计分",
+              "display_status": "应出表"
+            },
+            {
+              "herb_verbatim": "生地",
+              "dose_verbatim": "各一錢半",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                230,
+                220,
+                275,
+                325
+              ],
+              "dose_bbox": [
+                235,
+                280,
+                280,
+                425
+              ],
+              "role": "基本组成",
+              "observation_status": "可计分",
+              "display_status": "应出表"
+            },
+            {
+              "herb_verbatim": "細辛",
+              "dose_verbatim": "各五分",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                230,
+                385,
+                275,
+                490
+              ],
+              "dose_bbox": [
+                235,
+                610,
+                280,
+                720
+              ],
+              "role": "基本组成",
+              "observation_status": "可计分",
+              "display_status": "应出表"
+            },
+            {
+              "herb_verbatim": "甘草",
+              "dose_verbatim": "各五分",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                230,
+                545,
+                275,
+                650
+              ],
+              "dose_bbox": [
+                235,
+                610,
+                280,
+                720
+              ],
+              "role": "基本组成",
+              "observation_status": "可计分",
+              "display_status": "应出表"
+            },
+            {
+              "herb_verbatim": "生薑",
+              "dose_verbatim": "二錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                180,
+                270,
+                225,
+                375
+              ],
+              "dose_bbox": [
+                180,
+                335,
+                225,
+                425
+              ],
+              "role": "引药",
+              "observation_status": "可计分",
+              "display_status": "制服法",
+              "display_reason": "原文在九味组方之后另列「引加生薑二錢蔥白二寸水煎熱服」，按引药及煎服说明处理，不计基本方剂表。"
+            },
+            {
+              "herb_verbatim": "蔥白",
+              "dose_verbatim": "二寸",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                180,
+                385,
+                225,
+                490
+              ],
+              "dose_bbox": [
+                180,
+                450,
+                225,
+                540
+              ],
+              "role": "引药",
+              "observation_status": "可计分",
+              "display_status": "制服法",
+              "display_reason": "原文在九味组方之后另列「引加生薑二錢蔥白二寸水煎熱服」，按引药及煎服说明处理，不计基本方剂表。"
+            }
+          ],
+          "display_status": "应出表",
+          "display_reason": "本页有题名和明确九味配伍；另起的引加生薑、蔥白及水煎熱服归煎服说明，不并入基本方剂表。"
+        },
+        {
+          "id": "S50-3",
+          "name_verbatim": "衝和化滯湯",
+          "name_bbox": [
+            135,
+            212,
+            175,
+            355
+          ],
+          "quote": "即九味羌活湯加神麴麥芽山查各二錢",
+          "quote_bbox": [
+            35,
+            240,
+            75,
+            690
+          ],
+          "status": "加味方",
+          "note": "前方引用，不复制其药味。",
+          "ingredients": [
+            {
+              "herb_verbatim": "神麴",
+              "dose_verbatim": "各二錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                30,
+                410,
+                80,
+                505
+              ],
+              "dose_bbox": [
+                30,
+                605,
+                80,
+                710
+              ],
+              "role": "加味",
+              "observation_status": "可计分",
+              "display_status": "留在原文的加减／转引"
+            },
+            {
+              "herb_verbatim": "麥芽",
+              "dose_verbatim": "各二錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                30,
+                465,
+                80,
+                565
+              ],
+              "dose_bbox": [
+                30,
+                605,
+                80,
+                710
+              ],
+              "role": "加味",
+              "observation_status": "可计分",
+              "display_status": "留在原文的加减／转引"
+            },
+            {
+              "herb_verbatim": "山查",
+              "dose_verbatim": "各二錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                30,
+                525,
+                80,
+                625
+              ],
+              "dose_bbox": [
+                30,
+                605,
+                80,
+                710
+              ],
+              "role": "加味",
+              "observation_status": "可计分",
+              "display_status": "留在原文的加减／转引"
+            }
+          ],
+          "display_status": "留在原文的加减／转引",
+          "display_reason": "虽有本页方名，但正文仅称即九味羌活湯加三味，留在原文作为转引加味。"
+        }
+      ],
+      "negative_spans": [],
+      "unreviewed_regions": [],
+      "sha256": "932760d513220717ec74770095739c647e899b04db036687245c63965005f810",
+      "coverage_regions": [
+        {
+          "bbox": [
+            745,
+            210,
+            990,
+            740
+          ],
+          "kind": "题名和主治",
+          "details": "桂枝湯，此方為仲景公群方之冠……但見一二證即是不必悉具矣。"
+        },
+        {
+          "bbox": [
+            645,
+            225,
+            745,
+            735
+          ],
+          "kind": "配伍",
+          "details": "桂枝、芍藥、生薑、甘草、大棗，见 S50-1。"
+        },
+        {
+          "bbox": [
+            540,
+            225,
+            645,
+            740
+          ],
+          "kind": "煎服法",
+          "details": "右五味水煎溫服……啜稀粥一盞以助藥力，不将粥计作配伍味。",
+          "display_status": "制服法"
+        },
+        {
+          "bbox": [
+            375,
+            210,
+            475,
+            740
+          ],
+          "kind": "题名和主治",
+          "details": "九味羌活湯，此方乃四時發汗之通劑。"
+        },
+        {
+          "bbox": [
+            225,
+            225,
+            375,
+            740
+          ],
+          "kind": "配伍",
+          "details": "九味及共享剂量见 S50-2。"
+        },
+        {
+          "bbox": [
+            175,
+            225,
+            225,
+            735
+          ],
+          "kind": "引药及煎服",
+          "details": "引加生薑二錢蔥白二寸水煎熱服；两味标为引药。",
+          "display_status": "制服法"
+        },
+        {
+          "bbox": [
+            75,
+            210,
+            175,
+            740
+          ],
+          "kind": "题名及主治",
+          "details": "衝和化滯湯治感寒傷食者效。"
+        },
+        {
+          "bbox": [
+            25,
+            225,
+            75,
+            735
+          ],
+          "kind": "加味方及转引",
+          "details": "即九味羌活湯加神麴麥芽山查各二錢；只计本页新增三味，不重复基础方。"
+        },
+        {
+          "bbox": [
+            0,
+            180,
+            25,
+            750
+          ],
+          "kind": "版口页眉",
+          "details": "书名卷次和版口，不作为正文。"
+        }
+      ],
+      "full_page_review": {
+        "status": "全页正文已检查",
+        "base_rows": 14,
+        "conditional_rows": 3,
+        "guide_rows": 2,
+        "revision": "保留三方原有逐味标注，补齐主治、煎服、转引分类。",
+        "observation_readable_rows": 19,
+        "observation_pending_rows": 0,
+        "output_table_rows": 14,
+        "count_note": "观察行保留全部可读条目；出表分母只统计 display_status=应出表 的当前页药味。"
+      }
+    },
+    {
+      "id": "丹方彚编-0022",
+      "book": "丹方彚编",
+      "page_no": 22,
+      "image": "古籍评测集/医家类/丹方彚编/page_22.png",
+      "image_size": [
+        1024,
+        901
+      ],
+      "split": "开发",
+      "scope": "心痛段",
+      "instances": [
+        {
+          "id": "D22-1",
+          "name_verbatim": null,
+          "name_bbox": null,
+          "quote": "心痛 山梔子七枚炒焦黃 水一盞煎七分 入姜汁三匙熱服立止",
+          "quote_bbox": [
+            250,
+            165,
+            335,
+            820
+          ],
+          "status": "无名方",
+          "note": "心痛为病证小标题；水一盞煎七分为煎煮量，不是木香剂量。本段止于熱服立止。",
+          "ingredients": [
+            {
+              "herb_verbatim": "山梔子",
+              "dose_verbatim": "七枚",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                313,
+                230,
+                347,
+                360
+              ],
+              "dose_bbox": [
+                313,
+                320,
+                347,
+                410
+              ],
+              "role": "基本组成"
+            },
+            {
+              "herb_verbatim": "姜汁",
+              "dose_verbatim": "三匙",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                313,
+                615,
+                347,
+                700
+              ],
+              "dose_bbox": [
+                313,
+                660,
+                347,
+                755
+              ],
+              "role": "引药"
+            }
+          ]
+        },
+        {
+          "id": "D22-2",
+          "name_verbatim": null,
+          "name_bbox": null,
+          "quote": "寒痛 陳皮香附吳茱萸良薑石菖蒲各等分 水一碗",
+          "quote_bbox": [
+            275,
+            200,
+            320,
+            820
+          ],
+          "status": "无名方",
+          "note": "病证小标题，非方名；各等分为相对配比，无绝对剂量。 坐标为整列原文块，不是字级定位。",
+          "ingredients": [
+            {
+              "herb_verbatim": "陳皮",
+              "dose_verbatim": "各等分",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                275,
+                200,
+                320,
+                820
+              ],
+              "dose_bbox": [
+                275,
+                200,
+                320,
+                820
+              ],
+              "role": "基本组成"
+            },
+            {
+              "herb_verbatim": "香附",
+              "dose_verbatim": "各等分",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                275,
+                200,
+                320,
+                820
+              ],
+              "dose_bbox": [
+                275,
+                200,
+                320,
+                820
+              ],
+              "role": "基本组成"
+            },
+            {
+              "herb_verbatim": "吳茱萸",
+              "dose_verbatim": "各等分",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                275,
+                200,
+                320,
+                820
+              ],
+              "dose_bbox": [
+                275,
+                200,
+                320,
+                820
+              ],
+              "role": "基本组成"
+            },
+            {
+              "herb_verbatim": "良薑",
+              "dose_verbatim": "各等分",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                275,
+                200,
+                320,
+                820
+              ],
+              "dose_bbox": [
+                275,
+                200,
+                320,
+                820
+              ],
+              "role": "基本组成"
+            },
+            {
+              "herb_verbatim": "石菖蒲",
+              "dose_verbatim": "各等分",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                275,
+                200,
+                320,
+                820
+              ],
+              "dose_bbox": [
+                275,
+                200,
+                320,
+                820
+              ],
+              "role": "基本组成"
+            }
+          ]
+        }
+      ],
+      "negative_spans": [],
+      "unreviewed_regions": [
+        "同页其他多个处方尚未标注"
+      ],
+      "sha256": "75532d3740a8a74e527c0aee88cb8a08ea9f46b38b1608d379f8af0efc6c9372"
+    },
+    {
+      "id": "丹方彚编-0023",
+      "book": "丹方彚编",
+      "page_no": 23,
+      "image": "古籍评测集/医家类/丹方彚编/page_23.png",
+      "image_size": [
+        1024,
+        891
+      ],
+      "split": "开发",
+      "scope": "萬靈九轉還丹秘方片段",
+      "instances": [
+        {
+          "id": "D23-1",
+          "name_verbatim": "萬靈九轉還丹秘方",
+          "name_bbox": [
+            455,
+            175,
+            490,
+            450
+          ],
+          "quote": "真鴉片冬三兩夏〔?〕 石草霜九錢 西牛黃〔?〕 麝香〔?〕",
+          "quote_bbox": [
+            350,
+            235,
+            445,
+            820
+          ],
+          "status": "剂量待核",
+          "note": "剂量旁有改写或墨迹重叠，冬夏剂量与涂改字不能可靠辨读；保留原图位置，不纳入剂量计分。",
+          "ingredients": [
+            {
+              "herb_verbatim": "真鴉片",
+              "dose_verbatim": null,
+              "dose_status": "待核",
+              "herb_bbox": [
+                395,
+                225,
+                445,
+                390
+              ],
+              "dose_bbox": [
+                395,
+                350,
+                445,
+                530
+              ],
+              "role": "基本组成"
+            },
+            {
+              "herb_verbatim": "石草霜",
+              "dose_verbatim": "九錢",
+              "dose_status": "原文有载",
+              "herb_bbox": [
+                345,
+                225,
+                395,
+                380
+              ],
+              "dose_bbox": [
+                345,
+                340,
+                395,
+                440
+              ],
+              "role": "基本组成"
+            },
+            {
+              "herb_verbatim": "西牛黃",
+              "dose_verbatim": null,
+              "dose_status": "待核",
+              "herb_bbox": [
+                395,
+                500,
+                445,
+                630
+              ],
+              "dose_bbox": [
+                395,
+                590,
+                445,
+                710
+              ],
+              "role": "基本组成"
+            },
+            {
+              "herb_verbatim": "麝香",
+              "dose_verbatim": null,
+              "dose_status": "待核",
+              "herb_bbox": [
+                395,
+                670,
+                445,
+                775
+              ],
+              "dose_bbox": [
+                395,
+                735,
+                445,
+                840
+              ],
+              "role": "基本组成"
+            }
+          ]
+        }
+      ],
+      "negative_spans": [],
+      "unreviewed_regions": [
+        "右面多个方段尚未标注"
+      ],
+      "sha256": "298a4ede4909a4d0defaaaf679012d7d1ace10b7b3e3af59fe4d4b5e3ff2e2e0"
+    }
+  ],
+  "scoring_rule": "验收页药味仅 display_status=应出表 纳入方剂表行召回分母；原图观察、续页提示、加减转引、制服法、待核分列核验。"
+}

@@ -1,0 +1,344 @@
+{
+  "run": "D:\\A中医药赛题\\TCM-OCR-Knowledge-Graph\\output\\formula_stage5\\run-f2kv29_f",
+  "real": {
+    "page_id": "P20261119183911-5d68ae",
+    "names": [
+      "三化湯",
+      "六君子湯"
+    ],
+    "first_name": {
+      "blocks": [
+        {
+          "line": "R003",
+          "ref": "P20261119183911-5d68ae:R003",
+          "text": "三化湯",
+          "bbox": [
+            801,
+            212,
+            836,
+            303
+          ]
+        }
+      ],
+      "detail": "字段：三化湯 · 定位原文字段 · 已高亮 1 个文本块\nR003 · OCR 原文：三化湯 · bbox [801,212,836,303] · P20261119183911-5d68ae:R003",
+      "block_detail": "R003 · OCR 原文：三化湯\ntext_norm：三化汤 · quote：三化湯 · page_id：P20261119183911-5d68ae · bbox：[801,212,836,303] · block_ref：P20261119183911-5d68ae:R003 · 阅读顺序：5 · source_hash：afb4dc49fad51ba5 · kind/conf：paragraph / 0.9891"
+    },
+    "first_herb": {
+      "blocks": [
+        {
+          "line": "R014",
+          "ref": "P20261119183911-5d68ae:R014",
+          "text": "羌活枳實厚朴",
+          "bbox": [
+            652,
+            241,
+            686,
+            628
+          ]
+        }
+      ],
+      "detail": "字段：羌活 · 定位原文字段 · 已高亮 1 个文本块\nR014 · OCR 原文：羌活枳實厚朴 · bbox [652,241,686,628] · P20261119183911-5d68ae:R014",
+      "block_detail": "R014 · OCR 原文：羌活枳實厚朴\ntext_norm：羌活枳实厚朴 · quote：羌活枳實厚朴 · page_id：P20261119183911-5d68ae · bbox：[652,241,686,628] · block_ref：P20261119183911-5d68ae:R014 · 阅读顺序：8 · source_hash：9e62bc4016f79cd6 · kind/conf：paragraph / 0.7235"
+    },
+    "uncertain_dose": {
+      "blocks": [
+        {
+          "line": "R014",
+          "ref": "P20261119183911-5d68ae:R014",
+          "text": "羌活枳實厚朴",
+          "bbox": [
+            652,
+            241,
+            686,
+            628
+          ]
+        },
+        {
+          "line": "R013",
+          "ref": "P20261119183911-5d68ae:R013",
+          "text": "川大黄洛三錢芒硝一錢牛",
+          "bbox": [
+            603,
+            236,
+            645,
+            552
+          ]
+        }
+      ],
+      "detail": "字段：待核 · 定位配伍上下文 · 已高亮 2 个文本块\nR014 · OCR 原文：羌活枳實厚朴 · bbox [652,241,686,628] · P20261119183911-5d68ae:R014\nR013 · OCR 原文：川大黄洛三錢芒硝一錢牛 · bbox [603,236,645,552] · P20261119183911-5d68ae:R013",
+      "block_detail": "R014 · OCR 原文：羌活枳實厚朴\ntext_norm：羌活枳实厚朴 · quote：羌活枳實厚朴 · page_id：P20261119183911-5d68ae · bbox：[652,241,686,628] · block_ref：P20261119183911-5d68ae:R014 · 阅读顺序：8 · source_hash：9e62bc4016f79cd6 · kind/conf：paragraph / 0.7235\nR013 · OCR 原文：川大黄洛三錢芒硝一錢牛\ntext_norm：川大黄洛三钱芒硝一钱牛 · quote：川大黄洛三錢芒硝一錢牛 · page_id：P20261119183911-5d68ae · bbox：[603,236,645,552] · block_ref：P20261119183911-5d68ae:R013 · 阅读顺序：9 · source_hash：144fc7675d618098 · kind/conf：paragraph / 0.8415"
+    },
+    "second_name": {
+      "blocks": [
+        {
+          "line": "R002",
+          "ref": "P20261119183911-5d68ae:R002",
+          "text": "六君子湯",
+          "bbox": [
+            333,
+            216,
+            369,
+            350
+          ]
+        }
+      ],
+      "detail": "字段：六君子湯 · 定位原文字段 · 已高亮 1 个文本块\nR002 · OCR 原文：六君子湯 · bbox [333,216,369,350] · P20261119183911-5d68ae:R002",
+      "block_detail": "R002 · OCR 原文：六君子湯\ntext_norm：六君子汤 · quote：六君子湯 · page_id：P20261119183911-5d68ae · bbox：[333,216,369,350] · block_ref：P20261119183911-5d68ae:R002 · 阅读顺序：13 · source_hash：09c670c62c25c52a · kind/conf：paragraph / 0.9958"
+    },
+    "second_herb": {
+      "blocks": [
+        {
+          "line": "R006",
+          "ref": "P20261119183911-5d68ae:R006",
+          "text": "人参上白术城黄正白芬",
+          "bbox": [
+            122,
+            238,
+            189,
+            724
+          ]
+        }
+      ],
+      "detail": "字段：待核 · 定位原文字段 · 已高亮 1 个文本块\nR006 · OCR 原文：人参上白术城黄正白芬 · bbox [122,238,189,724] · P20261119183911-5d68ae:R006",
+      "block_detail": "R006 · OCR 原文：人参上白术城黄正白芬\ntext_norm：人参上白术城黄正白芬 · quote：人参上白术城黄正白芬 · page_id：P20261119183911-5d68ae · bbox：[122,238,189,724] · block_ref：P20261119183911-5d68ae:R006 · 阅读顺序：18 · source_hash：5db428d77d2b09af · kind/conf：paragraph / 0.6671"
+    },
+    "second_dose": {
+      "blocks": [
+        {
+          "line": "R006",
+          "ref": "P20261119183911-5d68ae:R006",
+          "text": "人参上白术城黄正白芬",
+          "bbox": [
+            122,
+            238,
+            189,
+            724
+          ]
+        },
+        {
+          "line": "R005",
+          "ref": "P20261119183911-5d68ae:R005",
+          "text": "甘草天廣皮V心甘装半夏各錢",
+          "bbox": [
+            80,
+            242,
+            131,
+            741
+          ]
+        }
+      ],
+      "detail": "字段：待核 · 定位配伍上下文 · 已高亮 2 个文本块\nR006 · OCR 原文：人参上白术城黄正白芬 · bbox [122,238,189,724] · P20261119183911-5d68ae:R006\nR005 · OCR 原文：甘草天廣皮V心甘装半夏各錢 · bbox [80,242,131,741] · P20261119183911-5d68ae:R005",
+      "block_detail": "R006 · OCR 原文：人参上白术城黄正白芬\ntext_norm：人参上白术城黄正白芬 · quote：人参上白术城黄正白芬 · page_id：P20261119183911-5d68ae · bbox：[122,238,189,724] · block_ref：P20261119183911-5d68ae:R006 · 阅读顺序：18 · source_hash：5db428d77d2b09af · kind/conf：paragraph / 0.6671\nR005 · OCR 原文：甘草天廣皮V心甘装半夏各錢\ntext_norm：甘草天广皮V心甘装半夏各钱 · quote：甘草天廣皮V心甘装半夏各錢 · page_id：P20261119183911-5d68ae · bbox：[80,242,131,741] · block_ref：P20261119183911-5d68ae:R005 · 阅读顺序：19 · source_hash：298431853a815e5f · kind/conf：paragraph / 0.532"
+    },
+    "reopened_uncertain_dose": {
+      "blocks": [
+        {
+          "line": "R014",
+          "ref": "P20261119183911-5d68ae:R014",
+          "text": "羌活枳實厚朴",
+          "bbox": [
+            652,
+            241,
+            686,
+            628
+          ]
+        },
+        {
+          "line": "R013",
+          "ref": "P20261119183911-5d68ae:R013",
+          "text": "川大黄洛三錢芒硝一錢牛",
+          "bbox": [
+            603,
+            236,
+            645,
+            552
+          ]
+        }
+      ],
+      "detail": "字段：待核 · 定位配伍上下文 · 已高亮 2 个文本块\nR014 · OCR 原文：羌活枳實厚朴 · bbox [652,241,686,628] · P20261119183911-5d68ae:R014\nR013 · OCR 原文：川大黄洛三錢芒硝一錢牛 · bbox [603,236,645,552] · P20261119183911-5d68ae:R013",
+      "block_detail": "R014 · OCR 原文：羌活枳實厚朴\ntext_norm：羌活枳实厚朴 · quote：羌活枳實厚朴 · page_id：P20261119183911-5d68ae · bbox：[652,241,686,628] · block_ref：P20261119183911-5d68ae:R014 · 阅读顺序：8 · source_hash：9e62bc4016f79cd6 · kind/conf：paragraph / 0.7235\nR013 · OCR 原文：川大黄洛三錢芒硝一錢牛\ntext_norm：川大黄洛三钱芒硝一钱牛 · quote：川大黄洛三錢芒硝一錢牛 · page_id：P20261119183911-5d68ae · bbox：[603,236,645,552] · block_ref：P20261119183911-5d68ae:R013 · 阅读顺序：9 · source_hash：144fc7675d618098 · kind/conf：paragraph / 0.8415"
+    },
+    "browser_reloaded_uncertain_dose": {
+      "blocks": [
+        {
+          "line": "R014",
+          "ref": "P20261119183911-5d68ae:R014",
+          "text": "羌活枳實厚朴",
+          "bbox": [
+            652,
+            241,
+            686,
+            628
+          ]
+        },
+        {
+          "line": "R013",
+          "ref": "P20261119183911-5d68ae:R013",
+          "text": "川大黄洛三錢芒硝一錢牛",
+          "bbox": [
+            603,
+            236,
+            645,
+            552
+          ]
+        }
+      ],
+      "detail": "字段：待核 · 定位配伍上下文 · 已高亮 2 个文本块\nR014 · OCR 原文：羌活枳實厚朴 · bbox [652,241,686,628] · P20261119183911-5d68ae:R014\nR013 · OCR 原文：川大黄洛三錢芒硝一錢牛 · bbox [603,236,645,552] · P20261119183911-5d68ae:R013",
+      "block_detail": "R014 · OCR 原文：羌活枳實厚朴\ntext_norm：羌活枳实厚朴 · quote：羌活枳實厚朴 · page_id：P20261119183911-5d68ae · bbox：[652,241,686,628] · block_ref：P20261119183911-5d68ae:R014 · 阅读顺序：8 · source_hash：9e62bc4016f79cd6 · kind/conf：paragraph / 0.7235\nR013 · OCR 原文：川大黄洛三錢芒硝一錢牛\ntext_norm：川大黄洛三钱芒硝一钱牛 · quote：川大黄洛三錢芒硝一錢牛 · page_id：P20261119183911-5d68ae · bbox：[603,236,645,552] · block_ref：P20261119183911-5d68ae:R013 · 阅读顺序：9 · source_hash：144fc7675d618098 · kind/conf：paragraph / 0.8415"
+    }
+  },
+  "controlled": {
+    "page_id": "P20261119000000-abc123",
+    "names": [
+      "桂枝湯",
+      "稀涎散",
+      "四君子湯"
+    ],
+    "shared_first": {
+      "blocks": [
+        {
+          "line": "R003",
+          "ref": "P20261119000000-abc123:R003",
+          "text": "各三",
+          "bbox": [
+            530,
+            130,
+            580,
+            230
+          ]
+        },
+        {
+          "line": "R004",
+          "ref": "P20261119000000-abc123:R004",
+          "text": "錢",
+          "bbox": [
+            460,
+            130,
+            510,
+            185
+          ]
+        }
+      ],
+      "detail": "字段：三錢 · 定位原文字段 · 已高亮 2 个文本块\nR003 · OCR 原文：各三 · bbox [530,130,580,230] · P20261119000000-abc123:R003\nR004 · OCR 原文：錢 · bbox [460,130,510,185] · P20261119000000-abc123:R004",
+      "block_detail": "R003 · OCR 原文：各三\ntext_norm：各三 · quote：各三 · page_id：P20261119000000-abc123 · bbox：[530,130,580,230] · block_ref：P20261119000000-abc123:R003 · 阅读顺序：3 · source_hash：fixture-3 · kind/conf：paragraph / 0.99\nR004 · OCR 原文：錢\ntext_norm：钱 · quote：錢 · page_id：P20261119000000-abc123 · bbox：[460,130,510,185] · block_ref：P20261119000000-abc123:R004 · 阅读顺序：4 · source_hash：fixture-4 · kind/conf：paragraph / 0.99"
+    },
+    "shared_second": {
+      "blocks": [
+        {
+          "line": "R003",
+          "ref": "P20261119000000-abc123:R003",
+          "text": "各三",
+          "bbox": [
+            530,
+            130,
+            580,
+            230
+          ]
+        },
+        {
+          "line": "R004",
+          "ref": "P20261119000000-abc123:R004",
+          "text": "錢",
+          "bbox": [
+            460,
+            130,
+            510,
+            185
+          ]
+        }
+      ],
+      "detail": "字段：三錢 · 定位原文字段 · 已高亮 2 个文本块\nR003 · OCR 原文：各三 · bbox [530,130,580,230] · P20261119000000-abc123:R003\nR004 · OCR 原文：錢 · bbox [460,130,510,185] · P20261119000000-abc123:R004",
+      "block_detail": "R003 · OCR 原文：各三\ntext_norm：各三 · quote：各三 · page_id：P20261119000000-abc123 · bbox：[530,130,580,230] · block_ref：P20261119000000-abc123:R003 · 阅读顺序：3 · source_hash：fixture-3 · kind/conf：paragraph / 0.99\nR004 · OCR 原文：錢\ntext_norm：钱 · quote：錢 · page_id：P20261119000000-abc123 · bbox：[460,130,510,185] · block_ref：P20261119000000-abc123:R004 · 阅读顺序：4 · source_hash：fixture-4 · kind/conf：paragraph / 0.99"
+    },
+    "keyboard_shared": {
+      "blocks": [
+        {
+          "line": "R003",
+          "ref": "P20261119000000-abc123:R003",
+          "text": "各三",
+          "bbox": [
+            530,
+            130,
+            580,
+            230
+          ]
+        },
+        {
+          "line": "R004",
+          "ref": "P20261119000000-abc123:R004",
+          "text": "錢",
+          "bbox": [
+            460,
+            130,
+            510,
+            185
+          ]
+        }
+      ],
+      "detail": "字段：三錢 · 定位原文字段 · 已高亮 2 个文本块\nR003 · OCR 原文：各三 · bbox [530,130,580,230] · P20261119000000-abc123:R003\nR004 · OCR 原文：錢 · bbox [460,130,510,185] · P20261119000000-abc123:R004",
+      "block_detail": "R003 · OCR 原文：各三\ntext_norm：各三 · quote：各三 · page_id：P20261119000000-abc123 · bbox：[530,130,580,230] · block_ref：P20261119000000-abc123:R003 · 阅读顺序：3 · source_hash：fixture-3 · kind/conf：paragraph / 0.99\nR004 · OCR 原文：錢\ntext_norm：钱 · quote：錢 · page_id：P20261119000000-abc123 · bbox：[460,130,510,185] · block_ref：P20261119000000-abc123:R004 · 阅读顺序：4 · source_hash：fixture-4 · kind/conf：paragraph / 0.99"
+    },
+    "absent": {
+      "blocks": [
+        {
+          "line": "R007",
+          "ref": "P20261119000000-abc123:R007",
+          "text": "白礬生用牙皂角",
+          "bbox": [
+            570,
+            390,
+            620,
+            710
+          ]
+        }
+      ],
+      "detail": "字段：原文未载 · 定位配伍上下文 · 已高亮 1 个文本块\nR007 · OCR 原文：白礬生用牙皂角 · bbox [570,390,620,710] · P20261119000000-abc123:R007",
+      "block_detail": "R007 · OCR 原文：白礬生用牙皂角\ntext_norm：白礬生用牙皂角 · quote：白礬生用牙皂角 · page_id：P20261119000000-abc123 · bbox：[570,390,620,710] · block_ref：P20261119000000-abc123:R007 · 阅读顺序：7 · source_hash：fixture-7 · kind/conf：paragraph / 0.99"
+    },
+    "continuation_visible": true
+  },
+  "printed": {
+    "p0011": {
+      "page_id": "P20261119183925-596ca9",
+      "click": {
+        "blocks": [
+          {
+            "line": "R006",
+            "ref": "P20261119183925-596ca9:R006",
+            "text": "三兩",
+            "bbox": [
+              342,
+              323,
+              405,
+              359
+            ]
+          }
+        ],
+        "detail": "字段：三兩 · 定位原文字段 · 已高亮 1 个文本块\nR006 · OCR 原文：三兩 · bbox [342,323,405,359] · P20261119183925-596ca9:R006",
+        "block_detail": "R006 · OCR 原文：三兩\ntext_norm：三两 · quote：三兩 · page_id：P20261119183925-596ca9 · bbox：[342,323,405,359] · block_ref：P20261119183925-596ca9:R006 · 阅读顺序：7 · source_hash：12e55d3d55721c9f · kind/conf：paragraph / 0.9498"
+      }
+    },
+    "p0015": {
+      "page_id": "P20261119183927-a9e88b",
+      "click": {
+        "blocks": [
+          {
+            "line": "R006",
+            "ref": "P20261119183927-a9e88b:R006",
+            "text": "三兩",
+            "bbox": [
+              342,
+              323,
+              405,
+              359
+            ]
+          }
+        ],
+        "detail": "字段：三兩 · 定位原文字段 · 已高亮 1 个文本块\nR006 · OCR 原文：三兩 · bbox [342,323,405,359] · P20261119183927-a9e88b:R006",
+        "block_detail": "R006 · OCR 原文：三兩\ntext_norm：三两 · quote：三兩 · page_id：P20261119183927-a9e88b · bbox：[342,323,405,359] · block_ref：P20261119183927-a9e88b:R006 · 阅读顺序：7 · source_hash：cdc71447518dca9f · kind/conf：paragraph / 0.9498"
+      }
+    }
+  },
+  "errors": [],
+  "browser_version": "157.0.8103.79"
+}

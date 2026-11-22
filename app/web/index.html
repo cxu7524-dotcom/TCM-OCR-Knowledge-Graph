@@ -1751,7 +1751,8 @@ async function loadOcr() {
     $("demoChip").textContent = badgeOf(r);
     $("demoChip").className = "chip " + (r.is_demo ? "warn" : "ok");
     $("s2hint").textContent = "识别后端：" + r.engine + "（模型 " + (r.rec_model || "—") + "）；共 " +
-      (r.blocks || []).length + " 个文本块，已按 reading_order 排序。所有坐标与摘抄均可回原文核对。";
+      (r.blocks || []).length + " 个文本块，已按 reading_order 排序。" +
+      (r.extraction ? " 抽取模式：" + r.extraction.mode + "，状态：" + r.extraction.status + (r.extraction.model ? "，模型：" + r.extraction.model : "") + "。" : "");
     $("s2sub").textContent = r.is_demo
       ? "示例数据无原图，此处为重排文字框（bbox 来自示例标注）。"
       : "原图 + bbox 叠加：悬停查看识别文本，点击框可查看对应的文本块与溯源字段。";
@@ -2101,7 +2102,7 @@ function renderEntities(entities, triples) {
   renderEntityRows(entities);
   $("triCount").textContent = triples.length;
   $("triBody").innerHTML = triples.length ? triples.map(t =>
-    '<tr><td>' + esc(t.head) + '</td><td>' + esc(t.relation) + '</td><td>' +
+    '<tr><td>' + esc(t.head) + '</td><td>' + esc(t.relation + (t.qualifier ? '（' + t.qualifier + '）' : '')) + '</td><td>' +
     esc(t.tail) + '</td><td>' + sourceCell(t) + '</td></tr>').join("")
     : "<tr><td colspan='4' class='empty'>暂无三元组</td></tr>";
 }
@@ -2182,7 +2183,7 @@ function drawGraph() {
     ctx.strokeStyle = "rgba(95,79,60,.38)"; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
     ctx.fillStyle = "#786b59"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
-    ctx.fillText(l.relation || "", (a.x + b.x) / 2, (a.y + b.y) / 2 - 3);
+    ctx.fillText((l.relation || "") + (l.qualifier ? "（" + l.qualifier + "）" : ""), (a.x + b.x) / 2, (a.y + b.y) / 2 - 3);
   });
   // 节点
   S.nodes.forEach(nd => {
@@ -2201,9 +2202,10 @@ function drawGraph() {
     const ins = S.links.filter(l => l.target === best.id).length, outs = S.links.filter(l => l.source === best.id).length;
     $("nodeDetail").innerHTML = [
       ["节点", best.label], ["类型", best.type], ["权重", best.value],
+      ["所属条目", best.entry_id || "—"],
       ["入边 / 出边", ins + " / " + outs], ["page_id", best.page_id || (S.pageId || "—")],
       ["source_hash", best.source_hash || "—"],
-      ["关系（出）", S.links.filter(l => l.source === best.id).map(l => l.relation + "→" + l.target).join("；") || "—"],
+      ["关系（出）", S.links.filter(l => l.source === best.id).map(l => l.relation + (l.qualifier ? "（" + l.qualifier + "）" : "") + "→" + (S.nodes.find(n => n.id === l.target)?.label || l.target)).join("；") || "—"],
       ["演示标注", badgeOf(S.graph)],
     ].map(([k, v]) => `<div><b>${esc(k)}：</b>${esc(fmt(v))}</div>`).join("");
   };
@@ -2254,7 +2256,7 @@ async function ask(q) {
       objs.map((o, i) => `<div class="obj-card" data-line="${esc(o.relation_line)}" data-page="${esc(o.page_id)}"
          title="点击定位到关系引文所在行">
          <div class="obj-main">[${i + 1}] <b>${esc(o.head)}</b><span class="obj-type">${esc(o.subject_type || "—")}</span>
-           <span class="obj-rel">—${esc(o.relation)}→</span>${esc(o.tail)}</div>
+           <span class="obj-rel">—${esc(o.relation)}→</span>${esc(o.tail)}${o.qualifier ? "（" + esc(o.qualifier) + "）" : ""}</div>
          <div class="obj-meta">关系引文 ${esc(o.relation_line)}：${esc(o.relation_quote)}<br>
          主体出处：${o.support === "carry"
             ? "主体引文 " + esc(o.subject_line) + "「" + esc(o.subject_quote) + "」（与关系分列两行）"

@@ -1,0 +1,552 @@
+[
+  {
+    "tag": "p0011",
+    "source": "2026-11-19 local run_ocr direct, not upload or browser",
+    "engine": "rapidocr",
+    "model_loaded": true,
+    "is_demo": false,
+    "rows": [
+      [
+        "藥名",
+        "劑量",
+        "炮製"
+      ],
+      [
+        "桂枝",
+        "三兩",
+        "去皮"
+      ],
+      [
+        "芍藥",
+        "三兩",
+        "切"
+      ],
+      [
+        "甘草",
+        "二兩",
+        "炙"
+      ],
+      [
+        "生薑",
+        "三兩",
+        "切"
+      ],
+      [
+        "大棗",
+        "十二枚",
+        "擘"
+      ]
+    ],
+    "cell_refs": [
+      [
+        "BASELINE-p0011:R002",
+        "BASELINE-p0011:R003",
+        "BASELINE-p0011:R004"
+      ],
+      [
+        "BASELINE-p0011:R005",
+        "BASELINE-p0011:R006",
+        "BASELINE-p0011:R007"
+      ],
+      [
+        "BASELINE-p0011:R008",
+        "BASELINE-p0011:R009",
+        "BASELINE-p0011:R010"
+      ],
+      [
+        "BASELINE-p0011:R011",
+        "BASELINE-p0011:R012",
+        "BASELINE-p0011:R013"
+      ],
+      [
+        "BASELINE-p0011:R014",
+        "BASELINE-p0011:R015",
+        "BASELINE-p0011:R016"
+      ],
+      [
+        "BASELINE-p0011:R017",
+        "BASELINE-p0011:R018",
+        "BASELINE-p0011:R019"
+      ]
+    ],
+    "cells": [
+      [
+        {
+          "text": "藥名",
+          "ref": "BASELINE-p0011:R002",
+          "bbox": [
+            100,
+            230,
+            164,
+            267
+          ]
+        },
+        {
+          "text": "劑量",
+          "ref": "BASELINE-p0011:R003",
+          "bbox": [
+            340,
+            230,
+            404,
+            267
+          ]
+        },
+        {
+          "text": "炮製",
+          "ref": "BASELINE-p0011:R004",
+          "bbox": [
+            581,
+            230,
+            645,
+            267
+          ]
+        }
+      ],
+      [
+        {
+          "text": "桂枝",
+          "ref": "BASELINE-p0011:R005",
+          "bbox": [
+            100,
+            322,
+            165,
+            359
+          ]
+        },
+        {
+          "text": "三兩",
+          "ref": "BASELINE-p0011:R006",
+          "bbox": [
+            342,
+            323,
+            405,
+            359
+          ]
+        },
+        {
+          "text": "去皮",
+          "ref": "BASELINE-p0011:R007",
+          "bbox": [
+            582,
+            322,
+            645,
+            359
+          ]
+        }
+      ],
+      [
+        {
+          "text": "芍藥",
+          "ref": "BASELINE-p0011:R008",
+          "bbox": [
+            100,
+            411,
+            166,
+            452
+          ]
+        },
+        {
+          "text": "三兩",
+          "ref": "BASELINE-p0011:R009",
+          "bbox": [
+            342,
+            414,
+            405,
+            452
+          ]
+        },
+        {
+          "text": "切",
+          "ref": "BASELINE-p0011:R010",
+          "bbox": [
+            582,
+            415,
+            618,
+            451
+          ]
+        }
+      ],
+      [
+        {
+          "text": "甘草",
+          "ref": "BASELINE-p0011:R011",
+          "bbox": [
+            101,
+            506,
+            165,
+            544
+          ]
+        },
+        {
+          "text": "二兩",
+          "ref": "BASELINE-p0011:R012",
+          "bbox": [
+            343,
+            506,
+            405,
+            544
+          ]
+        },
+        {
+          "text": "炙",
+          "ref": "BASELINE-p0011:R013",
+          "bbox": [
+            582,
+            505,
+            616,
+            544
+          ]
+        }
+      ],
+      [
+        {
+          "text": "生薑",
+          "ref": "BASELINE-p0011:R014",
+          "bbox": [
+            100,
+            598,
+            165,
+            635
+          ]
+        },
+        {
+          "text": "三兩",
+          "ref": "BASELINE-p0011:R015",
+          "bbox": [
+            340,
+            597,
+            405,
+            637
+          ]
+        },
+        {
+          "text": "切",
+          "ref": "BASELINE-p0011:R016",
+          "bbox": [
+            582,
+            599,
+            618,
+            636
+          ]
+        }
+      ],
+      [
+        {
+          "text": "大棗",
+          "ref": "BASELINE-p0011:R017",
+          "bbox": [
+            100,
+            690,
+            165,
+            727
+          ]
+        },
+        {
+          "text": "十二枚",
+          "ref": "BASELINE-p0011:R018",
+          "bbox": [
+            343,
+            691,
+            432,
+            726
+          ]
+        },
+        {
+          "text": "擘",
+          "ref": "BASELINE-p0011:R019",
+          "bbox": [
+            582,
+            691,
+            617,
+            728
+          ]
+        }
+      ]
+    ],
+    "notes": [
+      "推理后端：rapidocr-onnxruntime（本机 ONNX Runtime，CPU，模型随包分发，无公网调用）",
+      "识别模型：ch_PP-OCRv5_rec_mobile.onnx（来源=auto）",
+      "检测文本块 19 个",
+      "本地 OCR 依赖可用，执行真实推理（engine=rapidocr, model_loaded=True）",
+      "版面：horizontal-ltr，4 列；基于检测框 bbox 的 x 投影列聚类；竖长条框 0/19（0.00%），检测到 4 列；rule=new，命中[无]→horizontal-ltr",
+      "字形纠错：本页无命中（规则表见 data/lexicon/ocr_confusions.json）",
+      "归一化：字表 162 条，命中字符 18，转换 11（版本 v2）",
+      "表格：bbox 行列聚类还原 1 张方剂/剂量表"
+    ]
+  },
+  {
+    "tag": "p0015",
+    "source": "2026-11-19 local run_ocr direct, not upload or browser",
+    "engine": "rapidocr",
+    "model_loaded": true,
+    "is_demo": false,
+    "rows": [
+      [
+        "藥名",
+        "劑量",
+        "炮製"
+      ],
+      [
+        "桂枝",
+        "三兩",
+        "去皮"
+      ],
+      [
+        "芍藥",
+        "三兩",
+        "切"
+      ],
+      [
+        "甘草",
+        "二兩",
+        "炙"
+      ],
+      [
+        "生薑",
+        "三兩",
+        "切"
+      ],
+      [
+        "大棗",
+        "十二枚",
+        "擘"
+      ]
+    ],
+    "cell_refs": [
+      [
+        "BASELINE-p0015:R002",
+        "BASELINE-p0015:R003",
+        "BASELINE-p0015:R004"
+      ],
+      [
+        "BASELINE-p0015:R005",
+        "BASELINE-p0015:R006",
+        "BASELINE-p0015:R007"
+      ],
+      [
+        "BASELINE-p0015:R008",
+        "BASELINE-p0015:R009",
+        "BASELINE-p0015:R010"
+      ],
+      [
+        "BASELINE-p0015:R011",
+        "BASELINE-p0015:R012",
+        "BASELINE-p0015:R013"
+      ],
+      [
+        "BASELINE-p0015:R014",
+        "BASELINE-p0015:R015",
+        "BASELINE-p0015:R016"
+      ],
+      [
+        "BASELINE-p0015:R017",
+        "BASELINE-p0015:R018",
+        "BASELINE-p0015:R019"
+      ]
+    ],
+    "cells": [
+      [
+        {
+          "text": "藥名",
+          "ref": "BASELINE-p0015:R002",
+          "bbox": [
+            100,
+            230,
+            164,
+            267
+          ]
+        },
+        {
+          "text": "劑量",
+          "ref": "BASELINE-p0015:R003",
+          "bbox": [
+            340,
+            230,
+            404,
+            267
+          ]
+        },
+        {
+          "text": "炮製",
+          "ref": "BASELINE-p0015:R004",
+          "bbox": [
+            581,
+            230,
+            645,
+            267
+          ]
+        }
+      ],
+      [
+        {
+          "text": "桂枝",
+          "ref": "BASELINE-p0015:R005",
+          "bbox": [
+            100,
+            322,
+            165,
+            359
+          ]
+        },
+        {
+          "text": "三兩",
+          "ref": "BASELINE-p0015:R006",
+          "bbox": [
+            342,
+            323,
+            405,
+            359
+          ]
+        },
+        {
+          "text": "去皮",
+          "ref": "BASELINE-p0015:R007",
+          "bbox": [
+            582,
+            322,
+            645,
+            359
+          ]
+        }
+      ],
+      [
+        {
+          "text": "芍藥",
+          "ref": "BASELINE-p0015:R008",
+          "bbox": [
+            100,
+            411,
+            166,
+            452
+          ]
+        },
+        {
+          "text": "三兩",
+          "ref": "BASELINE-p0015:R009",
+          "bbox": [
+            342,
+            414,
+            405,
+            452
+          ]
+        },
+        {
+          "text": "切",
+          "ref": "BASELINE-p0015:R010",
+          "bbox": [
+            582,
+            415,
+            618,
+            451
+          ]
+        }
+      ],
+      [
+        {
+          "text": "甘草",
+          "ref": "BASELINE-p0015:R011",
+          "bbox": [
+            101,
+            506,
+            165,
+            544
+          ]
+        },
+        {
+          "text": "二兩",
+          "ref": "BASELINE-p0015:R012",
+          "bbox": [
+            343,
+            506,
+            405,
+            544
+          ]
+        },
+        {
+          "text": "炙",
+          "ref": "BASELINE-p0015:R013",
+          "bbox": [
+            582,
+            505,
+            616,
+            544
+          ]
+        }
+      ],
+      [
+        {
+          "text": "生薑",
+          "ref": "BASELINE-p0015:R014",
+          "bbox": [
+            100,
+            598,
+            165,
+            635
+          ]
+        },
+        {
+          "text": "三兩",
+          "ref": "BASELINE-p0015:R015",
+          "bbox": [
+            340,
+            597,
+            405,
+            637
+          ]
+        },
+        {
+          "text": "切",
+          "ref": "BASELINE-p0015:R016",
+          "bbox": [
+            582,
+            599,
+            618,
+            636
+          ]
+        }
+      ],
+      [
+        {
+          "text": "大棗",
+          "ref": "BASELINE-p0015:R017",
+          "bbox": [
+            100,
+            690,
+            165,
+            727
+          ]
+        },
+        {
+          "text": "十二枚",
+          "ref": "BASELINE-p0015:R018",
+          "bbox": [
+            343,
+            691,
+            432,
+            726
+          ]
+        },
+        {
+          "text": "擘",
+          "ref": "BASELINE-p0015:R019",
+          "bbox": [
+            582,
+            691,
+            617,
+            728
+          ]
+        }
+      ]
+    ],
+    "notes": [
+      "推理后端：rapidocr-onnxruntime（本机 ONNX Runtime，CPU，模型随包分发，无公网调用）",
+      "识别模型：ch_PP-OCRv5_rec_mobile.onnx（来源=auto）",
+      "检测文本块 19 个",
+      "本地 OCR 依赖可用，执行真实推理（engine=rapidocr, model_loaded=True）",
+      "版面：horizontal-ltr，4 列；基于检测框 bbox 的 x 投影列聚类；竖长条框 0/19（0.00%），检测到 4 列；rule=new，命中[无]→horizontal-ltr",
+      "字形纠错：本页无命中（规则表见 data/lexicon/ocr_confusions.json）",
+      "归一化：字表 162 条，命中字符 18，转换 11（版本 v2）",
+      "表格：bbox 行列聚类还原 1 张方剂/剂量表"
+    ]
+  }
+]

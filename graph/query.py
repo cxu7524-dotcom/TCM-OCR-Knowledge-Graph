@@ -44,7 +44,7 @@ _HERB_NORM = {_norm(h) for h in HERBS}
 _FORMULA_NORM = {_norm(f) for f in FORMULAS}
 
 
-def subject_type(name: str, entities: Optional[Iterable[Any]] = None) -> str:
+def subject_type(name: str, entities: Optional[Iterable[Any]] = None, entry_id: str = "") -> str:
     """推断三元组主语的实体类型：实体表 → 词典 → 方名后缀。
 
     「六君子湯」「三化湯」这类词典外方名靠后缀判为方剂；
@@ -56,7 +56,8 @@ def subject_type(name: str, entities: Optional[Iterable[Any]] = None) -> str:
     for e in entities or []:
         etype = e.get("type") if isinstance(e, dict) else getattr(e, "type", "")
         ename = e.get("name") if isinstance(e, dict) else getattr(e, "name", "")
-        if ename == raw and etype in SUBJECT_TYPES:
+        entity_entry = e.get("entry_id", "") if isinstance(e, dict) else getattr(e, "entry_id", "")
+        if ename == raw and etype in SUBJECT_TYPES and (not entry_id or entity_entry == entry_id):
             return str(etype)
     key = _norm(raw)
     if key in _HERB_NORM:
@@ -105,8 +106,8 @@ def _pack(kind: str, term: str, matches: List[Triple],
     results = []
     for t in matches:
         results.append({
-            "head": t.head, "relation": t.relation, "tail": t.tail,
-            "subject_type": subject_type(t.head, entities),
+            **t.to_dict(),
+            "subject_type": subject_type(t.head, entities, t.entry_id),
             "page_id": t.page_id, "bbox": t.bbox, "line_id": t.line_id,
             "quote": t.quote, "source_hash": t.source_hash,
             "evidence_refs": t.evidence_refs,
@@ -132,7 +133,7 @@ def query_herbs_by_symptom(symptom: str, triples: Iterable[Triple],
     hits = [t for t in triples if isinstance(t, Triple)
             and _page_ok(t, page_id)
             and t.relation == "主治"
-            and subject_type(t.head, ents) == "药材"
+            and subject_type(t.head, ents, t.entry_id) == "药材"
             and _tail_has(t.tail, symptom)]
     return _pack("herbs_by_symptom", symptom, hits, ents, page_id)
 
@@ -145,7 +146,7 @@ def query_formulas_by_symptom(symptom: str, triples: Iterable[Triple],
     hits = [t for t in triples if isinstance(t, Triple)
             and _page_ok(t, page_id)
             and t.relation == "主治"
-            and subject_type(t.head, ents) == "方剂"
+            and subject_type(t.head, ents, t.entry_id) == "方剂"
             and _tail_has(t.tail, symptom)]
     return _pack("formulas_by_symptom", symptom, hits, ents, page_id)
 
@@ -158,7 +159,7 @@ def query_contraindications(herb: str, triples: Iterable[Triple],
     hits = [t for t in triples if isinstance(t, Triple)
             and _page_ok(t, page_id)
             and t.relation == "禁忌"
-            and subject_type(t.head, ents) in SUBJECT_TYPES
+            and subject_type(t.head, ents, t.entry_id) in SUBJECT_TYPES
             and _head_is(t.head, herb)]
     return _pack("contraindications", herb, hits, ents, page_id)
 
@@ -168,9 +169,15 @@ def query_formula(formula: str, triples: Iterable[Triple],
                   entities: Optional[Iterable[Any]] = None) -> Dict[str, Any]:
     """方剂组成与剂量。"""
     ents = list(entities or [])
-    hits = [t for t in triples if isinstance(t, Triple)
+    items = list(triples)
+    entries = {e.get("entry_id", "") if isinstance(e, dict) else getattr(e, "entry_id", "")
+               for e in ents if (e.get("type") if isinstance(e, dict) else getattr(e, "type", "")) == "方剂"
+               and _head_is(e.get("name", "") if isinstance(e, dict) else getattr(e, "name", ""), formula)}
+    entries.discard("")
+    hits = [t for t in items if isinstance(t, Triple)
             and _page_ok(t, page_id)
-            and _head_is(t.head, formula) and t.relation in ("组成", "剂量")]
+            and ((_head_is(t.head, formula) and t.relation in ("组成", "剂量"))
+                 or (t.entry_id in entries and t.relation == "剂量"))]
     return _pack("formula", formula, hits, ents, page_id)
 
 

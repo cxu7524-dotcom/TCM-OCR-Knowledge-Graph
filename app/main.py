@@ -38,6 +38,7 @@ import logging
 import shutil
 import sys
 import threading
+from functools import wraps
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -61,6 +62,8 @@ from extract.rules import (candidate_triples,                           # noqa: 
 from extract.formula_segments import extract_formula_candidates
 from extract.formula_rows import extract_formula_rows
 from extract.formula_tables import text_formula_tables
+from extract.llm_extraction import extract_candidates, PROMPT_VERSION, PROTOCOL_VERSION
+from extract.llm_validate import validate_candidates
 from extract.schema import dictionary_stats, warn_if_degraded              # noqa: E402
 from graph.build import build_graph, build_triples                         # noqa: E402
 from graph.export import (                                                 # noqa: E402
@@ -104,7 +107,17 @@ _STATE: Dict[str, Any] = {
     "vector_index": None,
     "last_ingest": None,
     "ocr": None,
+    "extraction": None,
 }
+_INGEST_LOCK = threading.RLock()
+
+
+def _serialized_ingest(fn):
+    @wraps(fn)
+    def wrapped(*args, **kwargs):
+        with _INGEST_LOCK:
+            return fn(*args, **kwargs)
+    return wrapped
 
 
 def real_badge(model: str = "") -> str:
@@ -131,6 +144,7 @@ def _flags_for(ocr: Optional[OCRResult]) -> Dict[str, Any]:
 # 内部：一次完整入库（OCR → 抽取 → 图谱 → 存储）
 # ------------------------------------------------------------------
 
+@_serialized_ingest
 def _ingest(ocr: OCRResult) -> Dict[str, Any]:
     """把 OCRResult 走完 ②③④ 的构建并幂等入库，更新演示状态。
 
@@ -139,8 +153,32 @@ def _ingest(ocr: OCRResult) -> Dict[str, Any]:
     """
     # 同一 OCRResult 重复入库时，从原始块重新生成本轮证据，防止证据重复进抽取流。
     ocr.blocks = [b for b in ocr.blocks if b.kind != 'small_column_evidence']
-    entities, candidates, unresolved = extract_all_audited(ocr.blocks, is_demo=ocr.is_demo)
-    triples = build_triples(entities, ocr.blocks, candidates)
+    selected = CONFIG.llm.extract_backend.lower()
+    if selected not in {"auto", "rules", "cloud"}:
+        raise HTTPException(status_code=503, detail="抽取配置无效，请检查 TCM_EXTRACT_BACKEND。")
+    cloud = selected == "cloud" or (selected == "auto" and CONFIG.llm.backend.lower() == "cloud")
+    if cloud:
+        if CONFIG.llm.backend.lower() != "cloud" or not CONFIG.llm.enabled:
+            raise HTTPException(status_code=503, detail="云端抽取配置不完整，请检查服务端配置。")
+        try:
+            refs = [b.block_ref for b in ocr.blocks]
+            call = extract_candidates(ocr.blocks, refs)
+            validated = validate_candidates(ocr.blocks, refs, call, is_demo=ocr.is_demo)
+        except Exception:
+            raise HTTPException(status_code=503, detail="云端抽取调用或结果处理失败，可重试。")
+        if validated.status == "failure":
+            safe_errors = {"authentication", "model_unavailable", "rate_limit", "timeout", "server_error", "invalid_response", "truncated", "connection_error", "configuration", "invalid_protocol", "invalid_output", "invalid_input", "http_error", "scope_detection_failed"}
+            code = validated.error if validated.error in safe_errors else "unknown_error"
+            raise HTTPException(status_code=503, detail=f"云端抽取失败（{code}），可检查配置后重试。")
+        entities, triples, unresolved = validated.entities, validated.triples, validated.unresolved
+        extraction = {"mode": "cloud", "model": CONFIG.llm.model, "prompt_version": PROMPT_VERSION,
+                      "protocol_version": PROTOCOL_VERSION,
+                      "status": "success_with_relations" if triples else "success_no_relations"}
+    else:
+        entities, candidates, unresolved = extract_all_audited(ocr.blocks, is_demo=ocr.is_demo)
+        triples = build_triples(entities, ocr.blocks, candidates)
+        extraction = {"mode": "rules", "model": "", "prompt_version": "", "protocol_version": "",
+                      "status": "success_with_relations" if triples else "success_no_relations"}
     graph = build_graph(triples, entities)
     # 未确认归属随页入库：这些行「找不到可确认主体」，不产出关系，
     # 但记录要能事后核查（page_id / line_id / 关系 / 客体 / 原因 / bbox）。
@@ -162,8 +200,11 @@ def _ingest(ocr: OCRResult) -> Dict[str, Any]:
     # 保存原书表结构以便 JSON 快照不可读时从 SQLite 恢复。
     formula_extraction['_printed_tables'] = [t.to_dict() for t in ocr.tables]
     stat = store.save_page(ocr, entities, triples, unresolved=unresolved,
-                           formula_extraction=formula_extraction)
-    export_graph_json(graph)
+                           formula_extraction=formula_extraction, extraction_meta=extraction)
+    try:
+        export_graph_json(graph)
+    except OSError:
+        logger.warning("图谱镜像写入失败，页面数据仍可从数据库读取")
 
     # 新页面入库 → 语义索引后台增量重建（不阻塞本次请求）
     try:
@@ -178,6 +219,7 @@ def _ingest(ocr: OCRResult) -> Dict[str, Any]:
         "entities": entities,
         "triples": triples,
         "unresolved": unresolved,
+        "extraction": extraction,
         "graph": graph,
         "vector_index": build_index([b for b in ocr.blocks if b.kind != 'small_column_evidence']),
         "last_ingest": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -191,6 +233,7 @@ def _ingest(ocr: OCRResult) -> Dict[str, Any]:
         "graph_nodes": len(graph.nodes),
         "graph_edges": len(graph.edges),
         "ingest": stat,
+        "extraction": extraction,
         **_tables_payload(ocr.to_dict(), [b.to_dict() for b in ocr.blocks], formula_extraction),
         "formula_continuation_hints": formula_extraction['continuation_hints'],
         "formula_extraction_status": "stored",
@@ -232,7 +275,8 @@ def _objects_for(page_id: Optional[str], blocks: List[Block],
         ent, tri = _snapshot_objects(page_id)
     elif _STATE["triples"]:
         ent, tri = _STATE["entities"], _STATE["triples"]
-    if tri or not blocks:
+    snap = store.get_page(page_id) if page_id else None
+    if tri or not blocks or (snap and "extraction" in snap):
         return ent, tri
     try:
         blocks = [b for b in blocks if b.kind != 'small_column_evidence']
@@ -270,9 +314,9 @@ def _snapshot_objects(page_id: str):
     tris_raw = snap.get("triples") or []
     entities = [e if isinstance(e, Entity) else Entity.from_dict(e) for e in ents_raw]
     triples = [t if isinstance(t, Triple) else Triple.from_dict(t) for t in tris_raw]
-    if not entities:
+    if not entities and "extraction" not in snap:
         entities = store.get_entities(page_id)
-    if not triples:
+    if not triples and "extraction" not in snap:
         triples = store.get_triples(page_id)
     return entities, triples
 
@@ -381,8 +425,9 @@ def health():
                     "rec_model_source": _rec_src,
                     "model_loaded": bool(_STATE["ocr"] and _STATE["ocr"].model_loaded),
                     "is_demo": bool(_STATE["ocr"] is None or _STATE["ocr"].is_demo)},
-            "extract": {"backend": "rules", "llm": CONFIG.llm.backend,
+            "extract": {"backend": CONFIG.llm.extract_backend, "llm": CONFIG.llm.backend,
                         "llm_loaded": False, "is_demo": False,
+                        "current_page": _STATE.get("extraction"),
                         "dictionary": dictionary_stats()},
             "graph": {"nodes": len(_STATE["graph"].nodes) if _STATE["graph"] else 0,
                       "is_demo": bool(_STATE["graph"].is_demo) if _STATE["graph"] else True},
@@ -544,19 +589,30 @@ async def upload_page(
                    f"（诊断：{'；'.join(notes)}）")
 
     pid = page_id or new_page_id()
-    dest = CONFIG.paths.uploads_dir / f"{pid}{suffix}"
+    dest = None
     try:
-        with dest.open("wb") as fh:
-            fh.write(raw)
+        while True:
+            dest = CONFIG.paths.uploads_dir / f"{new_page_id()}{suffix}"
+            try:
+                with dest.open("xb") as fh:
+                    fh.write(raw)
+                break
+            except FileExistsError:
+                continue
         ocr = run_ocr(str(dest), pid)
     except HTTPException:
+        if dest is not None:
+            dest.unlink(missing_ok=True)
         raise
     except Exception as exc:
+        if dest is not None:
+            dest.unlink(missing_ok=True)
         logger.exception("上传处理失败：%s", type(exc).__name__)
         raise HTTPException(status_code=500,
                             detail=f"服务端处理异常（{type(exc).__name__}），详见服务端日志。")
 
     if ocr.is_demo or not ocr.model_loaded:
+        dest.unlink(missing_ok=True)
         # 真实上传路径**不允许**降级成示例数据（阶段九 P0-4）
         logger.error("真实上传被降级为示例数据：page_id=%s notes=%s", pid, ocr.notes)
         raise HTTPException(
@@ -566,7 +622,11 @@ async def upload_page(
 
     ocr.notes.append(f"已接收上传图像：{file.filename}（{len(raw) / 1024:.0f} KB）；"
                      f"识别模型 {rec_model_name()}，耗时见日志")
-    return JSONResponse(_ingest(ocr))
+    try:
+        return JSONResponse(_ingest(ocr))
+    except HTTPException:
+        dest.unlink(missing_ok=True)
+        raise
 
 
 @app.get("/api/pages")
@@ -585,7 +645,7 @@ def delete_page(page_id: str):
     if _STATE["page_id"] == page_id:
         _STATE.update({"page_id": None, "ocr": None, "blocks": [], "entities": [],
                        "triples": [], "unresolved": [], "graph": None,
-                       "vector_index": None})
+                       "vector_index": None, "extraction": None})
     return {"ok": True, **stat, "pages": store.list_pages()}
 
 
@@ -715,13 +775,14 @@ def get_ocr(page_id: str):
     page = snap.get("page", {})
     # blocks 必须按 reading_order 排序（阶段九 P1）：JSON 快照里的顺序是 OCR 原始返回顺序，
     # SQLite 已 ORDER BY reading_order, id，优先用它；取不到才退回快照并就地排序。
-    blocks = [b.to_dict() for b in store.get_blocks(page_id)]
+    blocks = ([] if "extraction" in snap else [b.to_dict() for b in store.get_blocks(page_id)])
     if not blocks:
         blocks = sorted(page.get("blocks", []),
                         key=lambda b: (b.get("reading_order", 0), b.get("line_id", "")))
     ocr_obj = OCRResult.from_dict(page)
     return {
         "page_id": page_id,
+        "extraction": snap.get("extraction"),
         "page": page,
         "entities": snap.get("entities", []),
         "triples": snap.get("triples", []),
@@ -929,8 +990,7 @@ def _cli() -> None:
     import uvicorn
     print(f"服务启动： http://{args.host}:{args.port}/")
     print(f"免责声明： {DISCLAIMER}")
-    print(f"阶段九：本地 OCR 真实推理（识别模型 {rec_model_name()}）；"
-          "抽取为词典 + 规则，未接入 LLM")
+    print(f"本地 OCR 识别模型：{rec_model_name()}；抽取模式：{CONFIG.llm.extract_backend}")
     print("五项实测指标见 data/reports/正式评测报告.md（合成集，非官方评测结果）")
     print("数据声明：合成示意数据用于工程自测；命题单位样本未到位，不得外传")
     uvicorn.run(app, host=args.host, port=args.port, reload=args.reload)
