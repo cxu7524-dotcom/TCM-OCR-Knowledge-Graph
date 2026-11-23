@@ -18,6 +18,9 @@ app/main.py —— FastAPI 入口与路由（四步演示台的服务端）
     POST   /api/qa                  可溯源问答
     GET    /uploads/{name}          上传页预览
     GET    /docs                    FastAPI 自带接口文档
+    GET    /lounge                  聊天室页面（跨设备公开聊天，纯内存）
+    GET    /api/chat/messages       聊天室：增量消息 + 在室成员
+    POST   /api/chat/send           聊天室：发言
 
 运行：python app/main.py [--port 8100]  或  双击 启动操作台.bat
 
@@ -334,6 +337,12 @@ def index_page():
 def home_page():
     """简洁主页：古籍页上传 + AI 大模型对话。"""
     return FileResponse(CONFIG.paths.web_dir / "home.html", media_type="text/html; charset=utf-8")
+
+
+@app.get("/lounge", include_in_schema=False)
+def lounge_page():
+    """聊天室页面（新增）：游客之间跨设备互通，纯前端渲染 + 两条内存接口。"""
+    return FileResponse(CONFIG.paths.web_dir / "lounge.html", media_type="text/html; charset=utf-8")
 
 
 CONFIG.paths.uploads_dir.mkdir(parents=True, exist_ok=True)
@@ -972,6 +981,152 @@ async def api_asr(file: UploadFile = File(...), lang: str = Form("zh")):
     if not r.get("text"):
         raise HTTPException(status_code=422, detail="没听清，再说一次")
     return r
+
+
+# ------------------------------------------------------------------
+# 聊天室（新增路由，只调用 app/chat_room.py；纯内存，不进数据库）
+# 目的：让「游客 + 五位编码」这套前端身份能真的跨设备说话。
+# 边界：公开一条消息流，重启即清空；删掉本段与 app/chat_room.py 即回退。
+# ------------------------------------------------------------------
+
+@app.get("/api/chat/messages")
+def api_chat_messages(room: str = "", since: int = 0, id: str = ""):
+    """取某间聊天室里 since 之后的新消息与在室列表（前端每 2.5 秒拉一次）。
+
+    room：聊天室 id（官方如 o-fangji，游客自建如 r7k2m）。
+    id：当前游客编码。带上就等于登记在场，所以「在室」是真实心跳，
+    不是「发过言的人」。
+    """
+    from app import chat_room
+    try:
+        return chat_room.snapshot(room, since, id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.post("/api/chat/send")
+def api_chat_send(payload: Dict[str, Any] = Body(default={})):
+    """发一条消息。
+
+    payload: {"room": "o-fangji", "id": "88129", "text": "..."}
+    昵称由服务端按 id 生成（游客88129），前端不传名字，避免伪造。
+    """
+    from app import chat_room
+    payload = payload or {}
+    try:
+        msg = chat_room.post(str(payload.get("room") or ""),
+                             str(payload.get("id") or ""),
+                             str(payload.get("text") or ""))
+    except chat_room.SlowDown as e:
+        raise HTTPException(status_code=429,
+                            detail="说得太快了，歇 %.1f 秒再发" % e.wait)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True, "seq": msg["seq"], "message": msg}
+
+
+@app.post("/api/chat/invite")
+def api_chat_invite(payload: Dict[str, Any] = Body(default={})):
+    """按编号邀请某位游客。
+
+    payload: {"from": "88129", "to": "47217", "room": "o-fangji"}
+    只进内存队列，对方拉消息时取走；对方不在线也不会丢（十分钟内有效）。
+    """
+    from app import chat_room
+    payload = payload or {}
+    try:
+        inv = chat_room.invite(str(payload.get("from") or ""),
+                               str(payload.get("to") or ""),
+                               str(payload.get("room") or ""))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True, "invite": inv, "to_name": inv["to_name"]}
+
+
+@app.post("/api/chat/invite/respond")
+def api_chat_invite_respond(payload: Dict[str, Any] = Body(default={})):
+    """被邀请人处理邀请。payload: {"id": "i3", "me": "93074", "action": "accept"}
+
+    action 取 accept / decline / ignore，结果转给邀请人。
+    """
+    from app import chat_room
+    payload = payload or {}
+    try:
+        res = chat_room.respond(str(payload.get("id") or ""),
+                                str(payload.get("me") or ""),
+                                str(payload.get("action") or ""))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True, "result": res}
+
+
+@app.get("/api/rooms")
+def api_rooms():
+    """聊天室列表：官方（固定 5 间）+ 游客自建（按创建时间倒序）。"""
+    from app import chat_room
+    return chat_room.list_rooms()
+
+
+@app.post("/api/rooms")
+def api_rooms_create(payload: Dict[str, Any] = Body(default={})):
+    """游客开一间。payload: {"name": "...", "desc": "...", "owner": "88129"}"""
+    from app import chat_room
+    payload = payload or {}
+    try:
+        room = chat_room.create_room(str(payload.get("name") or ""),
+                                     str(payload.get("desc") or ""),
+                                     str(payload.get("owner") or ""))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True, "room": room}
+
+
+@app.delete("/api/rooms")
+def api_rooms_delete(id: str = "", owner: str = ""):
+    """创建者删掉自己的聊天室。"""
+    from app import chat_room
+    try:
+        return chat_room.delete_room(id, owner)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/room")
+def api_room(id: str = ""):
+    """单间信息（房间页标题、类型、简介）。"""
+    from app import chat_room
+    try:
+        return chat_room.room_meta(id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.get("/api/chat/inbox")
+def api_chat_inbox(id: str = ""):
+    """收件箱：只取发给我的邀请与处理结果（列表页也会轮询这个）。"""
+    from app import chat_room
+    try:
+        return chat_room.inbox(id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/chat/invites")
+def api_chat_invites(me: str = ""):
+    """我发出的邀请及当前状态（对话框里的记录）。"""
+    from app import chat_room
+    try:
+        rows = chat_room.sent(me)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"invites": rows}
+
+
+@app.get("/api/chat/status")
+def api_chat_status():
+    """聊天室自检：条数、在室人数、限速与长度上限。"""
+    from app import chat_room
+    return chat_room.stats()
 
 
 # ------------------------------------------------------------------

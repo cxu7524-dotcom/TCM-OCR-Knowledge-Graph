@@ -1,0 +1,1713 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>聊天室 · 中医古籍文字识别与知识图谱</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='9' fill='%23a63a24'/%3E%3Ctext x='32' y='45' font-size='36' text-anchor='middle' fill='%23fbeee6' font-family='KaiTi,serif'%3E%E4%BA%A4%3C/text%3E%3C/svg%3E">
+<script>
+/* 主题先于渲染恢复，避免闪白 */
+try { if (localStorage.getItem("tcm.theme") === "dark") document.documentElement.dataset.theme = "dark"; } catch (e) {}
+</script>
+<style>
+  :root {
+    --paper: #f1e8d3; --paper-2: #fbf6ea; --paper-3: #efe4ca;
+    --ink: #2b2520; --ink-soft: #5a4e44; --muted: #70634f;
+    --line: #d8c7a2; --line-soft: #e9dec4;
+    --cinnabar: #a63a24; --cinnabar-dark: #852c1a; --cinnabar-soft: #f5e1d6;
+    --qing: #2e5e5a; --qing-dark: #224744; --qing-soft: #e0ebe5;
+    --gold: #b8964e;
+    --serif: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "STSong", "SimSun", serif;
+    --kai: "KaiTi", "STKaiti", "Kaiti SC", "BiauKai", "Noto Serif SC", serif;
+    --sans: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+    --mono: ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace;
+    --fang: "FangSong", "STFangsong", "仿宋", var(--serif);
+    --wei: "STXinwei", "华文新魏", var(--kai);
+    --shadow-sm: 0 1px 2px rgba(70,50,20,.08);
+    --shadow-md: 0 8px 24px rgba(70,50,20,.12);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    font-family: var(--sans); color: var(--ink); font-size: 14px;
+    background-color: var(--paper);
+    background-image:
+      radial-gradient(ellipse at 12% 8%, rgba(255,255,255,.55), transparent 45%),
+      radial-gradient(ellipse at 88% 92%, rgba(184,150,78,.10), transparent 50%),
+      repeating-linear-gradient(93deg, rgba(120,90,40,.018) 0 2px, transparent 2px 7px),
+      repeating-linear-gradient(-4deg, rgba(120,90,40,.015) 0 1px, transparent 1px 11px);
+  }
+
+  /* ============ 匾额式页眉（与演示台 / 主页同一套） ============ */
+  header {
+    position: sticky; top: 0; z-index: 40;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 10px 24px;
+    background: linear-gradient(180deg, #2f2a24, #26221d);
+    border-bottom: 3px double var(--gold); color: #f3e9d2;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .seal {
+    width: 40px; height: 40px; flex: 0 0 auto; display: grid; place-items: center;
+    font: 400 19px/1 var(--wei); color: #fbeee6; background: var(--cinnabar);
+    border-radius: 3px; transform: rotate(-2deg);
+    box-shadow: inset 0 0 0 2px var(--cinnabar), inset 0 0 0 3.4px #f6dccf;
+  }
+  .brand h1 { margin: 0; font-family: var(--wei); font-size: 19px; font-weight: 400; letter-spacing: 4px; }
+  .brand .sub {
+    display: block; margin-top: 3px; font-family: var(--fang); font-size: 11.5px;
+    letter-spacing: 1px; color: #b8a789;
+  }
+  .hdr-right {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    justify-content: flex-end; margin-left: auto; padding: 8px 0;
+  }
+  .nav-link {
+    display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; border-radius: 2px;
+    font-family: var(--fang); font-size: 12px; letter-spacing: 1.5px; text-decoration: none;
+    color: #e8dcc0; background: rgba(243,233,210,.08); border: 1px solid rgba(232,220,192,.3);
+    transition: .15s; white-space: nowrap;
+  }
+  .nav-link:hover { border-color: var(--gold); color: #f6eedb; background: rgba(201,162,83,.16); }
+  .theme-btn {
+    border: 1px solid rgba(232,220,192,.3); background: rgba(243,233,210,.08); color: #e8dcc0;
+    font-family: var(--fang); font-size: 12px; letter-spacing: 1.5px;
+    padding: 4px 11px; border-radius: 2px; cursor: pointer; transition: .15s; white-space: nowrap;
+  }
+  .theme-btn:hover { border-color: var(--gold); color: #f6eedb; background: rgba(201,162,83,.16); }
+
+  /* ============ 游客身份（与另两页同一套，键名一致） ============ */
+  .um-wrap { position: relative; }
+  .um-btn {
+    position: relative;
+    display: inline-flex; align-items: center; gap: 7px; padding: 3px 10px 3px 4px;
+    border-radius: 999px; cursor: pointer; transition: .15s; white-space: nowrap;
+    background: rgba(243,233,210,.08); border: 1px solid rgba(232,220,192,.3);
+    color: #e8dcc0; font-family: var(--fang); font-size: 12px; letter-spacing: .6px;
+  }
+  .um-btn:hover { border-color: var(--gold); color: #f6eedb; background: rgba(201,162,83,.16); }
+  .um-btn[aria-expanded="true"] { border-color: var(--gold); background: rgba(201,162,83,.2); color: #f6eedb; }
+  .um-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .um-avatar {
+    position: relative;
+    width: 22px; height: 22px; flex: 0 0 auto; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center; line-height: 1;
+    background-color: #8f2f1c;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='11.4' r='5.05' fill='%23fdf4e8' stroke='%23c9a462' stroke-width='.7'/%3E%3Cpath d='M4.5 32c0-6.4 5.15-10.35 11.5-10.35S27.5 25.6 27.5 32z' fill='%23fdf4e8' stroke='%23c9a462' stroke-width='.7'/%3E%3C/svg%3E"),
+      radial-gradient(circle at 33% 23%, #d76b4d 0%, #ab3b21 48%, #742012 100%);
+    background-repeat: no-repeat, no-repeat;
+    background-position: center center, center center;
+    background-size: 71% 71%, 100% 100%;
+    box-shadow: inset 0 0 0 1px rgba(247,226,190,.66),
+                inset 0 0 7px rgba(72,18,6,.42),
+                0 1px 3px rgba(40,18,6,.26);
+  }
+  .um-avatar::after {
+    content: ""; position: absolute; inset: 2px; border-radius: 50%;
+    border: 1px solid rgba(255,238,208,.28); pointer-events: none;
+  }
+  .um-avatar.sm { width: 26px; height: 26px; background-size: 70% 70%, 100% 100%; }
+  .um-avatar.sm::after { inset: 2.5px; }
+  .um-avatar.lg {
+    width: 40px; height: 40px; background-size: 64% 64%, 100% 100%;
+    box-shadow: inset 0 0 0 1.5px rgba(247,226,190,.6),
+                inset 0 0 12px rgba(72,18,6,.4),
+                0 2px 10px rgba(120,40,20,.26);
+  }
+  .um-avatar.lg::after { inset: 4px; border-color: rgba(255,238,208,.34); }
+  .um-caret { font-size: 8px; opacity: .7; }
+  .um-badge {
+    position: absolute; top: -4px; right: -4px; min-width: 15px; height: 15px; padding: 0 3px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 999px; background: var(--cinnabar); color: #fdf3e7;
+    font-family: var(--mono); font-size: 10px; line-height: 1; letter-spacing: 0;
+    box-shadow: 0 0 0 1.5px rgba(47,42,36,.92);
+  }
+  .um-badge[hidden] { display: none !important; }
+  #invQueueP { display: flex; flex-direction: column; gap: 6px; }
+  #invQueueP:empty { display: none; }
+  #invQueueP .inv-notice { flex-direction: column; align-items: flex-start; gap: 6px; padding: 8px 10px; }
+  #invQueueP .inv-notice-tx { font-size: 12px; line-height: 1.6; }
+  #invQueueP .inv-notice-acts { margin-left: 0; }
+  .um-name { color: #f2e7ce; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .um-panel {
+    position: absolute; top: calc(100% + 10px); right: 0; z-index: 70;
+    width: 316px; max-width: calc(100vw - 28px); overflow: hidden;
+    background: var(--paper); color: var(--ink); text-align: left;
+    border: 1px solid var(--line); border-radius: 3px;
+    box-shadow: 0 12px 30px rgba(0,0,0,.35);
+  }
+  .um-panel[hidden] { display: none !important; }
+  .um-hd {
+    display: flex; align-items: center; justify-content: space-between; padding: 9px 12px;
+    background: linear-gradient(180deg, #2f2a24, #26221d); border-bottom: 2px solid var(--gold);
+    color: #f3e9d2;
+  }
+  .um-hd b { font-family: var(--wei); font-size: 13.5px; letter-spacing: 3px; }
+  .um-x {
+    background: none; border: 0; color: #cdbd9b; font-size: 13px; line-height: 1;
+    cursor: pointer; padding: 3px 5px; border-radius: 2px; transition: .12s;
+  }
+  .um-x:hover { color: #fff; background: rgba(243,233,210,.12); }
+  .um-cur { display: flex; align-items: center; gap: 11px; padding: 13px 14px 11px; border-bottom: 1px dashed var(--line); }
+  .um-cur-tx { min-width: 0; }
+  .um-cur-tx b {
+    display: block; font-family: var(--serif); font-size: 14.5px; letter-spacing: 1.5px;
+    color: var(--cinnabar-dark); font-variant-numeric: tabular-nums;
+  }
+  .um-tag { display: block; margin-top: 3px; font-size: 11px; color: var(--muted); letter-spacing: .6px; }
+  .um-sec { padding: 10px 8px 2px; }
+  .um-sec-t { display: block; padding: 0 6px 6px; font-family: var(--serif); font-size: 11px; letter-spacing: 2px; color: var(--muted); }
+  .um-list { max-height: 228px; overflow: auto; }
+  .um-item {
+    width: 100%; display: flex; align-items: center; gap: 9px; text-align: left;
+    padding: 7px 8px; border: 1px solid transparent; border-radius: 2px;
+    background: none; cursor: pointer; color: var(--ink); transition: .12s;
+    font-family: var(--fang);
+  }
+  .um-item:hover { background: var(--paper-2); border-color: var(--line-soft); }
+  .um-item.on { background: var(--cinnabar-soft); border-color: rgba(166,58,36,.32); cursor: default; }
+  .um-item-tx { flex: 1; min-width: 0; }
+  .um-item-tx b { display: block; font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .um-item-tx small { display: block; margin-top: 2px; font-size: 10.5px; color: var(--muted); }
+  .um-item-go { font-size: 10.5px; letter-spacing: 1px; white-space: nowrap; color: var(--cinnabar-dark); }
+  .um-item.on .um-item-go { color: var(--muted); }
+  .um-act { padding: 9px 12px 12px; }
+  .um-act .btn { width: 100%; justify-content: center; }
+
+  /* ============ 主体布局 ============ */
+  .lounge {
+    --railw: 218px;
+    display: grid; grid-template-columns: 252px minmax(0, 1fr); gap: 14px;
+    max-width: 1440px; margin: 18px auto 0; padding: 0 24px 0 calc(var(--railw) + 14px);
+    height: calc(100vh - 132px); min-height: 480px;
+  }
+  .lounge.rail-off { --railw: 46px; }
+  /* hidden 要压得住 .lounge 的 display:grid，否则列表页底下会多出一间空聊天室 */
+  #viewRoom[hidden], #viewList[hidden] { display: none !important; }
+  .card {
+    background: var(--paper-2); border: 1px solid var(--line); border-radius: 3px;
+    box-shadow: var(--shadow-sm); min-height: 0; min-width: 0; display: flex; flex-direction: column;
+  }
+
+  /* 最左：全部聊天室（贴屏幕左边，与底色同色，可收起） */
+  .rail {
+    position: fixed; left: 0; top: var(--hdr-h, 69px); bottom: 0; z-index: 35;
+    width: var(--railw); overflow: hidden; transition: width .18s ease;
+    display: flex; flex-direction: column; min-height: 0;
+    background: var(--paper); border-right: 1px solid var(--line-soft);
+  }
+  .rail-tg {
+    position: absolute; top: 9px; right: 8px; z-index: 2;
+    width: 20px; height: 20px; padding: 0; border-radius: 2px; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid var(--line); background: transparent; color: var(--ink-soft);
+    font-family: var(--serif); font-size: 13px; line-height: 1;
+  }
+  .rail-tg:hover { border-color: var(--cinnabar); color: var(--cinnabar-dark); }
+  .rail-tg:focus-visible { outline: 2px solid var(--cinnabar); outline-offset: 1px; }
+  .rail-hd {
+    padding: 12px 34px 11px 16px; border-bottom: 1px solid var(--line);
+    font-family: var(--serif); font-size: 13.5px; letter-spacing: 3px;
+    color: var(--cinnabar-dark); white-space: nowrap;
+  }
+  .rail-list { flex: 1; min-height: 0; overflow-y: auto; }
+  .rail-sec {
+    padding: 15px 16px 8px; font-family: var(--kai, var(--serif)); font-size: 14px;
+    font-weight: 600; letter-spacing: 3px; color: var(--cinnabar);
+  }
+  .rail-sec + .rail-item { border-top: 1px solid var(--line); }
+  .rail-item {
+    display: flex; align-items: center; gap: 7px; padding: 10px 16px;
+    color: var(--ink-soft); text-decoration: none;
+    font-family: var(--fang, var(--serif)); font-size: 13px; line-height: 1.45;
+    white-space: nowrap; border-top: 1px solid var(--line-soft);
+  }
+  .rail-item:first-child { border-top: 0; }
+  .rail-item .rt { overflow: hidden; text-overflow: ellipsis; }
+  .rail-item:hover { background: var(--paper-2); color: var(--cinnabar-dark); }
+  .rail-item.on { background: var(--cinnabar-soft); color: var(--cinnabar-dark); box-shadow: inset 3px 0 0 var(--cinnabar); }
+  .rail-item.on .rt { font-weight: 600; }
+  .rail-item .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--line); flex: 0 0 auto; }
+  .rail-item .dot.on { background: #7a9450; }
+  .rail-del {
+    margin-left: auto; width: 18px; height: 18px; flex: 0 0 auto; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 0; border-radius: 2px; background: transparent; cursor: pointer;
+    color: var(--muted); font-family: var(--serif); font-size: 11px; line-height: 1;
+    opacity: .4; transition: .14s;
+  }
+  .rail-item:hover .rail-del { opacity: 1; }
+  .rail-del:hover { background: var(--cinnabar-soft); color: var(--cinnabar); }
+  .rail-off .rail-hd {
+    writing-mode: vertical-rl; width: 1em; margin: 40px auto 0; padding: 0;
+    border-bottom: 0; letter-spacing: 4px; color: var(--muted);
+  }
+  .rail-off .rail-list { display: none; }
+  .rail-off .rail-tg { position: static; margin: 10px auto 0; }
+
+  /* 左：在室 */
+  .side-back {
+    display: inline-flex; align-items: center; justify-content: center; align-self: center;
+    margin: 12px 13px 0; padding: 9px 26px;
+    border: 1px solid var(--cinnabar); border-radius: 3px; background: transparent;
+    font-family: var(--kai, var(--serif)); font-size: 15px; letter-spacing: 3px;
+    color: var(--cinnabar); text-decoration: none;
+    transition: background .15s, color .15s, border-color .15s;
+  }
+  .side-back:hover { background: var(--cinnabar); border-color: var(--cinnabar); color: #fdf3e7; }
+  .side-back:focus-visible { outline: 2px solid var(--cinnabar); outline-offset: 2px; }
+  .side-hd {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 10px 13px; border-bottom: 1px solid var(--line-soft);
+    font-family: var(--serif); font-size: 12.5px; letter-spacing: 2px; color: var(--ink-soft);
+  }
+  .side-hd b { color: var(--cinnabar-dark); font-variant-numeric: tabular-nums; }
+  .members { flex: 1; min-width: 0; overflow: auto; padding: 6px; }
+  .mem { display: flex; align-items: center; gap: 8px; padding: 6px 7px; border-radius: 2px; }
+  .mem.me { background: var(--cinnabar-soft); }
+  .mem .nm { font-family: var(--fang); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  .mem .st { margin-left: auto; font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+  .mem .st.on { color: var(--qing); }
+  .mem-empty { padding: 18px 10px; text-align: center; font-size: 12px; color: var(--muted); line-height: 1.9; }
+
+  /* 右：消息 */
+  .room-hd {
+    display: flex; align-items: center; gap: 10px; padding: 9px 14px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .room-hd b { font-family: var(--serif); font-size: 14px; letter-spacing: 2px; }
+  .room-hd .meta { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted); }
+  .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--qing); box-shadow: 0 0 5px rgba(46,94,90,.6); }
+  .live-dot.off { background: #c05a45; box-shadow: none; }
+
+  .msgs { flex: 1; overflow: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 11px; }
+  .msgs .empty {
+    margin: auto; text-align: center; font-family: var(--kai); font-size: 13.5px;
+    letter-spacing: 2px; line-height: 2; color: var(--muted);
+  }
+  .msg { display: flex; gap: 9px; max-width: 78%; }
+  .msg.mine { margin-left: auto; flex-direction: row-reverse; }
+  .msg.cont { margin-top: -6px; }
+  .msg.cont .um-avatar { visibility: hidden; }
+  .msg .body { min-width: 0; }
+  .msg .who { display: flex; gap: 7px; margin-bottom: 3px; font-size: 10.5px; color: var(--muted); }
+  .msg.mine .who { justify-content: flex-end; }
+  .msg .bub {
+    padding: 8px 11px; border-radius: 3px; font-size: 13.5px; line-height: 1.75;
+    background: var(--paper); border: 1px solid var(--line);
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .msg.mine .bub { background: var(--cinnabar-soft); border-color: rgba(166,58,36,.3); }
+
+  .composer {
+    display: flex; align-items: flex-end; gap: 9px;
+    padding: 10px 12px 6px; border-top: 1px solid var(--line-soft);
+  }
+  .composer textarea {
+    flex: 1; resize: none; min-height: 40px; max-height: 132px; padding: 9px 11px;
+    font-family: inherit; font-size: 13.5px; line-height: 1.6; color: var(--ink);
+    background: var(--paper-2); border: 1px solid var(--line); border-radius: 3px; outline: none;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .composer textarea:focus { border-color: var(--cinnabar); box-shadow: 0 0 0 3px rgba(166,58,36,.1); }
+  .composer textarea::placeholder { color: #a2937c; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 8px 16px; border-radius: 3px; cursor: pointer; white-space: nowrap;
+    font-family: var(--fang); font-size: 13px; letter-spacing: 1.5px;
+    background: var(--paper-3); border: 1px solid var(--line); color: var(--ink-soft);
+    transition: .15s;
+  }
+  .btn:hover { background: var(--paper-2); border-color: var(--cinnabar); color: var(--cinnabar-dark); }
+  .btn.primary { background: var(--cinnabar); border-color: var(--cinnabar); color: #fbeee6; }
+  .btn.primary:hover { background: var(--cinnabar-dark); border-color: var(--cinnabar-dark); color: #fff; }
+  .btn[disabled] { opacity: .5; cursor: not-allowed; }
+  .composer .cnt { font-family: var(--mono); font-size: 11px; color: var(--muted); align-self: center; }
+  .composer .cnt.hi { color: var(--cinnabar); }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
+    padding: 9px 16px; border-radius: 3px; z-index: 900;
+    background: #2b2520; color: #f7efdd; font-family: var(--kai); font-size: 13px;
+    letter-spacing: 1px; box-shadow: 0 10px 26px rgba(0,0,0,.28);
+  }
+  .toast[hidden] { display: none !important; }
+
+  /* 时间分节 */
+  .day-sep {
+    display: flex; align-items: center; gap: 10px; margin: 4px 0;
+    font-family: var(--serif); font-size: 11px; letter-spacing: 2px; color: var(--muted);
+  }
+  .day-sep::before, .day-sep::after { content: ""; flex: 1; height: 1px; background: var(--line-soft); }
+
+  /* 在室成员：可点开看资料 */
+  .mem { cursor: pointer; transition: background .12s; }
+  .mem:hover { background: var(--paper-3); }
+  .mem:focus-visible { outline: 2px solid var(--cinnabar); outline-offset: -1px; }
+  .side-inv {
+    padding: 2px 8px; border-radius: 2px; cursor: pointer; white-space: nowrap;
+    font-family: var(--fang); font-size: 11px; letter-spacing: .5px;
+    color: var(--cinnabar-dark); background: none; border: 1px solid var(--line); transition: .14s;
+  }
+  .side-inv:hover { background: var(--cinnabar-soft); border-color: var(--cinnabar); }
+
+  .mprof {
+    position: fixed; z-index: 200; width: 248px; overflow: hidden;
+    background: var(--paper-2); border: 1px solid var(--line); border-radius: 3px;
+    box-shadow: 0 14px 34px rgba(40,26,12,.24);
+  }
+  .mprof[hidden] { display: none !important; }
+  .mprof-top { display: flex; align-items: center; gap: 10px; padding: 12px 13px 10px; border-bottom: 1px dashed var(--line); }
+  .mprof-tx { min-width: 0; }
+  .mprof-tx b {
+    display: block; font-family: var(--serif); font-size: 14px; letter-spacing: 1.5px;
+    color: var(--cinnabar-dark); font-variant-numeric: tabular-nums;
+  }
+  .mprof-tx span { display: block; margin-top: 2px; font-size: 11px; color: var(--muted); }
+  .mprof-rows { padding: 8px 13px 10px; }
+  .mprof-row { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; font-size: 12px; color: var(--ink-soft); }
+  .mprof-row b { font-family: var(--fang); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink); }
+  .mprof-act { padding: 0 13px 12px; }
+  .mprof-act .btn { width: 100%; justify-content: center; }
+
+  /* 邀请 */
+  .invite {
+    position: fixed; inset: 0; z-index: 300; display: flex; align-items: center;
+    justify-content: center; padding: 20px; background: rgba(20,15,10,.55);
+  }
+  .invite[hidden] { display: none !important; }
+  .invite-card {
+    width: min(430px, 100%); padding: 0 0 14px; overflow: hidden;
+    background: var(--paper-2); border: 1px solid var(--gold); border-radius: 4px;
+    box-shadow: 0 24px 60px rgba(14,9,4,.5);
+  }
+  .invite-hd {
+    display: flex; align-items: center; justify-content: space-between; padding: 10px 13px;
+    background: linear-gradient(180deg, #2f2a24, #26221d); border-bottom: 2px solid var(--gold); color: #f3e9d2;
+  }
+  .invite-hd b { font-family: var(--wei); font-size: 14px; letter-spacing: 3px; }
+  .invite-x { background: none; border: 0; color: #cdbd9b; font-size: 13px; cursor: pointer; padding: 3px 5px; border-radius: 2px; }
+  .invite-x:hover { color: #fff; background: rgba(243,233,210,.12); }
+  .invite-body { padding: 12px 14px 4px; }
+  .invite-tabs {
+    display: flex; gap: 0; margin-bottom: 12px;
+    border: 1px solid var(--line); border-radius: 3px; overflow: hidden; width: fit-content;
+  }
+  .invite-tab {
+    padding: 5px 18px; border: 0; background: none; cursor: pointer;
+    font-family: var(--serif); font-size: 12.5px; letter-spacing: 2px; color: var(--ink-soft);
+    transition: .14s;
+  }
+  .invite-tab + .invite-tab { border-left: 1px solid var(--line); }
+  .invite-tab:hover { background: var(--paper-3); }
+  .invite-tab.on { background: var(--cinnabar); color: #fbeee6; }
+  .invite-lb { display: block; margin: 0 0 5px; font-family: var(--serif); font-size: 11px; letter-spacing: 1.5px; color: var(--muted); }
+  .invite-row { display: flex; gap: 7px; }
+  .invite-row input {
+    flex: 1; min-width: 0; padding: 7px 9px; font-family: var(--mono); font-size: 11.5px;
+    color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 3px;
+  }
+  .invite-note { margin: 10px 0 0; min-height: 1.6em; font-size: 11.5px; line-height: 1.7; color: var(--qing-dark); }
+  .invite-note.err { color: var(--cinnabar); }
+  .invite-banner {
+    display: flex; align-items: center; gap: 8px; padding: 8px 14px;
+    background: var(--cinnabar-soft); border-bottom: 1px solid var(--line-soft);
+    font-family: var(--kai); font-size: 12.5px; letter-spacing: 1px; color: var(--cinnabar-dark);
+  }
+  .invite-banner[hidden] { display: none !important; }
+  .invite-banner-x { margin-left: auto; background: none; border: 0; color: var(--cinnabar-dark); cursor: pointer; font-size: 12px; padding: 2px 4px; }
+
+  /* 收到的邀请：三键提示 */
+  .inv-queue:empty { display: none; }
+  .inv-notice {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 9px 14px; background: var(--cinnabar-soft); border-bottom: 1px solid var(--line-soft);
+  }
+  .inv-notice + .inv-notice { border-top: 1px solid rgba(166,58,36,.16); }
+  .inv-notice-tx { font-family: var(--kai); font-size: 13px; letter-spacing: 1px; color: var(--cinnabar-dark); }
+  .inv-notice-tx b { font-family: var(--serif); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .inv-notice-tx .rn { font-style: normal; color: var(--ink); }
+  .inv-notice-acts { display: flex; gap: 6px; margin-left: auto; }
+  .inv-act {
+    padding: 4px 12px; border-radius: 2px; cursor: pointer; border: 1px solid var(--line);
+    background: var(--paper-2); font-family: var(--serif); font-size: 12px; letter-spacing: 1px;
+    color: var(--ink-soft); transition: .14s;
+  }
+  .inv-act:hover { border-color: var(--cinnabar); color: var(--cinnabar-dark); }
+  .inv-act.ok { background: var(--cinnabar); border-color: var(--cinnabar); color: #fbeee6; }
+  .inv-act.ok:hover { background: var(--cinnabar-dark); color: #fff; }
+  .inv-act.mute { color: var(--muted); border-style: dashed; }
+
+  /* 邀请已送达 */
+  .done {
+    position: fixed; inset: 0; z-index: 320; display: flex; align-items: center;
+    justify-content: center; padding: 20px; background: rgba(20,15,10,.5);
+  }
+  .done[hidden] { display: none !important; }
+  .done-card {
+    width: min(320px, 100%); padding: 20px 22px 18px; text-align: center;
+    background: var(--paper-2); border: 1px solid var(--gold); border-radius: 4px;
+    box-shadow: 0 20px 50px rgba(14,9,4,.45);
+  }
+  .done-seal {
+    width: 38px; height: 38px; margin: 0 auto 10px; border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--cinnabar); color: #fbeee6; font-family: var(--wei); font-size: 20px;
+  }
+  .done-card b { display: block; font-family: var(--serif); font-size: 15px; letter-spacing: 2px; color: var(--cinnabar-dark); }
+  .done-card p { margin: 8px 0 16px; font-size: 12.5px; line-height: 1.8; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  .done-card .btn { width: 100%; justify-content: center; }
+
+  /* 我发出的邀请 */
+  .sent { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); }
+  .sent[hidden] { display: none !important; }
+  .sent-hd { margin-bottom: 6px; font-family: var(--serif); font-size: 11px; letter-spacing: 1.5px; color: var(--muted); }
+  .sent-row {
+    display: flex; align-items: center; gap: 8px; padding: 4px 0;
+    font-size: 12px; color: var(--ink-soft); font-variant-numeric: tabular-nums;
+  }
+  .sent-row .t { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .chip { padding: 1px 7px; border-radius: 2px; font-size: 11px; letter-spacing: .5px; }
+  .chip.pending { background: var(--paper-3); color: var(--ink-soft); }
+  .chip.accepted { background: var(--cinnabar-soft); color: var(--cinnabar-dark); }
+  .chip.declined, .chip.ignored { background: var(--paper-3); color: var(--muted); }
+  .chip.ignored { border: 1px dashed var(--line); }
+
+  /* ---------- 聊天室列表 ---------- */
+  .rooms {
+    margin-inline: max(24px, calc((100% - 1180px) / 2)); margin-block: 22px 40px;
+  }
+  @media (max-width: 640px) { .rooms { margin-inline: 12px; } }
+  .rooms-hd { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; margin-bottom: 20px; }
+  .rooms-hd h2 {
+    font-family: var(--wei, var(--serif)); font-size: 24px; letter-spacing: 5px;
+    color: var(--cinnabar-dark); font-weight: 400;
+  }
+  .rooms-act { display: flex; flex-direction: column; align-items: flex-end; gap: 9px; }
+  .rooms-back {
+    display: inline-flex; align-items: center; margin-bottom: 18px;
+    padding: 9px 26px; border: 1px solid var(--cinnabar); border-radius: 3px;
+    color: var(--cinnabar); background: transparent; text-decoration: none;
+    font-family: var(--kai, var(--serif)); font-size: 15px; letter-spacing: 3px;
+    transition: background .15s, color .15s, border-color .15s;
+  }
+  .rooms-back:hover { background: var(--cinnabar); border-color: var(--cinnabar); color: #fdf3e7; }
+  .rooms-back:focus-visible { outline: 2px solid var(--cinnabar); outline-offset: 2px; }
+
+  .rooms-sub { margin-top: 6px; font-family: var(--kai, var(--serif)); font-size: 12.5px; letter-spacing: 1px; color: var(--muted); }
+  .rooms-sec + .rooms-sec { margin-top: 28px; }
+  .sec-t {
+    display: flex; align-items: center; gap: 10px;
+    font-family: var(--serif); font-size: 13px; font-weight: 400; letter-spacing: 3px; color: var(--ink-soft);
+  }
+  .sec-t::after { content: ""; flex: 1; height: 1px; background: var(--line-soft); }
+  .sec-n { font-family: var(--mono); font-size: 11px; letter-spacing: 0; color: var(--muted); }
+  .room-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(266px, 1fr)); gap: 12px; margin-top: 12px; }
+  .room-card {
+    position: relative; display: flex; flex-direction: column; gap: 6px;
+    padding: 15px 16px 12px; text-decoration: none; color: inherit;
+    background: var(--paper-2); border: 1px solid var(--line); border-radius: 3px;
+    box-shadow: var(--shadow-sm); transition: transform .15s, border-color .15s, box-shadow .15s;
+  }
+  .room-card:hover { border-color: var(--cinnabar); transform: translateY(-2px); box-shadow: 0 8px 20px rgba(60,40,18,.14); }
+  .room-card:focus-visible { outline: 2px solid var(--cinnabar); outline-offset: 2px; }
+  .room-card b { padding-right: 26px; font-family: var(--serif); font-size: 15px; letter-spacing: 1.5px; color: var(--ink); }
+  .room-card .d {
+    font-family: var(--fang, var(--serif)); font-size: 12px; line-height: 1.75; color: var(--ink-soft);
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .room-card .ft { display: flex; align-items: center; gap: 7px; margin-top: 2px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .room-card .ft .by { margin-left: auto; }
+  .room-card .seal-o {
+    position: absolute; right: 12px; top: 13px; width: 22px; height: 22px; border-radius: 2px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--cinnabar); color: #fbeee6; font-family: var(--wei, var(--serif)); font-size: 12px; line-height: 1;
+  }
+  .room-card.off { background: linear-gradient(180deg, var(--paper-2) 0%, var(--paper-3) 100%); }
+  .rooms-empty { margin-top: 12px; font-family: var(--kai, var(--serif)); font-size: 12.5px; color: var(--muted); letter-spacing: 1px; }
+
+  /* 房间头 */
+  .room-tag {
+    padding: 1px 7px; border-radius: 2px; font-family: var(--kai, var(--serif));
+    font-size: 11px; letter-spacing: 1px; color: var(--cinnabar-dark); background: var(--cinnabar-soft);
+  }
+  .room-tag.guest { color: var(--ink-soft); background: var(--paper-3); border: 1px dashed var(--line); }
+  .room-desc {
+    padding: 0 14px 8px; font-family: var(--kai, var(--serif)); font-size: 12px;
+    letter-spacing: .5px; color: var(--muted);
+  }
+  .del-tx {
+    font-family: var(--kai, var(--serif)); font-size: 12.5px; line-height: 1.9;
+    letter-spacing: .5px; color: var(--ink-soft); margin-bottom: 12px;
+  }
+  .del-tx b { color: var(--ink); font-weight: 600; }
+  .invite-row.end { justify-content: flex-end; }
+  .btn.danger { background: var(--cinnabar); border-color: var(--cinnabar); color: #fdf3e7; }
+  .btn.danger:hover { background: var(--cinnabar-dark); border-color: var(--cinnabar-dark); color: #fdf3e7; }
+  .btn.danger:disabled { opacity: .55; }
+
+  .inv-link { margin-top: 10px; }
+  .inv-link-t { display: block; margin-bottom: 5px; font-family: var(--serif); font-size: 11px; letter-spacing: 1.5px; color: var(--muted); }
+
+  /* ============ 深色 ============ */
+  html[data-theme="dark"] {
+    --paper: #16130f; --paper-2: #1f1b16; --paper-3: #272119;
+    --ink: #e9e0cd; --ink-soft: #c3b6a0; --muted: #9c8e77;
+    --line: #3a3227; --line-soft: #2b241c;
+    --cinnabar: #c4553c; --cinnabar-dark: #dd6f54; --cinnabar-soft: #36201a;
+    --qing: #63a89e; --qing-dark: #8cc4ba; --qing-soft: #1d2c29;
+    --gold: #c9a253; color-scheme: dark;
+  }
+  html[data-theme="dark"] body {
+    background-color: var(--paper);
+    background-image:
+      radial-gradient(ellipse at 10% 6%, rgba(255,246,224,.035), transparent 46%),
+      radial-gradient(ellipse at 90% 94%, rgba(201,162,83,.07), transparent 52%),
+      repeating-linear-gradient(90deg, rgba(255,255,255,.014) 0 1px, transparent 1px 96px);
+  }
+  html[data-theme="dark"] header { background: linear-gradient(180deg, #100e0b, #1a1611); }
+  html[data-theme="dark"] .card { background: var(--paper-2); }
+  html[data-theme="dark"] .msg .bub { background: #241f18; border-color: var(--line); }
+  html[data-theme="dark"] .msg.mine .bub { background: #3a221b; border-color: rgba(196,85,60,.4); }
+  html[data-theme="dark"] .composer textarea { background: #221d17; }
+  html[data-theme="dark"] .btn { background: #241f18; }
+  html[data-theme="dark"] .btn:hover { background: #2c261e; }
+  html[data-theme="dark"] .btn.primary { background: var(--cinnabar); color: #1b1310; }
+  html[data-theme="dark"] .toast { background: #0d0b08; }
+  html[data-theme="dark"] .um-panel { background: var(--paper-2); }
+  html[data-theme="dark"] .um-item.on { background: #3a221b; border-color: rgba(196,85,60,.45); }
+
+  /* ============ 窄屏 ============ */
+  @media (max-width: 820px) {
+    .rail { display: none; }
+    .lounge {
+      grid-template-columns: minmax(0, 1fr); height: auto; min-height: 0;
+      padding: 0 12px; margin-top: 12px;
+      gap: 10px;
+    }
+    header { padding: 8px 12px; }
+    .brand h1 { font-size: 16px; letter-spacing: 2px; }
+    .brand .sub { display: none; }
+    .side { max-height: 150px; }
+    .members { display: flex; gap: 6px; overflow-x: auto; padding: 8px; }
+    .mem { flex: 0 0 auto; border: 1px solid var(--line-soft); }
+    .room { height: calc(100vh - 260px); min-height: 360px; }
+    .msg { max-width: 92%; }
+    .um-wrap { margin-left: auto; }
+    .um-panel {
+      position: fixed; left: 12px; right: 12px; top: auto; bottom: 12px;
+      width: auto; max-width: none; max-height: calc(100vh - 24px); overflow: auto;
+    }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span class="seal" aria-hidden="true">交</span>
+    <div>
+      <h1>聊天室</h1>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <a class="nav-link" href="/home" title="回到 AI 问答">智能问答</a>
+    <a class="nav-link" href="/" title="返回四步演示台">四步演示台</a>
+    <button class="theme-btn" id="themeBtn" type="button" title="切换深色 / 浅色（记忆在本机）">◑ 深色模式</button>
+    <div class="um-wrap" id="umWrap">
+      <button class="um-btn" id="umBtn" type="button" aria-haspopup="dialog" aria-expanded="false" title="当前身份">
+        <span class="um-avatar" aria-hidden="true"></span>
+        <span class="um-name" data-um-name>游客</span>
+        <span class="um-caret" aria-hidden="true">▼</span>
+        <span class="um-badge" id="umBadge" hidden aria-hidden="true">+</span>
+      </button>
+      <div class="um-panel" id="umPanel" role="dialog" aria-label="身份面板" hidden>
+        <div class="um-hd">
+          <b>身份</b>
+          <button class="um-x" id="umClose" type="button" title="关闭身份面板" aria-label="关闭身份面板">✕</button>
+        </div>
+        <div class="um-cur">
+          <span class="um-avatar lg" aria-hidden="true"></span>
+          <div class="um-cur-tx">
+            <b data-um-name>游客</b>
+            <span class="um-tag">当前游客 · 未登录</span>
+          </div>
+        </div>
+        <div class="um-sec um-inv" id="umInvSec" hidden>
+          <span class="um-sec-t">收到的邀请</span>
+          <div class="inv-queue" id="invQueueP"></div>
+        </div>
+        <div class="um-sec">
+          <span class="um-sec-t">本机使用过的游客</span>
+          <div class="um-list" id="umList"></div>
+        </div>
+        <div class="um-act">
+          <button class="btn sm" id="umNew" type="button">新建一个游客身份</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="rooms" id="viewList" hidden>
+  <a class="rooms-back" href="/" title="回到四步演示台">返回</a>
+  <div class="rooms-hd">
+    <div>
+      <h2>全部聊天室</h2>
+      <p class="rooms-sub">官方按药性分间，游客也能自开一间；不用注册，进来就是游客。</p>
+    </div>
+    <div class="rooms-act">
+      <button class="btn primary" id="newRoomBtn" type="button">＋ 新建聊天室</button>
+    </div>
+  </div>
+
+  <section class="rooms-sec">
+    <h3 class="sec-t">官方 · 中药主题<span class="sec-n" id="offCount"></span></h3>
+    <div class="room-grid" id="offGrid"></div>
+  </section>
+
+  <section class="rooms-sec" id="guestSec" hidden>
+    <h3 class="sec-t">游客创建<span class="sec-n" id="guestCount"></span></h3>
+    <div class="room-grid" id="guestGrid"></div>
+  </section>
+</main>
+
+<main class="lounge" id="viewRoom" hidden>
+  <aside class="rail" id="rail" aria-label="全部聊天室">
+    <button class="rail-tg" id="railTg" type="button" aria-expanded="true" aria-controls="railList" title="收起聊天室列表">‹</button>
+    <div class="rail-hd">全部聊天室</div>
+    <div class="rail-list" id="railList"></div>
+  </aside>
+
+  <aside class="card side" aria-label="在室成员">
+    <a class="side-back" id="navBack" href="/lounge" title="返回全部聊天室">返回</a>
+    <div class="side-hd"><span>在室 <b id="onlineNum">0</b></span><button class="side-inv" id="inviteBtn" type="button" title="邀请其他人进聊天室">＋ 邀请</button></div>
+    <div class="members" id="members"></div>
+  </aside>
+
+  <section class="card room" aria-label="聊天室">
+    <div class="room-hd">
+      <b id="roomName">聊天室</b>
+      <span class="room-tag" id="roomTag" hidden>官方</span>
+      <span class="meta">
+        <span class="live-dot" id="liveDot"></span>
+        <span id="liveTxt">连接中…</span>
+      </span>
+    </div>
+    <div class="room-desc" id="roomDesc" hidden></div>
+    <div class="invite-banner" id="invBanner" hidden>
+      <span id="invBannerTxt"></span>
+      <button class="invite-banner-x" id="invBannerX" type="button" aria-label="关闭">✕</button>
+    </div>
+    <div class="msgs" id="msgs">
+      <p class="empty">还没有人开口。<br>说第一句吧。</p>
+    </div>
+    <div class="composer">
+      <textarea id="input" rows="1" maxlength="600" aria-label="输入消息"></textarea>
+      <span class="cnt" id="cnt"></span>
+      <button class="btn primary" id="send" type="button">发送</button>
+    </div>
+  </section>
+</main>
+
+<div class="invite" id="newRoom" hidden>
+  <div class="invite-card" role="dialog" aria-label="新建聊天室">
+    <div class="invite-hd"><b>新建聊天室</b><button class="invite-x" id="newRoomX" type="button" aria-label="关闭">✕</button></div>
+    <div class="invite-body">
+      <label class="invite-lb" for="nrName">名称（2–16 字）</label>
+      <div class="invite-row"><input id="nrName" maxlength="16" autocomplete="off" aria-label="聊天室名称"></div>
+      <label class="invite-lb" for="nrDesc">一句话简介（可不填，40 字内）</label>
+      <div class="invite-row"><input id="nrDesc" maxlength="40" autocomplete="off" aria-label="聊天室简介"></div>
+      <p class="invite-note" id="nrNote"></p>
+      <div class="invite-row"><button class="btn primary" id="nrOk" type="button">创建并进入</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="invite" id="delRoom" hidden>
+  <div class="invite-card" role="dialog" aria-label="删除聊天室">
+    <div class="invite-hd"><b>删除聊天室</b><button class="invite-x" id="delX" type="button" aria-label="关闭">✕</button></div>
+    <div class="invite-body">
+      <p class="del-tx">「<b id="delName"></b>」和里面的消息会一起删掉，不能恢复。</p>
+      <div class="invite-row end">
+        <button class="btn sm" id="delNo" type="button">取消</button>
+        <button class="btn sm danger" id="delYes" type="button">删除</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mprof" id="mprof" role="dialog" aria-label="成员资料" hidden>
+  <div class="mprof-top">
+    <span class="um-avatar lg" aria-hidden="true"></span>
+    <div class="mprof-tx"><b id="mprofName">游客</b><span id="mprofState">在线</span></div>
+  </div>
+  <div class="mprof-rows">
+    <div class="mprof-row"><span>编码</span><b id="mprofId">—</b></div>
+    <div class="mprof-row"><span>在室</span><b id="mprofSeen">—</b></div>
+    <div class="mprof-row"><span>发言</span><b id="mprofCount">0 条</b></div>
+  </div>
+  <div class="mprof-act"><button class="btn sm" id="mprofAt" type="button">@ TA</button></div>
+</div>
+
+<div class="invite" id="invite" hidden>
+  <div class="invite-card" role="dialog" aria-label="邀请进入聊天室">
+    <div class="invite-hd"><b>邀请进入聊天室</b><button class="invite-x" id="inviteX" type="button" aria-label="关闭">✕</button></div>
+    <div class="invite-body">
+      <div class="invite-tabs" role="tablist" aria-label="邀请对象类型">
+        <button class="invite-tab" id="invTabUser" type="button" role="tab" aria-selected="false" data-kind="user">用户</button>
+        <button class="invite-tab on" id="invTabGuest" type="button" role="tab" aria-selected="true" data-kind="guest">游客</button>
+      </div>
+      <label class="invite-lb" id="invLb" for="invCode">游客编号</label>
+      <div class="invite-row">
+        <input id="invCode" inputmode="numeric" maxlength="5" autocomplete="off" aria-label="邀请对象的编号">
+        <button class="btn primary" id="invSend" type="button">发送邀请</button>
+      </div>
+      <p class="invite-note" id="inviteNote"></p>
+      <div class="inv-link">
+        <span class="inv-link-t">也可以把链接发给 TA</span>
+        <div class="invite-row">
+          <input id="invLink" readonly aria-label="聊天室邀请链接">
+          <button class="btn sm" type="button" id="invCopy">复制</button>
+        </div>
+      </div>
+      <div class="sent" id="sentBox" hidden>
+        <div class="sent-hd">我发出的邀请</div>
+        <div class="sent-list" id="sentList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="done" id="invDone" hidden>
+  <div class="done-card" role="dialog" aria-label="邀请已送达">
+    <div class="done-seal" aria-hidden="true">邀</div>
+    <b>邀请已送达</b>
+    <p id="invDoneTxt"></p>
+    <button class="btn primary" id="invDoneOk" type="button">知道了</button>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script>
+/* ============ 游客身份（与演示台 / 主页同一套，键名与规则一致） ============ */
+(function () {
+  var CUR = "tcm.guest.current", LIST = "tcm.guest.list", MAX = 12;
+  var mem = {}, open = false;
+  function rd(k) { try { return localStorage.getItem(k); } catch (e) { return mem.hasOwnProperty(k) ? mem[k] : null; } }
+  function wr(k, v) { try { localStorage.setItem(k, v); } catch (e) { mem[k] = v; } }
+  function el(id) { return document.getElementById(id); }
+  function readList() {
+    try {
+      var a = JSON.parse(rd(LIST) || "[]");
+      if (!Array.isArray(a)) return [];
+      return a.filter(function (o) { return o && /^\d{5}$/.test(String(o.id)); });
+    } catch (e) { return []; }
+  }
+  function writeList(l) { wr(LIST, JSON.stringify(l.slice(0, MAX))); }
+  function nameOf(id) { return "游客" + id; }
+  function newId(list) {
+    var used = {};
+    list.forEach(function (o) { used[String(o.id)] = 1; });
+    for (var i = 0; i < 500; i++) {
+      var id = String(10000 + Math.floor(Math.random() * 90000));
+      if (!used[id]) return id;
+    }
+    return String((Date.now() % 90000) + 10000);
+  }
+  function ensure() {
+    var cur = rd(CUR), list = readList();
+    if (cur && /^\d{5}$/.test(cur)) {
+      if (!list.some(function (o) { return String(o.id) === cur; })) {
+        list.unshift({ id: cur, at: Date.now() });
+        writeList(list);
+      }
+      return cur;
+    }
+    var id = newId(list);
+    list.unshift({ id: id, at: Date.now() });
+    writeList(list);
+    wr(CUR, id);
+    return id;
+  }
+  function ago(ts) {
+    var t = Number(ts);
+    if (!t) return "最近使用";
+    var d = Date.now() - t;
+    if (d < 60000) return "刚刚使用";
+    if (d < 3600000) return Math.floor(d / 60000) + " 分钟前使用";
+    if (d < 86400000) return Math.floor(d / 3600000) + " 小时前使用";
+    if (d < 604800000) return Math.floor(d / 86400000) + " 天前使用";
+    var dt = new Date(t);
+    return (dt.getMonth() + 1) + " 月 " + dt.getDate() + " 日使用";
+  }
+  function switchTo(raw) {
+    var id = String(raw);
+    if (!/^\d{5}$/.test(id)) return;
+    var list = readList().filter(function (o) { return String(o.id) !== id; });
+    list.unshift({ id: id, at: Date.now() });
+    writeList(list);
+    wr(CUR, id);
+    render();
+    try { document.dispatchEvent(new CustomEvent("tcm:guest", { detail: { id: id } })); } catch (e) {}
+  }
+  function create() { switchTo(newId(readList())); }
+  function render() {
+    var id = ensure(), nm = nameOf(id), i;
+    var nodes = document.querySelectorAll("[data-um-name]");
+    for (i = 0; i < nodes.length; i++) nodes[i].textContent = nm;
+    var btn = el("umBtn");
+    if (btn) {
+      btn.title = "当前身份：" + nm + "（点开可查看或切换）";
+      btn.setAttribute("aria-label", "当前身份 " + nm + "，点开可查看或切换");
+    }
+    var box = el("umList");
+    if (box) {
+      box.innerHTML = readList().map(function (o) {
+        var oid = String(o.id), on = oid === id;
+        return '<button class="um-item' + (on ? " on" : "") + '" type="button" data-id="' + oid + '"' +
+          (on ? ' aria-current="true"' : "") + '>' +
+          '<span class="um-avatar sm" aria-hidden="true"></span>' +
+          '<span class="um-item-tx"><b>' + nameOf(oid) + '</b><small>' + (on ? "正在使用 · " : "") + ago(o.at) + '</small></span>' +
+          '<span class="um-item-go">' + (on ? "当前" : "切换") + '</span></button>';
+      }).join("");
+    }
+  }
+  function setOpen(v) {
+    open = !!v;
+    var panel = el("umPanel"), btn = el("umBtn");
+    if (!panel || !btn) return;
+    panel.hidden = !open;
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) render();
+  }
+  function init() {
+    var btn = el("umBtn"), panel = el("umPanel");
+    ensure(); render();
+    if (!btn || !panel) return;
+    btn.addEventListener("click", function (ev) { ev.stopPropagation(); setOpen(!open); });
+    var x = el("umClose"); if (x) x.addEventListener("click", function () { setOpen(false); btn.focus(); });
+    var n = el("umNew"); if (n) n.addEventListener("click", function () { create(); });
+    panel.addEventListener("click", function (ev) {
+      var item = ev.target.closest(".um-item");
+      if (!item) return;
+      if (item.classList.contains("on")) { setOpen(false); btn.focus(); return; }
+      switchTo(item.dataset.id);
+    });
+    document.addEventListener("click", function (ev) {
+      if (open && !ev.target.closest("#umWrap")) setOpen(false);
+    });
+    document.addEventListener("keydown", function (ev) {
+      if (ev.key === "Escape" && open) { setOpen(false); btn.focus(); }
+    });
+    window.addEventListener("storage", function (ev) {
+      if (!ev.key || ev.key === CUR || ev.key === LIST) render();
+    });
+    window.tcmGuest = {
+      current: function () { return ensure(); },
+      name: function () { return nameOf(ensure()); },
+      list: readList,
+      switchTo: switchTo,
+      create: create
+    };
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
+})();
+
+/* ============ 聊天室 ============ */
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var cursor = 0, myId = "", timer = null, sending = false, lastId = "", lastAt = 0, lastDay = "";
+  var ROOM = "";
+  try { ROOM = new URLSearchParams(location.search).get("room") || ""; } catch (e) {}
+  var membersData = [], profFor = "";
+  var booted = false;
+
+  function guestId() { return (window.tcmGuest && window.tcmGuest.current()) || ""; }
+
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function fmtTime(at) {
+    var d = new Date((Number(at) || 0) * 1000), now = new Date();
+    var hm = pad(d.getHours()) + ":" + pad(d.getMinutes());
+    if (d.toDateString() === now.toDateString()) return hm;
+    return (d.getMonth() + 1) + "/" + d.getDate() + " " + hm;
+  }
+  function toast(msg) {
+    var t = $("toast");
+    if (!t) return;
+    t.textContent = msg;
+    t.hidden = false;
+    clearTimeout(t._h);
+    t._h = setTimeout(function () { t.hidden = true; }, 2600);
+  }
+  function setLive(ok) {
+    var dot = $("liveDot"), txt = $("liveTxt");
+    if (dot) dot.className = "live-dot" + (ok ? "" : " off");
+    if (txt) txt.textContent = ok ? "已连接" : "连接中断，重试中";
+  }
+
+  function node(m, cont) {
+    var wrap = document.createElement("div");
+    wrap.className = "msg" + (m.id === myId ? " mine" : "") + (cont ? " cont" : "");
+    wrap.dataset.id = m.id;                 // 归属只认这个，署名永远是服务端给的发送者
+    var av = document.createElement("span");
+    av.className = "um-avatar sm";
+    av.setAttribute("aria-hidden", "true");
+    var body = document.createElement("div");
+    body.className = "body";
+    if (!cont) {
+      var who = document.createElement("div");
+      who.className = "who";
+      var n = document.createElement("span"); n.textContent = m.name;
+      var t = document.createElement("span"); t.textContent = fmtTime(m.at);
+      who.appendChild(n); who.appendChild(t);
+      body.appendChild(who);
+    }
+    var bub = document.createElement("div");
+    bub.className = "bub";
+    bub.textContent = m.text;
+    body.appendChild(bub);
+    wrap.appendChild(av); wrap.appendChild(body);
+    return wrap;
+  }
+
+  function nearBottom() {
+    var b = $("msgs");
+    return b.scrollHeight - b.scrollTop - b.clientHeight < 130;
+  }
+  function toBottom() { var b = $("msgs"); b.scrollTop = b.scrollHeight; }
+
+  function fmtDay(at) {
+    var d = new Date((Number(at) || 0) * 1000), now = new Date();
+    function same(a, b) {
+      return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    }
+    if (same(d, now)) return "今天";
+    if (same(d, new Date(now.getTime() - 86400000))) return "昨天";
+    if (d.getFullYear() === now.getFullYear()) return (d.getMonth() + 1) + " 月 " + d.getDate() + " 日";
+    return d.getFullYear() + " 年 " + (d.getMonth() + 1) + " 月 " + d.getDate() + " 日";
+  }
+  function daySep(at) {
+    var s = document.createElement("div");
+    s.className = "day-sep";
+    s.textContent = fmtDay(at);
+    return s;
+  }
+
+  function append(msgs) {
+    var box = $("msgs"), i, empty = box.querySelector(".empty");
+    var stick = nearBottom();
+    for (i = 0; i < msgs.length; i++) {
+      var m = msgs[i], at = Number(m.at) || 0;
+      var day = new Date(at * 1000).toDateString();
+      if (day !== lastDay) {                 // 跨天就插一条分节
+        box.appendChild(daySep(at));
+        lastDay = day;
+        lastId = "";                         // 分节后重新显示头像与名字
+      }
+      var cont = (m.id === lastId) && (at - lastAt < 120);
+      box.appendChild(node(m, cont));
+      lastId = m.id; lastAt = at;
+    }
+    if (empty) empty.remove();
+    if (stick) toBottom();
+  }
+
+  function renderMembers(list, online) {
+    var box = $("members");
+    if (!box) return;
+    var rows = (list || []).slice();
+    var hasMe = rows.some(function (m) { return m.id === myId; });
+    if (!hasMe && myId) {
+      var now = Date.now() / 1000;
+      rows.unshift({ id: myId, name: "游客" + myId, online: true, at: now, first: now, count: 0 });
+    }
+    membersData = rows;
+    $("onlineNum").textContent = online == null ? rows.filter(function (m) { return m.online; }).length : online;
+    if (!rows.length) {
+      box.innerHTML = '<div class="mem-empty">还没有人。</div>';
+      return;
+    }
+    box.innerHTML = rows.map(function (m) {
+      var me = m.id === myId;
+      return '<div class="mem' + (me ? " me" : "") + '" data-id="' + m.id + '" role="button" tabindex="0">' +
+        '<span class="um-avatar" aria-hidden="true"></span>' +
+        '<span class="nm">' + (m.name || ("游客" + m.id)) + '</span>' +
+        '<span class="st' + (m.online ? " on" : "") + '">' + (m.online ? "在线" : fmtTime(m.at) + " 来过") + '</span>' +
+        '</div>';
+    }).join("");
+    if (profFor && !$("mprof").hidden) {
+      var still = rows.filter(function (m) { return m.id === profFor; })[0];
+      if (still) fillProfile(still);
+    }
+  }
+
+  /* —— 成员资料 —— */
+  function fillProfile(m) {
+    $("mprofName").textContent = m.name || ("游客" + m.id);
+    $("mprofState").textContent = m.online ? "在线" : ("最近 " + fmtTime(m.at) + " 来过");
+    $("mprofId").textContent = m.id;
+    $("mprofSeen").textContent = m.first ? ("首次 " + fmtTime(m.first)) : "刚刚";
+    $("mprofCount").textContent = (Number(m.count) || 0) + " 条";
+  }
+  function openProfile(id, row) {
+    var p = $("mprof"), m = membersData.filter(function (x) { return x.id === id; })[0];
+    if (!p || !m || !row) return;
+    profFor = id;
+    fillProfile(m);
+    p.hidden = false;
+    var r = row.getBoundingClientRect(), w = p.offsetWidth || 248, h = p.offsetHeight || 190;
+    var left = Math.min(r.left + 6, window.innerWidth - w - 10);
+    var top = r.bottom + 6;
+    if (top + h > window.innerHeight - 10) top = Math.max(10, r.top - h - 6);
+    p.style.left = Math.max(8, left) + "px";
+    p.style.top = Math.round(top) + "px";
+  }
+  function closeProfile() {
+    var p = $("mprof");
+    if (p) p.hidden = true;
+    profFor = "";
+  }
+
+  /* —— 左边栏：全部聊天室 —— */
+  var RAIL_KEY = "tcm.lounge.rail";
+  function railSet(open, save) {
+    var main = $("viewRoom"), tg = $("railTg");
+    if (!main) return;
+    main.classList.toggle("rail-off", !open);
+    if (tg) {
+      tg.textContent = open ? "\u2039" : "\u203a";
+      tg.setAttribute("aria-expanded", open ? "true" : "false");
+      tg.title = open ? "收起聊天室列表" : "展开聊天室列表";
+    }
+    if (save !== false) { try { localStorage.setItem(RAIL_KEY, open ? "1" : "0"); } catch (e) {} }
+  }
+  function loadRail() {
+    fetch("/api/rooms", { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var box = $("railList");
+        if (!box) return;
+        box.innerHTML = "";
+        function sec(t) {
+          var s = document.createElement("div");
+          s.className = "rail-sec";
+          s.textContent = t;
+          box.appendChild(s);
+        }
+        function item(r) {
+          var a = document.createElement("a");
+          a.className = "rail-item" + (r.id === ROOM ? " on" : "");
+          a.href = "/lounge?room=" + encodeURIComponent(r.id);
+          if (r.id === ROOM) a.setAttribute("aria-current", "page");
+          var dot = document.createElement("span");
+          dot.className = "dot" + (r.online ? " on" : "");
+          a.appendChild(dot);
+          var nm = document.createElement("span");
+          nm.className = "rt";
+          nm.textContent = r.name;
+          a.appendChild(nm);
+          if (r.kind === "guest" && r.owner === guestId()) {
+            var del = document.createElement("button");
+            del.className = "rail-del";
+            del.type = "button";
+            del.title = "删除聊天室";
+            del.setAttribute("aria-label", "删除聊天室 " + r.name);
+            del.textContent = "✕";
+            del.addEventListener("click", function (ev) {
+              ev.preventDefault();
+              ev.stopPropagation();
+              askDelete(r);
+            });
+            a.appendChild(del);
+          }
+          return a;
+        }
+        var off = (d && d.official) || [], gst = (d && d.guest) || [];
+        sec("官方");
+        off.forEach(function (r) { box.appendChild(item(r)); });
+        if (gst.length) {
+          sec("游客创建");
+          gst.forEach(function (r) { box.appendChild(item(r)); });
+        }
+      })
+      .catch(function () {});
+  }
+  var delTarget = null;
+  function askDelete(r) {
+    delTarget = r;
+    $("delName").textContent = r.name;
+    $("delRoom").hidden = false;
+    $("delYes").disabled = false;
+  }
+  function doDelete() {
+    var r = delTarget;
+    if (!r) return;
+    var btn = $("delYes");
+    btn.disabled = true;
+    fetch("/api/rooms?id=" + encodeURIComponent(r.id) + "&owner=" + encodeURIComponent(guestId()),
+          { method: "DELETE" })
+      .then(function (resp) {
+        return resp.json().catch(function () { return {}; }).then(function (d) {
+          if (!resp.ok) throw new Error(d.detail || ("删除失败（" + resp.status + "）"));
+          return d;
+        });
+      })
+      .then(function () {
+        $("delRoom").hidden = true;
+        btn.disabled = false;
+        if (r.id === ROOM) { location.href = "/lounge"; return; }
+        toast("已删除「" + r.name + "」");
+        loadRail();
+      })
+      .catch(function (e) {
+        btn.disabled = false;
+        toast(e.message || "删除失败");
+      });
+  }
+
+  function railInit() {
+    var open = true;
+    try { if (localStorage.getItem(RAIL_KEY) === "0") open = false; } catch (e) {}
+    if (window.innerWidth < 1080) open = false;
+    railSet(open, false);
+    var hdr = document.querySelector("header");
+    if (hdr) document.documentElement.style.setProperty("--hdr-h", hdr.offsetHeight + "px");
+    var tg = $("railTg");
+    if (tg) {
+      tg.addEventListener("click", function () {
+        railSet($("viewRoom").classList.contains("rail-off"));
+      });
+    }
+    var dx = $("delX"), dn = $("delNo"), dy = $("delYes"), dm = $("delRoom");
+    if (dx) dx.addEventListener("click", function () { dm.hidden = true; });
+    if (dn) dn.addEventListener("click", function () { dm.hidden = true; });
+    if (dy) dy.addEventListener("click", function (ev) { ev.stopPropagation(); doDelete(); });
+    if (dm) dm.addEventListener("click", function (ev) { if (ev.target === dm) dm.hidden = true; });
+    loadRail();
+  }
+
+  /* —— 房间信息 —— */
+  function loadRoomMeta() {
+    fetch("/api/room?id=" + encodeURIComponent(ROOM), { cache: "no-store" })
+      .then(function (r) {
+        if (r.status === 404) { location.replace("/lounge"); throw new Error("gone"); }
+        return r.json();
+      })
+      .then(function (d) {
+        if (!d || !d.id) return;
+        $("roomName").textContent = d.name;
+        var tag = $("roomTag");
+        tag.hidden = false;
+        tag.textContent = d.kind === "official" ? "官方" : "游客创建";
+        tag.className = "room-tag" + (d.kind === "official" ? "" : " guest");
+        if (d.desc) {
+          var de = $("roomDesc");
+          de.textContent = d.desc;
+          de.hidden = false;
+        }
+        document.title = d.name + " · 聊天室";
+      })
+      .catch(function () {});
+  }
+  function greeting() {
+    var from = "";
+    try { from = new URLSearchParams(location.search).get("from") || ""; } catch (e) { return; }
+    if (!/^\d{5}$/.test(from) || from === myId) return;
+    showBanner("游客" + from + " 邀请你来到这里。");
+    try {
+      var u = new URL(location.href);
+      u.searchParams.delete("from");
+      history.replaceState(null, "", u.pathname + u.search);
+    } catch (e) {}
+  }
+
+  /* —— 房间列表 —— */
+  function fmtN(n) { return (Number(n) || 0).toLocaleString("zh-CN"); }
+  function roomCard(r) {
+    var a = document.createElement("a");
+    a.className = "room-card" + (r.kind === "official" ? " off" : "");
+    a.href = "/lounge?room=" + encodeURIComponent(r.id);
+
+    if (r.kind === "official") {
+      var seal = document.createElement("span");
+      seal.className = "seal-o";
+      seal.textContent = "官";
+      seal.setAttribute("aria-hidden", "true");
+      a.appendChild(seal);
+    }
+
+    var b = document.createElement("b");
+    b.textContent = r.name;
+    a.appendChild(b);
+
+    if (r.desc) {
+      var d = document.createElement("div");
+      d.className = "d";
+      d.textContent = r.desc;
+      a.appendChild(d);
+    }
+
+    var ft = document.createElement("div");
+    ft.className = "ft";
+    var dot = document.createElement("span");
+    dot.className = "live-dot" + (r.online ? " on" : "");
+    ft.appendChild(dot);
+    var st = document.createElement("span");
+    st.textContent = (r.online ? r.online + " 人在室" : "暂无人在线") + " · " + fmtN(r.messages) + " 条";
+    ft.appendChild(st);
+    var by = document.createElement("span");
+    by.className = "by";
+    by.textContent = r.kind === "official" ? "官方" : ("创建者 " + (r.owner_name || ""));
+    ft.appendChild(by);
+    a.appendChild(ft);
+    return a;
+  }
+  function fillGrid(box, rows) {
+    box.innerHTML = "";
+    rows.forEach(function (r) { box.appendChild(roomCard(r)); });
+  }
+  function loadRooms() {
+    fetch("/api/rooms", { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var off = (d && d.official) || [], guest = (d && d.guest) || [];
+        fillGrid($("offGrid"), off);
+        fillGrid($("guestGrid"), guest);
+        $("offCount").textContent = off.length;
+        $("guestCount").textContent = guest.length;
+        $("guestSec").hidden = guest.length === 0;
+      })
+      .catch(function () { $("offCount").textContent = "…"; });
+  }
+  function openNewRoom() {
+    $("newRoom").hidden = false;
+    $("nrNote").className = "invite-note";
+    $("nrNote").textContent = "";
+    $("nrName").value = "";
+    $("nrDesc").value = "";
+    $("nrName").focus();
+  }
+  function createRoom() {
+    var name = ($("nrName").value || "").trim();
+    var desc = ($("nrDesc").value || "").trim();
+    var note = $("nrNote");
+    note.className = "invite-note";
+    if (name.length < 2) {
+      note.className = "invite-note err";
+      note.textContent = "名称至少两个字。";
+      return;
+    }
+    var btn = $("nrOk");
+    btn.disabled = true;
+    fetch("/api/rooms", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: name, desc: desc, owner: guestId() })
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (d) {
+        if (!r.ok) throw new Error(d.detail || ("创建失败（" + r.status + "）"));
+        return d;
+      });
+    }).then(function (d) {
+      var rid = d && d.room && d.room.id;
+      if (rid) location.href = "/lounge?room=" + encodeURIComponent(rid);
+    }).catch(function (e) {
+      note.className = "invite-note err";
+      note.textContent = e.message || "创建失败";
+      btn.disabled = false;
+    });
+  }
+  function pollInbox() {
+    fetch("/api/chat/inbox?id=" + encodeURIComponent(guestId()), { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        (d.results || []).forEach(function (x) {
+          var t = x.action === "accept" ? "接受了你的邀请"
+                : x.action === "decline" ? "拒绝了你的邀请" : "忽略了你发出的邀请";
+          toast((x.by_name || ("游客" + x.by)) + " " + t + "。");
+        });
+        if (d.invites && d.invites.length) {
+          addNotices(d.invites);
+          toast("收到一条邀请，点右上角看。");
+        }
+      })
+      .catch(function () {})
+      .then(function () { setTimeout(pollInbox, 4000); });
+  }
+  function initList() {
+    document.title = "全部聊天室 · 聊天室";
+    $("viewList").hidden = false;
+    loadRooms();
+    pollInbox();
+    $("newRoomBtn").addEventListener("click", openNewRoom);
+    $("newRoomX").addEventListener("click", function () { $("newRoom").hidden = true; });
+    $("newRoom").addEventListener("click", function (ev) {
+      if (ev.target === $("newRoom")) $("newRoom").hidden = true;
+    });
+    $("nrOk").addEventListener("click", function (ev) { ev.stopPropagation(); createRoom(); });
+    $("nrName").addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter") { ev.preventDefault(); $("nrDesc").focus(); }
+    });
+    $("nrDesc").addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter") { ev.preventDefault(); createRoom(); }
+    });
+    document.addEventListener("keydown", function (ev) {
+      if (ev.key === "Escape" && !$("newRoom").hidden) $("newRoom").hidden = true;
+    });
+    window.addEventListener("pageshow", function (ev) { if (ev.persisted) loadRooms(); });
+  }
+
+  /* —— 邀请：按编号 —— */
+  var invKind = "guest";
+  function setInvKind(kind) {
+    invKind = kind;
+    $("invTabGuest").classList.toggle("on", kind === "guest");
+    $("invTabUser").classList.toggle("on", kind === "user");
+    $("invTabGuest").setAttribute("aria-selected", kind === "guest" ? "true" : "false");
+    $("invTabUser").setAttribute("aria-selected", kind === "user" ? "true" : "false");
+    var guest = kind === "guest";
+    $("invLb").textContent = guest ? "游客编号" : "用户编号";
+    $("invCode").disabled = !guest;
+    $("invSend").disabled = !guest;
+    $("inviteNote").className = "invite-note";
+    $("inviteNote").textContent = guest ? "" : "用户体系还没接（不用登录），先用游客编号邀请。";
+    $("invCode").value = "";
+    if (guest) $("invCode").focus();
+  }
+  function openInvite() {
+    var box = $("invite");
+    if (!box) return;
+    closeProfile();
+    box.hidden = false;
+    setInvKind("guest");
+    loadSent();
+    $("invLink").value = location.origin + "/lounge?room=" + encodeURIComponent(ROOM) +
+      "&from=" + encodeURIComponent(myId);
+  }
+  function sendInvite() {
+    if (invKind !== "guest") return;
+    var code = ($("invCode").value || "").replace(/\D/g, "").slice(0, 5);
+    $("invCode").value = code;
+    var note = $("inviteNote");
+    note.className = "invite-note";
+    if (code.length !== 5) {
+      note.className = "invite-note err";
+      note.textContent = "游客编号是五位数字。";
+      return;
+    }
+    var btn = $("invSend");
+    btn.disabled = true;
+    fetch("/api/chat/invite", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ room: ROOM, from: myId, to: code })
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (d) {
+        if (!r.ok) throw new Error(d.detail || ("邀请失败（" + r.status + "）"));
+        return d;
+      });
+    }).then(function (d) {
+      var online = membersData.some(function (m) { return m.id === code && m.online; });
+      note.className = "invite-note";
+      note.textContent = "已邀请 " + (d.to_name || ("游客" + code)) + (online ? "（对方在线，马上能看到）" : "（对方进来时会看到）");
+      $("invCode").value = "";
+      $("invite").hidden = true;
+      showInviteDone(d.to_name || ("游客" + code));
+    }).catch(function (e) {
+      note.className = "invite-note err";
+      note.textContent = e.message || "邀请失败";
+    }).then(function () { btn.disabled = (invKind !== "guest"); });
+  }
+  var noticeIds = {};
+  function addNotices(list, boxId) {
+    var q = $(boxId || "invQueueP");
+    if (!q) return;
+    (list || []).forEach(function (x) {
+      if (!x || !x.id || noticeIds[x.id]) return;
+      noticeIds[x.id] = true;
+      var n = document.createElement("div");
+      n.className = "inv-notice";
+      n.dataset.id = x.id;
+      n.innerHTML = '<div class="inv-notice-tx"><b></b> 邀请你进入 <i class="rn"></i>。</div>' +
+        '<div class="inv-notice-acts">' +
+        '<button class="inv-act ok" type="button" data-act="accept">接受</button>' +
+        '<button class="inv-act no" type="button" data-act="decline">拒绝</button>' +
+        '<button class="inv-act mute" type="button" data-act="ignore">忽略</button>' +
+        '</div>';
+      n.querySelector("b").textContent = x.name || ("游客" + x.from);
+      var rn = n.querySelector(".rn");
+      if (rn) rn.textContent = "《" + (x.room_name || "聊天室") + "》";
+      q.appendChild(n);
+      syncInvBadge();          // 必须先入 DOM 再数，否则一直算作 0 张，整块保持 hidden
+    });
+  }
+  function syncInvBadge() {
+    var q = $("invQueueP"), sec = $("umInvSec"), badge = $("umBadge");
+    var n = q ? q.querySelectorAll(".inv-notice").length : 0;
+    if (sec) sec.hidden = n === 0;
+    if (badge) {
+      badge.hidden = n === 0;
+      badge.textContent = n > 1 ? "+" + n : "+";
+    }
+  }
+  function respondInvite(id, act, node) {
+    if (!id) return;
+    fetch("/api/chat/invite/respond", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: id, me: guestId(), action: act })
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (d) {
+        if (!r.ok) throw new Error(d.detail || ("处理失败（" + r.status + "）"));
+        return d;
+      });
+    }).then(function (d) {
+      if (node) node.remove();
+      syncInvBadge();
+      var res = (d && d.result) || {};
+      if (act === "accept" && res.room && res.room !== ROOM) {
+        location.href = "/lounge?room=" + encodeURIComponent(res.room);
+        return;
+      }
+      showBanner({ accept: "已接受邀请，可以开始聊了。",
+                   decline: "已拒绝这条邀请。",
+                   ignore: "已忽略这条邀请。" }[act] || "已处理。");
+    }).catch(function (e) { showBanner(e.message || "处理失败"); });
+  }
+  function showInviteDone(name) {
+    var box = $("invDone");
+    if (!box) return;
+    $("invDoneTxt").textContent = "已通知 " + name + "，TA 看到后决定是否进来。";
+    box.hidden = false;
+  }
+  function loadSent() {
+    var box = $("sentBox"), list = $("sentList");
+    if (!box || !list) return;
+    fetch("/api/chat/invites?me=" + encodeURIComponent(myId), { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var rows = (d && d.invites) || [];
+        if (!rows.length) { box.hidden = true; list.innerHTML = ""; return; }
+        box.hidden = false;
+        list.innerHTML = rows.map(function (x) {
+          return '<div class="sent-row"><span></span>' +
+            '<span class="chip ' + x.status + '"></span>' +
+            '<span class="t">' + fmtTime(x.at) + '</span></div>';
+        }).join("");
+        rows.forEach(function (x, i) {
+          var row = list.children[i];
+          if (!row) return;
+          row.children[0].textContent = x.to_name || ("游客" + x.to);
+          row.children[1].textContent = x.status_text || x.status;
+        });
+      })
+      .catch(function () {});
+  }
+  function showBanner(text) {
+    var b = $("invBanner");
+    if (!b) return;
+    $("invBannerTxt").textContent = text;
+    b.hidden = false;
+    clearTimeout(b._h);
+    b._h = setTimeout(function () { b.hidden = true; }, 12000);
+  }
+  function bindRoom() {
+    var box = $("members");
+    box.addEventListener("click", function (ev) {
+      var row = ev.target.closest(".mem");
+      if (row) openProfile(row.dataset.id, row);
+    });
+    box.addEventListener("keydown", function (ev) {
+      if (ev.key !== "Enter" && ev.key !== " ") return;
+      var row = ev.target.closest(".mem");
+      if (row) { ev.preventDefault(); openProfile(row.dataset.id, row); }
+    });
+    $("inviteBtn").addEventListener("click", function (ev) { ev.stopPropagation(); openInvite(); });
+    $("inviteX").addEventListener("click", function () { $("invite").hidden = true; });
+    $("invite").addEventListener("click", function (ev) {
+      if (ev.target === $("invite")) { $("invite").hidden = true; return; }
+      var tab = ev.target.closest(".invite-tab");
+      if (tab) setInvKind(tab.dataset.kind);
+    });
+    $("invSend").addEventListener("click", function (ev) { ev.stopPropagation(); sendInvite(); });
+    $("invCode").addEventListener("input", function () {
+      this.value = this.value.replace(/\D/g, "").slice(0, 5);
+    });
+    $("invCode").addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter") { ev.preventDefault(); sendInvite(); }
+    });
+    $("invBannerX").addEventListener("click", function () { $("invBanner").hidden = true; });
+    $("invCopy").addEventListener("click", function () {
+      var el = $("invLink"), btn = this;
+      el.select();
+      function done() {
+        var old = btn.textContent;
+        btn.textContent = "已复制";
+        setTimeout(function () { btn.textContent = old; }, 1600);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(el.value).then(done, function () {
+          try { document.execCommand("copy"); done(); } catch (e) {}
+        });
+      } else {
+        try { document.execCommand("copy"); done(); } catch (e) {}
+      }
+    });
+    $("invDoneOk").addEventListener("click", function () { $("invDone").hidden = true; });
+    $("invDone").addEventListener("click", function (ev) {
+      if (ev.target === $("invDone")) $("invDone").hidden = true;
+    });
+    $("mprofAt").addEventListener("click", function () {
+      var t = $("input"), nm = $("mprofName").textContent || "";
+      t.value = (t.value ? t.value + " " : "") + "@" + nm;
+      autoGrow();
+      closeProfile();
+      t.focus();
+    });
+    document.addEventListener("click", function (ev) {
+      if ($("mprof").hidden) return;
+      if (!ev.target.closest("#mprof") && !ev.target.closest(".mem")) closeProfile();
+    });
+    document.addEventListener("keydown", function (ev) {
+      if (ev.key !== "Escape") return;
+      if (!$("invDone").hidden) { $("invDone").hidden = true; return; }
+      if (!$("invite").hidden) { $("invite").hidden = true; return; }
+      if (!$("mprof").hidden) closeProfile();
+    });
+  }
+
+  function poll() {
+    var id = guestId();
+    fetch("/api/chat/messages?room=" + encodeURIComponent(ROOM) + "&since=" + encodeURIComponent(cursor) + "&id=" + encodeURIComponent(id), { cache: "no-store" })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (d) {
+        setLive(true);
+        if (Number(d.seq) < cursor) {                 // 服务重启：序号归零，重来
+          cursor = 0; lastId = ""; lastAt = 0;
+          $("msgs").innerHTML = '<p class="empty">还没有人开口。<br>说第一句吧。</p>';
+        }
+        if (d.results && d.results.length) {
+          d.results.forEach(function (r) {
+            var t = r.action === "accept" ? "接受了你的邀请"
+                  : r.action === "decline" ? "拒绝了你的邀请" : "忽略了你发出的邀请";
+            showBanner((r.by_name || ("游客" + r.by)) + " " + t + "。");
+          });
+          if ($("invite") && !$("invite").hidden) loadSent();
+        }
+        if (d.invites && d.invites.length) {
+      addNotices(d.invites);
+      toast("收到一条邀请，点右上角看。");
+    }
+        if (d.messages && d.messages.length) append(d.messages);
+        cursor = Number(d.seq) || 0;
+        renderMembers(d.members, d.online);
+        if (!booted) { booted = true; toBottom(); }
+      })
+      .catch(function () { setLive(false); })
+      .then(function () { timer = setTimeout(poll, 2500); });
+  }
+
+  function autoGrow() {
+    var t = $("input");
+    t.style.height = "auto";
+    t.style.height = Math.min(t.scrollHeight, 132) + "px";
+    var n = t.value.length, c = $("cnt");
+    c.textContent = n > 480 ? n + " / 600" : "";
+    c.className = "cnt" + (n > 560 ? " hi" : "");
+  }
+
+  function send() {
+    var t = $("input"), text = t.value.trim();
+    if (!text || sending) return;
+    sending = true;
+    $("send").disabled = true;
+    fetch("/api/chat/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ room: ROOM, id: guestId(), text: text })
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (d) {
+        if (!r.ok) throw new Error(d.detail || ("发送失败（" + r.status + "）"));
+        return d;
+      });
+    }).then(function () {
+      t.value = "";
+      autoGrow();
+      clearTimeout(timer);
+      poll();
+    }).catch(function (e) {
+      toast(e.message || "发送失败");
+    }).then(function () {
+      sending = false;
+      $("send").disabled = false;
+      t.focus();
+    });
+  }
+
+  function bindInvites() {
+    var q = $("invQueueP");
+    if (!q) return;
+    q.addEventListener("click", function (ev) {
+      var btn = ev.target.closest(".inv-act");
+      if (!btn) return;
+      var card = btn.closest(".inv-notice");
+      respondInvite(card && card.dataset.id, btn.dataset.act, card);
+    });
+  }
+
+  function init() {
+    myId = guestId();
+    bindInvites();
+    if (!ROOM) { initList(); return; }
+    $("viewRoom").hidden = false;
+    railInit();
+    loadRoomMeta();
+    greeting();
+    bindRoom();
+    var t = $("input");
+    t.addEventListener("input", autoGrow);
+    t.addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter" && !ev.shiftKey && !ev.isComposing) {
+        ev.preventDefault();
+        send();
+      }
+    });
+    $("send").addEventListener("click", send);
+    document.addEventListener("tcm:guest", function (e) {
+      myId = String(e.detail.id);
+      // 只改「是不是我发的」，绝不改署名：署名一旦改写，历史消息就会串号
+      document.querySelectorAll(".msg").forEach(function (n) {
+        n.classList.toggle("mine", n.dataset.id === myId);
+      });
+      renderMembers([], null);
+      if ($("invite") && !$("invite").hidden) loadSent();
+      cursor = cursor || 0;
+    });
+    poll();
+  }
+
+  /* 主题切换 */
+  (function theme() {
+    var b = $("themeBtn");
+    function label() {
+      var dark = document.documentElement.dataset.theme === "dark";
+      if (b) b.textContent = dark ? "◑ 浅色模式" : "◑ 深色模式";
+    }
+    label();
+    if (b) b.addEventListener("click", function () {
+      var dark = document.documentElement.dataset.theme === "dark";
+      if (dark) delete document.documentElement.dataset.theme;
+      else document.documentElement.dataset.theme = "dark";
+      try { localStorage.setItem("tcm.theme", dark ? "light" : "dark"); } catch (e) {}
+      label();
+    });
+  })();
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
+})();
+</script>
+</body>
+</html>
