@@ -128,7 +128,8 @@ def _expand_query(query: str) -> Tuple[str, List[str]]:
 
 def retrieve(query: str, top_k: Optional[int] = None,
              page_id: Optional[str] = None,
-             scope: str = "library") -> Tuple[List[Tuple[object, float]], Dict[str, object]]:
+             scope: str = "library",
+             relative_keep: Optional[float] = None) -> Tuple[List[Tuple[object, float]], Dict[str, object]]:
     """语义检索 + 阈值过滤。返回（命中段落+分数, 检索元信息）。"""
     k = int(top_k or CONFIG.rag.top_k)
     meta: Dict[str, object] = {
@@ -167,7 +168,8 @@ def retrieve(query: str, top_k: Optional[int] = None,
         return [], meta
 
     top = float(raw[0][1])
-    floor = max(float(CONFIG.rag.min_score), top * float(CONFIG.rag.relative_keep))
+    keep = float(relative_keep if relative_keep is not None else CONFIG.rag.relative_keep)
+    floor = max(float(CONFIG.rag.min_score), top * keep)
     above = [(ps, s) for ps, s in raw if float(s) >= floor]
 
     # 字面锚点：语义分数过线还不够，必须至少共享一个实词二元组。
@@ -184,6 +186,7 @@ def retrieve(query: str, top_k: Optional[int] = None,
         "hits": len(kept),
         "top_score": round(top, 4),
         "floor": round(floor, 4),
+        "relative_keep": round(keep, 4),
         "has_evidence": bool(kept),
         "candidates": len(raw),
         "anchor_dropped": dropped,
@@ -295,6 +298,160 @@ def _clean_citations(text: str, upper: int) -> str:
     return "".join(out)
 
 
+# 三档回答模式：只改检索广度与生成方式，输出边界（拒答规则）三档一致
+EXPERT_CHECK = True          # 专家模式答完再自查一遍（多一次模型调用）
+
+_MODE_CFG = {
+    "fast": {"label": "快速", "top_k": 4, "max_citations": 3, "llm": False},
+    "standard": {"label": "标准", "top_k": None, "max_citations": None, "llm": True},
+    "expert": {"label": "专家", "top_k": 12, "max_citations": 6, "llm": True,
+               "relative_keep": 0.60},
+}
+
+
+def _split_sentences(text: str) -> List[str]:
+    """粗分句：按句末标点与换行切开，够用来点数与定位。"""
+    parts = re.findall(r"[^。！？；\n]+[。！？；]?", str(text or ""))
+    return [p.strip() for p in parts if p.strip()]
+
+
+def _head(sentence: str) -> str:
+    """去掉句首的项目符号、序号、引用编号、「（据中医常识）」，好拿句子开头做比对。"""
+    h = sentence.strip()
+    for _ in range(5):
+        h2 = re.sub(r"^(?:[·•*\-—]+\s*|\d{1,2}[.、)）]?\s*|\[\d+\]\s*"
+                    r"|（据中医常识）|\(据中医常识\)|[：:，,、]\s*)+", "", h)
+        if h2 == h:
+            break
+        h = h2
+    return h
+
+
+def _self_check(question: str, hits, text: str) -> Tuple[str, Dict[str, object]]:
+    """专家模式第二遍：让模型回查哪些句子原文不支持，就地标〔未核〕。
+
+    三条规矩，都是为了「宁可少标，不要错标」：
+      1. 只按句首匹配，不按句子中间的字去撞——否则会把标注插进书名、页码里；
+      2. 作者自己标了「（据中医常识）」的句子不再重复标注；
+      3. 定位不到的只记账不硬标，统计里如实写「已改写、未能定位」。
+    """
+    parts = re.split(r"([。！？；\n])", str(text or ""))   # 偶数位是句子，奇数位是分隔符
+    idxs = [i for i in range(0, len(parts), 2) if parts[i].strip()]
+    sents = [parts[i] for i in idxs]
+    stat: Dict[str, object] = {"ran": False, "sentences": len(sents), "cited": 0,
+                               "common_sense": 0, "flagged": 0, "marked": 0,
+                               "flagged_common": 0, "note": "", "ok": False}
+    valid = set(range(1, len(hits) + 1))
+    for s in sents:
+        marks = [int(m) for m in re.findall(r"\[(\d+)\]", s)]
+        if any(m in valid for m in marks):
+            stat["cited"] = int(stat["cited"]) + 1
+        elif "据中医常识" in s:
+            stat["common_sense"] = int(stat["common_sense"]) + 1
+
+    raw = llm_client.chat_messages(
+        prompt_mod.build_check_messages(question, hits, text),
+        temperature=0.0, max_tokens=400)
+    stat["ran"] = bool(raw)
+    if not raw:
+        stat["note"] = "自查未执行：模型没有回应"
+        return text, stat
+
+    flagged: List[str] = []
+    for line in str(raw).splitlines():
+        line = line.strip().strip("-·•* ").strip().replace("｜", "|")
+        if "|" in line:
+            head, _, body = line.partition("|")
+            if head.strip().startswith("无据"):
+                body = body.strip().strip("「」『』\"“”")
+                if body and body not in flagged:
+                    flagged.append(body)
+        elif line.startswith("无据"):
+            body = line[2:].strip().strip("：: 「」『』\"“”")
+            if body and body not in flagged:
+                flagged.append(body)
+
+    if not flagged:
+        stat["ok"] = "全部有据" in str(raw)
+        stat["note"] = "自查通过：答案句子都能被原文支持" if stat["ok"] else "自查未挑出无据句"
+        return text, stat
+
+    # 满篇标注反而看不清重点：最多标 3 句，多出的只记账
+    capped = len(flagged) > 3
+    flagged = flagged[:3]
+
+    # 逐条按句首定位
+    hits_idx: List[int] = []
+    common = 0
+    for frag in flagged[:6]:
+        f = frag.strip().strip("「」『』\"“”")
+        if len(f) < 6:
+            continue
+        found = -1
+        for k, s in enumerate(sents):
+            head = _head(s)
+            n = min(len(f), len(head), 40)
+            if n >= 6 and head[:n] == f[:n]:
+                found = k
+                break
+        if found < 0:
+            continue
+        if "据中医常识" in sents[found]:
+            common += 1
+            continue
+        if found not in hits_idx:
+            hits_idx.append(found)
+
+    for k in hits_idx:
+        i = idxs[k]
+        body = parts[i].rstrip()
+        tail = re.search(r"((?:\s*\[\d+\])+)\s*$", body)   # 标注放到 [n] 之后，读起来顺
+        if tail:
+            parts[i] = body[: tail.end()] + "〔未核〕"
+        else:
+            parts[i] = body + "〔未核〕"
+
+    hit = len(hits_idx)
+    tail_note = "（满篇标注反而看不清重点，最多标 3 句）" if capped else ""
+    stat["flagged"] = len(flagged)
+    stat["marked"] = hit
+    stat["flagged_common"] = common
+    stat["ok"] = False
+    if hit:
+        stat["note"] = f"自查：{hit} 句原文未直接支持，已就地标〔未核〕{tail_note}"
+    elif common:
+        stat["note"] = f"自查：模型指认 {common} 句，均属「（据中医常识）」补充，未重复标注"
+    else:
+        stat["note"] = f"自查：模型指认 {len(flagged)} 句，但句子已被改写、未能定位"
+
+    bits = [f"共 {len(sents)} 句", f"{stat['cited']} 句有原文依据"]
+    if int(stat["common_sense"]):
+        bits.append(f"{stat['common_sense']} 句为常识补充")
+    if hit:
+        bits.append(f"{hit} 句原文未直接支持，已标〔未核〕")
+    missing = len(flagged) - hit - common
+    if not hit and missing:
+        bits.append(f"{missing} 句被指为无据但已改写、未能定位")
+    if not flagged:
+        bits.append("未发现无据句")
+    return "".join(parts) + "\n\n—— 自查：" + "，".join(bits) + "。", stat
+
+
+def mode_label(mode: str) -> str:
+    """给前端显示用的中文档位名。"""
+    return _MODE_CFG.get(str(mode or "").strip().lower(), _MODE_CFG["standard"])["label"]
+
+
+def _fast_extract(hits: List[Tuple[object, float]]) -> str:
+    """快速模式：只摘原文，不解释、不编造。"""
+    lines = ["以下是古籍中与该问题相关的原文（快速模式：只摘录，不做解释）："]
+    for i, (ps, score) in enumerate(hits[:CONFIG.rag.max_citations], start=1):
+        label = ps.cite_label() if hasattr(ps, "cite_label") else getattr(ps, "page_id", "")
+        lines.append(f"[{i}] 《{getattr(ps, 'book', '')}》{label}：{_flat(getattr(ps, 'text', ''))}"
+                     f"（相似度 {float(score):.2f}）")
+    return "\n".join(lines)
+
+
 def _extractive_fallback(hits: List[Tuple[object, float]]) -> str:
     """模型不可用时的降级答案：只列原文，不编造。"""
     lines = ["以下是古籍中与该问题相关的原文："]
@@ -320,10 +477,15 @@ def _norm_refusal(query: str, is_demo: bool, reason: str, trace: List[str]) -> A
 
 def rag_answer(query: str, *, history: Optional[List[dict]] = None,
                page_id: Optional[str] = None, scope: str = "library",
-               is_demo: Optional[bool] = None) -> Answer:
-    """RAG 问答主入口。任何异常都返回合规的降级 Answer，不抛。"""
+               is_demo: Optional[bool] = None, mode: str = "standard") -> Answer:
+    """RAG 问答主入口。mode 取 fast / standard / expert，任何异常都返回合规的降级 Answer，不抛。"""
     q = (query or "").strip()
     trace: List[str] = []
+    mode = str(mode or "standard").strip().lower()
+    if mode not in _MODE_CFG:
+        mode = "standard"
+    cfg = _MODE_CFG[mode]
+    trace.append(f"回答模式：{cfg['label']}（{mode}）")
     if is_demo is None:
         is_demo = bool(CONFIG.demo_mode)
 
@@ -334,7 +496,8 @@ def rag_answer(query: str, *, history: Optional[List[dict]] = None,
 
     try:
         # ② 语义检索
-        hits, meta = retrieve(q, page_id=page_id, scope=scope)
+        hits, meta = retrieve(q, top_k=cfg["top_k"], relative_keep=cfg.get("relative_keep"),
+                              page_id=page_id, scope=scope)
         trace.append(
             f"语义检索：知识库 {meta.get('index', {}).get('vectors', 0)} 段向量，"
             f"候选 {meta.get('candidates', 0)}，命中 {meta.get('hits', 0)}，"
@@ -349,6 +512,9 @@ def rag_answer(query: str, *, history: Optional[List[dict]] = None,
 
         # ③ 无证据：按配置给「常识作答」或拒答
         if not has_ev:
+            if not cfg["llm"]:                    # 快速模式不调模型，也不做常识补充
+                return _norm_refusal(q, is_demo, "快速模式只做原文检索，本次未检索到依据",
+                                     trace + ["未调用模型，因此不作常识补充"])
             if not CONFIG.rag.answer_without_evidence:
                 return _norm_refusal(q, is_demo, "原文未检索到依据", trace +
                                      ["未开启常识作答，按约定拒答"])
@@ -367,27 +533,41 @@ def rag_answer(query: str, *, history: Optional[List[dict]] = None,
                 retrieval={**meta, "answered_without_evidence": True},
             )
 
-        # ④ 有证据：RAG 生成
-        text = llm_client.chat_messages(
-            prompt_mod.build_messages(q, hits, history),
-            temperature=0.2, max_tokens=900)
-        if not text:
-            text = _extractive_fallback(hits)
-            trace.append("本机大模型不可用：降级为原文摘录（不编造解释）")
-            backend = "rag-extractive"
+        # ④ 有证据：按档位作答（快速只摘录 / 标准综合 / 专家分条对照）
+        if not cfg["llm"]:
+            text = _fast_extract(hits)
+            trace.append("快速模式：只摘原文，未调用本机模型")
+            backend = "rag-fast"
         else:
-            trace.append(f"本机大模型已生成答案（{CONFIG.llm.model}）")
-            backend = "rag"
+            text = llm_client.chat_messages(
+                prompt_mod.build_messages(q, hits, history,
+                                          style="expert" if mode == "expert" else "standard"),
+                temperature=0.1 if mode == "expert" else 0.2,
+                max_tokens=1200 if mode == "expert" else 900)
+            if not text:
+                text = _extractive_fallback(hits)
+                trace.append("本机大模型不可用：降级为原文摘录（不编造解释）")
+                backend = "rag-extractive"
+            else:
+                trace.append(f"本机大模型已生成答案（{CONFIG.llm.model}·{cfg['label']}模式）")
+                backend = "rag"
 
         text = _clean_citations(text, len(hits))
         cited = _cited_indexes(text, len(hits))
         trace.append(f"答案引用编号：{cited or '未显式标注'}")
 
+        # 专家模式：答完再自查一遍，把原文不支持的句子挑出来（多一次模型调用）
+        check: Dict[str, object] = {}
+        if mode == "expert" and EXPERT_CHECK and backend == "rag":
+            text, check = _self_check(q, hits, text)
+            trace.append("专家自查：" + str(check.get("note") or ""))
+
         # ⑤ 出处：被引用的排前面，其余作为「备选出处」一并返回
         ordered = [i for i in cited] + [i for i in range(1, len(hits) + 1) if i not in cited]
         sources: List[Dict[str, object]] = []
         evidences: List[Evidence] = []
-        for i in ordered[:max(1, CONFIG.rag.max_citations)]:
+        cap = int(cfg["max_citations"] or CONFIG.rag.max_citations)
+        for i in ordered[:max(1, cap)]:
             ps, score = hits[i - 1]
             sources.append(_passage_payload(ps, score, i, cited and i in cited))
             ev = _evidence_of(ps, score, is_demo)
@@ -402,7 +582,9 @@ def rag_answer(query: str, *, history: Optional[List[dict]] = None,
             evidences=evidences, refused=False, refuse_reason="",
             disclaimer=DISCLAIMER, trace=trace, backend=backend, is_demo=is_demo,
             sources=sources,
-            retrieval={**meta, "cited": cited, "answered_without_evidence": False},
+            retrieval={**meta, "cited": cited, "answered_without_evidence": False,
+                       "qa_mode": mode, "qa_mode_label": cfg["label"],
+                       **({"self_check": check} if check else {})},
         )
     except Exception as exc:
         logger.warning("RAG 链路异常：%s", exc)

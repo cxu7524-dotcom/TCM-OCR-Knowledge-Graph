@@ -141,6 +141,24 @@
   .typing { display: none; color: var(--muted); font-size: 12.5px; padding: 4px 2px; }
   .typing.show { display: block; }
 
+  /* 专家模式自查：未核标注与自查小结 */
+  .bubble .unchecked { color: #a63a24; border-bottom: 1px dashed rgba(166,58,36,.55); font-size: .92em; }
+  .bubble .sc-note { color: var(--muted); font-size: 11.5px; letter-spacing: .5px; }
+
+  /* 回答模式：三档 */
+  .qmode { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+  .qmode-lb { font-size: 11.5px; color: var(--muted); letter-spacing: 2px; }
+  .qm {
+    border: 1px solid var(--line); background: #fff; color: var(--ink); border-radius: 999px;
+    padding: 4px 13px; font-family: inherit; font-size: 12px; letter-spacing: 1px;
+    cursor: pointer; transition: .15s;
+  }
+  .qm:hover { border-color: var(--qing); color: var(--qing); }
+  .qm[aria-pressed="true"] { background: var(--qing); border-color: var(--qing); color: #f6fbf9; }
+  .qmode-note { font-size: 11px; color: var(--muted); }
+  html[data-theme="dark"] .qm { background: #241f18; }
+  html[data-theme="dark"] .qm[aria-pressed="true"] { background: var(--qing); color: #f2f7f5; }
+
   /* 输入条 */
   .chat-input { display: flex; gap: 8px; margin-top: 12px; border-top: 1px solid var(--line-soft); padding-top: 12px; }
   .chat-input input[type=text] {
@@ -1123,6 +1141,13 @@
       <span class="vt" id="voiceText">正在听……说完停一下会自动结束，也可以再点一次按钮</span>
       <button class="vx" id="voiceX" type="button" title="取消这次语音输入">取消</button>
     </div>
+    <div class="qmode" id="qmode" role="group" aria-label="回答模式">
+      <span class="qmode-lb">回答</span>
+      <button class="qm" type="button" data-mode="fast" aria-pressed="false">快速</button>
+      <button class="qm" type="button" data-mode="standard" aria-pressed="true">标准</button>
+      <button class="qm" type="button" data-mode="expert" aria-pressed="false">专家</button>
+      <span class="qmode-note" id="qmodeNote"></span>
+    </div>
     <div class="chat-input">
       <button class="mic" id="voiceBtn" type="button" title="语音输入：点一下开始说，再点一下结束（识别结果可改）">🎙</button>
       <select class="vlang" id="voiceLang" title="语音识别语言：普通话 / 粤语 / English" aria-label="语音识别语言">
@@ -1136,9 +1161,6 @@
   </section>
 </main>
 
-<!-- ============ 退出智能问答：回四步演示台 ============ -->
-<a class="qa-exit" id="qaExit" href="/">退出智能问答</a>
-
 <!-- ============ 意见反馈：入口条 + 弹窗 ============ -->
 <section class="fb-band" id="fbBand" aria-labelledby="fbBandTitle">
   <span class="fb-band-l">
@@ -1147,6 +1169,9 @@
   </span>
   <button class="btn primary" id="fbOpen" type="button">意见反馈入口</button>
 </section>
+
+<!-- ============ 退出智能问答：回四步演示台 ============ -->
+<a class="qa-exit" id="qaExit" href="/">退出智能问答</a>
 
 <div class="fb-mask" id="fbMask" hidden>
   <div class="fb-panel" role="dialog" aria-modal="true" aria-labelledby="fbTitle">
@@ -1242,6 +1267,29 @@ function errText(e) {
 }
 
 const S = { pageId: null, history: [] };
+
+/* ---------------- 回答模式：快速 / 标准 / 专家 ----------------
+   三档只改检索广度与生成方式，越界拒答等输出边界三档一致；
+   档位记在本机，下次打开还是上次选的。 */
+const QA_MODES = {
+  fast:     { note: "只检索原文摘录，不调模型，通常 1–2 秒", wait: "正在检索原文…" },
+  standard: { note: "检索 + 本机模型综合作答，约 8–15 秒", wait: "正在查阅古籍…" },
+  expert:   { note: "扩大检索、分条作答，答完再自查一遍，约 20–40 秒", wait: "正在通检诸书…" }
+};
+let qaMode = "standard";
+try { const _m = localStorage.getItem("tcm.qa.mode"); if (QA_MODES[_m]) qaMode = _m; } catch (e) {}
+function setQaMode(m) {
+  if (!QA_MODES[m]) m = "standard";
+  qaMode = m;
+  document.querySelectorAll("#qmode .qm").forEach(b => {
+    b.setAttribute("aria-pressed", b.dataset.mode === m ? "true" : "false");
+  });
+  const n = $("qmodeNote");
+  if (n) n.textContent = QA_MODES[m].note;
+  const ty = $("typing");
+  if (ty) ty.innerHTML = '<span class="spinner"></span>' + QA_MODES[m].wait;
+  try { localStorage.setItem("tcm.qa.mode", m); } catch (e) {}
+}
 
 /* ---------------- 主题：深色 / 浅色（记忆在本机） ---------------- */
 function applyTheme(dark) {
@@ -1454,7 +1502,9 @@ function mdLite(text) {
   return esc(text)
     .replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>")
     .replace(/\\n/g, "<br>")
-    .replace(/\r?\n/g, "<br>");
+    .replace(/\r?\n/g, "<br>")
+    .replace(/—— 自查：([^<]*?)。/g, '<span class="sc-note">—— 自查：$1。</span>')
+    .replace(/〔未核〕/g, '<span class="unchecked">〔未核〕</span>');
 }
 function addMsg(role, text, refused) {
   const scroll = $("chatScroll");
@@ -1492,6 +1542,25 @@ function addSources(r) {
   if (rt.hits) tags.push('<span class="tag">命中 ' + rt.hits + " 段原文</span>");
   if (typeof rt.top_score === "number" && rt.top_score > 0) {
     tags.push('<span class="tag">最高相似度 ' + rt.top_score.toFixed(2) + "</span>");
+  }
+  if (r.qa_mode) {
+    const lm = { fast: "快速", standard: "标准", expert: "专家" }[r.qa_mode] || r.qa_mode;
+    const sec = r.elapsed == null ? ""
+      : (r.elapsed < 1 ? " · 不到 1 秒" : " · " + Math.round(r.elapsed) + " 秒");
+    tags.unshift('<span class="tag">回答模式 · ' + lm + sec + "</span>");
+  }
+  if (rt.self_check) {
+    const sc = rt.self_check;
+    if (sc.marked) {
+      tags.push('<span class="tag warn">自查：' + sc.marked + ' 句原文未直接支持（已标〔未核〕）</span>');
+    } else if (sc.flagged) {
+      tags.push('<span class="tag warn">自查：' + sc.flagged + ' 句被指为无据，句子已改写、未能定位</span>');
+    } else if (sc.ran) {
+      tags.push('<span class="tag">自查：共 ' + sc.sentences + ' 句，' + sc.cited +
+                ' 句有原文依据' + (sc.common_sense ? '、' + sc.common_sense + ' 句为常识补充' : '') + '</span>');
+    } else {
+      tags.push('<span class="tag warn">自查未执行（模型无回应）</span>');
+    }
   }
   if (rt.answered_without_evidence) {
     tags.push('<span class="tag warn">古籍库无直接依据 · 通用常识作答</span>');
@@ -1537,7 +1606,7 @@ async function ask(q) {
   $("typing").classList.add("show");
   $("btnAsk").disabled = true;
   try {
-    const body = { question: q, history: S.history.slice(-6) };
+    const body = { question: q, history: S.history.slice(-6), mode: qaMode };
     if (S.pageId) body.page_id = S.pageId;
     const r = await api("/api/qa", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     addMsg("ai", r.text, !!r.refused);
@@ -1551,6 +1620,11 @@ async function ask(q) {
     $("btnAsk").disabled = false;
   }
 }
+$("qmode").addEventListener("click", e => {
+  const b = e.target.closest(".qm");
+  if (b) setQaMode(b.dataset.mode);
+});
+setQaMode(qaMode);
 $("btnAsk").onclick = () => ask();
 $("qInput").addEventListener("keydown", e => { if (e.key === "Enter") ask(); });
 
