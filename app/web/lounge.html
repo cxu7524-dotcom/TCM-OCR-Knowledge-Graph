@@ -1,10 +1,10 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>聊天室 · 中医古籍文字识别与知识图谱</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='9' fill='%23a63a24'/%3E%3Ctext x='32' y='45' font-size='36' text-anchor='middle' fill='%23fbeee6' font-family='KaiTi,serif'%3E%E4%BA%A4%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='9' fill='%23a63a24'/%3E%3Ctext x='32' y='45' font-size='34' text-anchor='middle' fill='%23fbeee6' font-family='KaiTi,serif'%3E%E9%86%AB%3C/text%3E%3C/svg%3E">
 <script>
 /* 主题先于渲染恢复，避免闪白 */
 try { if (localStorage.getItem("tcm.theme") === "dark") document.documentElement.dataset.theme = "dark"; } catch (e) {}
@@ -191,6 +191,8 @@ try { if (localStorage.getItem("tcm.theme") === "dark") document.documentElement
   }
 
   /* 最左：全部聊天室（贴屏幕左边，与底色同色，可收起） */
+  .rail-open { display: none; }
+  .rail-scrim { display: none; }
   .rail {
     position: fixed; left: 0; top: var(--hdr-h, 69px); bottom: 0; z-index: 35;
     width: var(--railw); overflow: hidden; transition: width .18s ease;
@@ -245,6 +247,17 @@ try { if (localStorage.getItem("tcm.theme") === "dark") document.documentElement
   }
   .rail-off .rail-list { display: none; }
   .rail-off .rail-tg { position: static; margin: 10px auto 0; }
+  .rail-exit {
+    display: flex; align-items: center; justify-content: center; gap: 5px;
+    margin: 9px 12px 12px; padding: 9px 8px; white-space: nowrap;
+    font-family: var(--kai); font-size: 13px; letter-spacing: 2px;
+    color: var(--cinnabar); text-decoration: none;
+    border: 1px solid rgba(166, 58, 36, .45); border-radius: 3px;
+    background: transparent; transition: background .15s, color .15s, border-color .15s;
+  }
+  .rail-exit:hover { background: var(--cinnabar); border-color: var(--cinnabar); color: #fdf3e7; }
+  .rail-exit:focus-visible { outline: 2px solid var(--cinnabar); outline-offset: 2px; }
+  .rail-off .rail-exit { display: none; }
 
   /* 左：在室 */
   .side-back {
@@ -312,6 +325,32 @@ try { if (localStorage.getItem("tcm.theme") === "dark") document.documentElement
   }
   .composer textarea:focus { border-color: var(--cinnabar); box-shadow: 0 0 0 3px rgba(166,58,36,.1); }
   .composer textarea::placeholder { color: #a2937c; }
+  .composer textarea.ask {
+    border-color: rgba(184, 150, 78, .8); background: #fdf8ec;
+    box-shadow: 0 0 0 3px rgba(184, 150, 78, .13);
+  }
+  .tool-ai.on { background: #f2e2bd; border-color: var(--gold); color: #6b4f14; }
+  html[data-theme="dark"] .composer textarea.ask { background: #262119; }
+  .btn.ask { border-color: rgba(184, 150, 78, .55); color: #8a6a28; background: #fbf3df; }
+  .btn.ask:hover:not(:disabled) { border-color: var(--gold); background: #f7ecd2; color: #6f5418; }
+  .btn.ask:disabled { opacity: .55; cursor: default; }
+  .btn.ask.on { background: #f2e2bd; border-color: var(--gold); color: #6b4f14; }
+  .btn.ask.on::after { content: "✓"; font-size: 10px; }
+  .ask-hint {
+    margin: 0; padding: 7px 13px 0; font-family: var(--kai); font-size: 11.5px;
+    letter-spacing: 1px; line-height: 1.6; color: var(--muted);
+  }
+  .ask-hint[hidden] { display: none; }
+  /* 问答卡片：问句一行、答复一段、出处几行，比普通气泡宽一点 */
+  .msg.qa { max-width: 92%; }
+  .msg.qa .bub { background: var(--paper-2); border-color: rgba(184, 150, 78, .45); }
+  .msg.qa.refused .bub { border-color: rgba(166, 58, 36, .4); }
+  .msg.qa .qa-q { margin: 0 0 5px; font-family: var(--kai); font-size: 13px; letter-spacing: 1px; color: var(--cinnabar-dark); }
+  .msg.qa .qa-src { margin-top: 6px; display: flex; flex-direction: column; gap: 3px; }
+  .msg.qa .qa-src-row { font-size: 11.5px; line-height: 1.6; color: var(--ink-soft); }
+  .msg.qa .qa-src-meta { font-family: var(--kai); color: #8a6a28; margin-right: 4px; }
+  .msg.qa .qa-src-q { color: var(--muted); }
+  .msg.qa.pending .bub { color: var(--muted); }
   .btn {
     display: inline-flex; align-items: center; justify-content: center; gap: 6px;
     padding: 8px 16px; border-radius: 3px; cursor: pointer; white-space: nowrap;
@@ -577,10 +616,298 @@ try { if (localStorage.getItem("tcm.theme") === "dark") document.documentElement
   html[data-theme="dark"] .toast { background: #0d0b08; }
   html[data-theme="dark"] .um-panel { background: var(--paper-2); }
   html[data-theme="dark"] .um-item.on { background: #3a221b; border-color: rgba(196,85,60,.45); }
+  html[data-theme="dark"] .btn.ask { background: #2a2218; color: #d9bd80; border-color: rgba(184,150,78,.45); }
+  html[data-theme="dark"] .btn.ask.on { background: #3a2f1c; border-color: #7a6231; color: #e6cd93; }
+  html[data-theme="dark"] .msg.qa .bub { background: #201b15; border-color: rgba(184,150,78,.35); }
+  html[data-theme="dark"] .msg.qa .qa-src-meta { color: #d0ab63; }
+
+  /* ============ 房间工具条 / 公告 / AI 中医师 ============ */
+  .seal.seal-logo { padding: 0; }
+  .seal.seal-logo svg { display: block; }
+
+  .tools { display: flex; align-items: center; gap: 6px; padding: 9px 12px 0; flex-wrap: wrap; }
+  .tool {
+    display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; cursor: pointer;
+    font-family: var(--fang); font-size: 12px; letter-spacing: 1px; color: var(--ink-soft);
+    background: var(--paper-2); border: 1px solid var(--line); border-radius: 2px; transition: .14s;
+  }
+  .tool .ti {
+    width: 17px; height: 17px; flex: 0 0 17px; box-sizing: border-box;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: var(--kai); font-size: 10.5px; line-height: 1; color: var(--cinnabar);
+    border: 1px solid rgba(166, 58, 36, .38); border-radius: 2px;
+    background: rgba(166, 58, 36, .05);
+  }
+  .tool-ai .ti { border-color: rgba(184, 150, 78, .6); background: rgba(184, 150, 78, .1); }
+  .tool:hover { border-color: var(--cinnabar); color: var(--cinnabar-dark); background: var(--paper-3); }
+  .tool.on { background: var(--cinnabar-soft); border-color: var(--cinnabar); color: var(--cinnabar-dark); }
+  .tool-ai { margin-left: auto; border-color: rgba(184,150,78,.55); background: #fbf3df; color: #7a5a1c; }
+  .tool-ai .ti { color: #8a6a28; }
+  .tool-ai:hover { border-color: var(--gold); background: #f7ecd2; color: #6f5418; }
+
+  .searchbar { display: flex; align-items: center; gap: 7px; padding: 9px 12px 0; }
+  .searchbar[hidden] { display: none; }
+  .searchbar input {
+    flex: 1; min-width: 0; padding: 6px 9px; font-family: inherit; font-size: 12.5px;
+    color: var(--ink); background: var(--paper-2); border: 1px solid var(--line);
+    border-radius: 2px; outline: none;
+  }
+  .searchbar input:focus { border-color: var(--cinnabar); box-shadow: 0 0 0 3px rgba(166,58,36,.08); }
+  .sb-info { font-family: var(--kai); font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+  .sb-x { background: none; border: 0; cursor: pointer; color: var(--muted); font-size: 12px; padding: 2px 4px; }
+  .sb-x:hover { color: var(--cinnabar); }
+  .searchres {
+    max-height: 214px; overflow: auto; margin: 6px 12px 0;
+    border: 1px solid var(--line-soft); border-radius: 2px; background: var(--paper);
+  }
+  .searchres[hidden] { display: none; }
+  .sr-row {
+    display: block; width: 100%; text-align: left; padding: 6px 9px; border: 0;
+    border-top: 1px solid var(--line-soft); background: none; cursor: pointer;
+    font-family: var(--fang); font-size: 12px; color: var(--ink-soft); line-height: 1.65;
+  }
+  .sr-row:first-child { border-top: 0; }
+  .sr-row:hover { background: var(--paper-3); }
+  .sr-row .sr-hd { color: var(--muted); font-size: 10.5px; }
+  .sr-row mark, .msg.hit .bub mark { background: rgba(201,165,94,.38); color: inherit; padding: 0 1px; }
+  .msg.hit .bub { box-shadow: 0 0 0 2px rgba(201,165,94,.55); }
+
+  .notice-bar {
+    display: flex; align-items: flex-start; gap: 7px; padding: 7px 14px;
+    background: #fbf3df; border-bottom: 1px solid rgba(184,150,78,.4);
+    font-family: var(--kai); font-size: 12px; line-height: 1.75; color: #6f5418;
+  }
+  .notice-bar[hidden] { display: none; }
+  .nb-tag {
+    flex: 0 0 auto; padding: 0 5px; margin-top: 2px; border: 1px solid rgba(184,150,78,.6);
+    border-radius: 2px; font-size: 10.5px; letter-spacing: 1px;
+  }
+  .nb-tx { flex: 1; min-width: 0; word-break: break-word; }
+  .nb-x {
+    flex: 0 0 auto; margin-top: 1px; padding: 0 6px; cursor: pointer;
+    font-family: var(--fang); font-size: 10.5px; color: #8a6a28;
+    background: none; border: 1px solid rgba(184,150,78,.5); border-radius: 2px;
+  }
+  .nb-x:hover { background: #f2e2bd; }
+  .nb-x[hidden] { display: none; }
+
+  .ai-card {
+    margin: 10px 12px 0; padding: 9px 12px 11px; background: var(--paper-2);
+    flex: 0 1 auto; max-height: 46%; overflow: auto;
+    border: 1px solid rgba(184,150,78,.5); border-left: 3px solid var(--gold); border-radius: 3px;
+    box-shadow: 0 6px 18px rgba(60,40,18,.07); animation: aiIn .18s ease-out;
+  }
+  .ai-card[hidden] { display: none; }
+  @keyframes aiIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+  .ai-hd { display: flex; align-items: center; gap: 8px; }
+  .ai-av {
+    width: 26px; height: 26px; flex: 0 0 26px; display: grid; place-items: center; border-radius: 50%;
+    font-family: var(--wei); font-size: 14px; color: #fbeee6; background: var(--cinnabar);
+    box-shadow: inset 0 0 0 1.5px rgba(246,220,207,.7);
+  }
+  .ai-av.sm { width: 22px; height: 22px; flex: 0 0 22px; font-size: 12px; }
+  .ai-who { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+  .ai-who b { font-family: var(--serif); font-size: 13px; letter-spacing: 2px; }
+  .ai-who span { font-size: 11px; color: var(--muted); }
+  .ai-x { margin-left: auto; background: none; border: 0; cursor: pointer; color: var(--muted); font-size: 13px; }
+  .ai-x:hover { color: var(--cinnabar); }
+  .ai-q { margin: 7px 0 5px; font-family: var(--kai); font-size: 12.5px; letter-spacing: .5px; color: var(--cinnabar-dark); }
+  .ai-q[hidden] { display: none; }
+  .ai-body { font-size: 13px; line-height: 1.85; white-space: pre-wrap; word-break: break-word; color: var(--ink); }
+  .ai-body.pending { color: var(--muted); font-family: var(--kai); letter-spacing: 1px; }
+  .ai-body.refused { color: var(--cinnabar-dark); }
+  .ai-body .unchecked { color: #a63a24; border-bottom: 1px dashed rgba(166,58,36,.55); }
+  .ai-body .sc-note { display: block; margin-top: 4px; font-size: 11px; color: var(--muted); }
+  .ai-src { margin-top: 6px; display: flex; flex-direction: column; gap: 2px; }
+  .ai-src .row { font-size: 11px; line-height: 1.6; color: var(--ink-soft); }
+  .ai-src .m { font-family: var(--kai); color: #8a6a28; margin-right: 4px; }
+  .ai-src .q { color: var(--muted); }
+
+  .room-acts {
+    margin-left: auto; display: flex; gap: 0; flex-wrap: wrap; justify-content: flex-end;
+    padding: 1px; border: 1px solid var(--line); border-radius: 3px;
+    background: var(--paper-2); overflow: hidden;
+  }
+  .ract {
+    padding: 3px 8px; cursor: pointer; font-family: var(--fang); font-size: 11.5px;
+    letter-spacing: .5px; color: var(--ink-soft); background: none;
+    border: 0; border-left: 1px solid var(--line-soft); border-radius: 0; transition: .14s;
+  }
+  .ract:first-child { border-left: 0; }
+  .ract:hover { background: var(--paper-3); color: var(--cinnabar-dark); }
+  .ract[aria-pressed="true"] { color: var(--cinnabar-dark); background: var(--cinnabar-soft); }
+
+  .side-hd-r { display: flex; align-items: center; gap: 5px; }
+  .side-tg {
+    padding: 2px 7px; cursor: pointer; font-family: var(--fang); font-size: 11px;
+    letter-spacing: .5px; color: var(--muted); background: none;
+    border: 1px solid var(--line); border-radius: 2px;
+  }
+  .side-tg:hover { color: var(--cinnabar-dark); border-color: var(--cinnabar); }
+  .lounge.members-off { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .lounge.members-off .side { display: none; }
+
+  .rail-item .room-av { width: 20px; height: 20px; flex: 0 0 20px; display: block; border-radius: 5px; }
+  .rail-item .room-av svg { display: block; }
+  .rail-item.on .room-av { box-shadow: 0 0 0 1.5px rgba(166,58,36,.4); }
+
+  .invite-card.wide { width: 560px; max-width: calc(100vw - 32px); }
+  .file-drop {
+    border: 1px dashed rgba(184,150,78,.6); background: #fbf7ee; border-radius: 3px;
+    padding: 14px 12px; text-align: center; font-family: var(--kai); font-size: 12.5px; color: #7a5a1c;
+  }
+  .file-drop.over { background: #f6ecd6; border-color: var(--gold); }
+  .fd-note { margin-top: 5px; font-size: 11px; color: var(--muted); }
+  .file-list { margin-top: 9px; max-height: 262px; overflow: auto; }
+  .file-row { display: flex; align-items: center; gap: 8px; padding: 7px 2px; border-top: 1px solid var(--line-soft); font-family: var(--fang); font-size: 12.5px; }
+  .file-row:first-child { border-top: 0; }
+  .file-row .fn { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+  .file-row .fm { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .file-row a.dl { font-size: 11.5px; color: var(--cinnabar); text-decoration: none; border-bottom: 1px solid rgba(166,58,36,.35); }
+  .file-row a.dl:hover { border-bottom-color: var(--cinnabar); }
+  .file-row a.dl.view { color: var(--qing); border-bottom-color: rgba(46,94,90,.35); }
+  .file-row a.dl.view:hover { border-bottom-color: var(--qing); }
+  .file-empty, .audit-empty { padding: 14px 4px; text-align: center; font-family: var(--kai); font-size: 12px; color: var(--muted); }
+
+  .audit-list { max-height: 320px; overflow: auto; }
+  .audit-row { display: flex; align-items: center; gap: 8px; padding: 8px 2px; border-top: 1px solid var(--line-soft); }
+  .audit-row:first-child { border-top: 0; }
+  .audit-row .ar-tx { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-family: var(--fang); font-size: 12.5px; }
+  .audit-row b { color: var(--ink); }
+  .audit-row .ar-st { font-size: 11px; color: var(--muted); }
+  .audit-row .ar-st.ok { color: var(--qing); }
+  .audit-row .ar-t { font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  .ask-box {
+    width: 100%; box-sizing: border-box; min-height: 84px; resize: vertical; padding: 8px 10px;
+    font-family: inherit; font-size: 13px; line-height: 1.7; color: var(--ink);
+    background: var(--paper-2); border: 1px solid var(--line); border-radius: 2px; outline: none;
+  }
+  .ask-box:focus { border-color: var(--cinnabar); box-shadow: 0 0 0 3px rgba(166,58,36,.08); }
+  .ask-box:disabled { color: var(--muted); background: var(--paper-3); }
+
+  html[data-theme="dark"] .tool-ai { background: #2a2318; color: #e0c184; border-color: rgba(184,150,78,.45); }
+  html[data-theme="dark"] .tool .ti { border-color: rgba(214, 170, 120, .32); background: rgba(214, 170, 120, .07); }
+  html[data-theme="dark"] .tool-ai .ti { color: #d0ab63; border-color: rgba(208, 171, 99, .5); }
+  html[data-theme="dark"] .room-acts { border-color: rgba(214, 170, 120, .22); }
+  html[data-theme="dark"] .ract { border-left-color: rgba(214, 170, 120, .16); }
+  html[data-theme="dark"] .rail-exit { border-color: rgba(214, 170, 120, .3); color: #d99b7c; }
+  html[data-theme="dark"] .rail-exit:hover { background: #8f3f2b; border-color: #8f3f2b; color: #fdf3e7; }
+  html[data-theme="dark"] .notice-bar { background: #2a2318; color: #e0c184; border-bottom-color: rgba(184,150,78,.28); }
+  html[data-theme="dark"] .nb-x { color: #d8bd8b; }
+  html[data-theme="dark"] .file-drop { background: #241f18; color: #d8bd8b; border-color: rgba(184,150,78,.45); }
+  html[data-theme="dark"] .ai-card { background: #221d17; }
+
+  /* ============ 引用 / @ / 未读 / 角色 ============ */
+  .msg { position: relative; }
+  .msg-re {
+    position: absolute; top: 0; right: 0; z-index: 2; opacity: 0;
+    padding: 1px 6px; cursor: pointer; transition: opacity .12s;
+    font-family: var(--kai); font-size: 11px; line-height: 1.6; color: var(--cinnabar);
+    background: var(--paper-2); border: 1px solid var(--line); border-radius: 2px;
+  }
+  .msg.mine .msg-re { right: auto; left: 0; }
+  .msg:hover .msg-re, .msg:focus-within .msg-re { opacity: 1; }
+  .msg-re:hover { border-color: var(--cinnabar); background: var(--cinnabar-soft); }
+  .msg-re:focus-visible { opacity: 1; outline: 2px solid var(--cinnabar); outline-offset: 1px; }
+  .bub-quote {
+    display: block; margin: 0 0 6px; padding: 4px 7px; cursor: pointer;
+    font-size: 11.5px; line-height: 1.6; color: var(--muted);
+    border-left: 2px solid rgba(166, 58, 36, .35); background: rgba(166, 58, 36, .045);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .bub-quote:hover { color: var(--cinnabar-dark); border-left-color: var(--cinnabar); }
+  .reply-bar {
+    display: flex; align-items: center; gap: 8px; margin: 0 12px; padding: 6px 9px;
+    border-left: 2px solid var(--cinnabar); background: var(--cinnabar-soft);
+    font-size: 12px; color: var(--ink-soft);
+  }
+  .reply-bar[hidden] { display: none; }
+  .reply-bar .rb-tag { font-family: var(--kai); letter-spacing: 1px; color: var(--cinnabar-dark); }
+  .reply-bar .rb-tx { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .reply-bar .rb-x { background: none; border: 0; cursor: pointer; color: var(--muted); font-size: 12px; }
+  .reply-bar .rb-x:hover { color: var(--cinnabar); }
+  .bub .at { color: var(--cinnabar-dark); background: rgba(166, 58, 36, .08); border-radius: 2px; padding: 0 2px; }
+  .msg.for-me .bub { box-shadow: inset 0 0 0 1px rgba(166, 58, 36, .4); }
+  .msg.for-me .who .at-me { font-family: var(--kai); font-size: 10px; color: var(--cinnabar); }
+  .msg .um-avatar.sm[data-prof] { cursor: pointer; transition: box-shadow .12s, filter .12s; }
+  .msg .um-avatar.sm[data-prof]:hover { box-shadow: 0 0 0 2px rgba(166, 58, 36, .38); filter: brightness(1.05); }
+  .msg .um-avatar.sm[data-prof]:focus-visible { outline: 2px solid var(--cinnabar); outline-offset: 2px; }
+  .rail-badge {
+    margin-left: auto; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 10px; line-height: 1; color: #fdf3e7; background: var(--cinnabar);
+  }
+  .rail-item.on .rail-badge { display: none; }
+  .mem .role-tag {
+    font-family: var(--kai); font-size: 10px; letter-spacing: .5px; padding: 0 4px;
+    border: 1px solid rgba(166, 58, 36, .35); border-radius: 2px; color: var(--cinnabar-dark);
+  }
+  .mem .role-tag.admin { border-color: rgba(184, 150, 78, .65); color: #8a6a28; }
+  .mem .role-tag.mute { border-color: rgba(46, 94, 90, .4); color: var(--qing); }
+  .mem .mem-more {
+    width: 18px; height: 18px; flex: 0 0 18px; padding: 0; border: 0; border-radius: 2px;
+    background: none; cursor: pointer; color: var(--muted); font-size: 13px; line-height: 1;
+  }
+  .mem .mem-more:hover { background: var(--paper-3); color: var(--cinnabar); }
+  .mem-menu {
+    position: fixed; z-index: 61; min-width: 134px; padding: 4px;
+    background: var(--paper); border: 1px solid var(--line); border-radius: 3px;
+    box-shadow: 0 8px 22px rgba(40, 30, 18, .18);
+  }
+  .mem-menu[hidden] { display: none; }
+  .mem-menu button {
+    display: block; width: 100%; text-align: left; padding: 6px 8px; border: 0; border-radius: 2px;
+    background: none; cursor: pointer; font-family: var(--fang); font-size: 12px; color: var(--ink);
+  }
+  .mem-menu button:hover { background: var(--cinnabar-soft); color: var(--cinnabar-dark); }
+  .mem-menu button.danger { color: var(--cinnabar); }
+  .mem-note { padding: 8px 8px 0; font-family: var(--kai); font-size: 11px; line-height: 1.6; color: var(--muted); }
+  .notice-hist { margin-top: 12px; border-top: 1px dashed var(--line); padding-top: 8px; }
+  .notice-hist[hidden] { display: none; }
+  .notice-hist summary {
+    cursor: pointer; font-family: var(--kai); font-size: 12px; color: var(--cinnabar-dark);
+    letter-spacing: 1px; outline: none;
+  }
+  .notice-hist .nh-row { padding: 6px 0; border-top: 1px solid var(--line-soft); font-size: 12px; color: var(--ink-soft); line-height: 1.65; }
+  .notice-hist .nh-row:first-child { border-top: 0; }
+  .notice-hist .nh-meta { display: block; font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
+  html[data-theme="dark"] .bub-quote { background: rgba(214, 170, 120, .06); border-left-color: rgba(214, 170, 120, .38); }
+  html[data-theme="dark"] .reply-bar { background: #2a211a; }
+  html[data-theme="dark"] .mem-menu { background: #1f1b16; }
+  html[data-theme="dark"] .bub .at { color: #e6b98a; background: rgba(214, 170, 120, .12); }
 
   /* ============ 窄屏 ============ */
   @media (max-width: 820px) {
-    .rail { display: none; }
+    /* 手机：边栏变成抽屉，从左边滑出；不然就没有切房的入口 */
+    .rail {
+      width: 262px; z-index: 46; box-shadow: 0 0 24px rgba(20, 16, 12, .18);
+      transform: translateX(-100%); transition: transform .2s ease;
+    }
+    .rail.drawer-open { transform: none; }
+    .rail-off .rail-hd {
+      writing-mode: horizontal-tb; width: auto; margin: 0;
+      padding: 12px 34px 11px 16px; letter-spacing: 3px;
+      color: var(--cinnabar-dark); border-bottom: 1px solid var(--line);
+    }
+    .rail-off .rail-list { display: block; }
+    .rail-off .rail-exit { display: flex; }      /* 抽屉里也要能退出 */
+    .rail-off .rail-tg { position: absolute; top: 9px; right: 8px; margin: 0; }
+    .rail-scrim {
+      display: block; position: fixed; left: 0; right: 0;
+      top: var(--hdr-h, 69px); bottom: 0; z-index: 45;
+      background: rgba(20, 16, 12, .34);
+    }
+    .rail-scrim[hidden] { display: none; }
+    .rail-open {
+      display: inline-flex; align-items: center; gap: 4px; flex: 0 0 auto;
+      padding: 3px 9px; border: 1px solid var(--line); border-radius: 2px;
+      background: transparent; color: var(--ink-soft); cursor: pointer;
+      font-family: var(--kai, var(--serif)); font-size: 12px; letter-spacing: 1px;
+    }
+    .rail-open::after { content: "▾"; font-size: 9px; line-height: 1; }
+    .rail-open:active { border-color: var(--cinnabar); color: var(--cinnabar-dark); }
+    .btn.ask { padding: 8px 10px; font-size: 12px; letter-spacing: 1px; }
     .lounge {
       grid-template-columns: minmax(0, 1fr); height: auto; min-height: 0;
       padding: 0 12px; margin-top: 12px;
@@ -606,7 +933,13 @@ try { if (localStorage.getItem("tcm.theme") === "dark") document.documentElement
 
 <header>
   <div class="brand">
-    <span class="seal" aria-hidden="true">交</span>
+    <span class="seal seal-logo" aria-hidden="true">
+      <svg viewBox="0 0 40 40" width="26" height="26" focusable="false">
+        <path d="M20 7.4c-5.4 0-9.8 3.7-9.8 8.3 0 2.6 1.4 4.9 3.7 6.5l-1.1 4.3 4.5-2.1c.9.2 1.8.3 2.7.3 5.4 0 9.8-3.7 9.8-8.3S25.4 7.4 20 7.4z"
+              fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+        <path d="M20 11.6v7.6M16.2 15.4h7.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+    </span>
     <div>
       <h1>聊天室</h1>
     </div>
@@ -674,28 +1007,56 @@ try { if (localStorage.getItem("tcm.theme") === "dark") document.documentElement
 </main>
 
 <main class="lounge" id="viewRoom" hidden>
+  <div class="rail-scrim" id="railScrim" hidden></div>
   <aside class="rail" id="rail" aria-label="全部聊天室">
     <button class="rail-tg" id="railTg" type="button" aria-expanded="true" aria-controls="railList" title="收起聊天室列表">‹</button>
     <div class="rail-hd">全部聊天室</div>
     <div class="rail-list" id="railList"></div>
+    <a class="rail-exit" href="/" title="退出聊天室，回到四步演示台">退出聊天室</a>
   </aside>
 
   <aside class="card side" aria-label="在室成员">
     <a class="side-back" id="navBack" href="/lounge" title="返回全部聊天室">返回</a>
-    <div class="side-hd"><span>在室 <b id="onlineNum">0</b></span><button class="side-inv" id="inviteBtn" type="button" title="邀请其他人进聊天室">＋ 邀请</button></div>
+    <div class="side-hd"><span>在线人数 <b id="onlineNum">0</b></span>
+      <span class="side-hd-r">
+        <button class="side-inv" id="inviteBtn" type="button" title="邀请其他人进聊天室">＋ 邀请</button>
+        <button class="side-tg" id="memTg" type="button" aria-expanded="true" title="收起成员列表">收起</button>
+      </span>
+    </div>
     <div class="members" id="members"></div>
   </aside>
 
   <section class="card room" aria-label="聊天室">
     <div class="room-hd">
+      <button class="rail-open" id="railOpen" type="button" aria-label="切换聊天室"
+              aria-controls="rail" aria-expanded="false">房间</button>
       <b id="roomName">聊天室</b>
       <span class="room-tag" id="roomTag" hidden>官方</span>
-      <span class="meta">
-        <span class="live-dot" id="liveDot"></span>
-        <span id="liveTxt">连接中…</span>
-      </span>
+      <div class="room-acts" id="roomActs">
+        <button class="ract" id="actMembers" type="button" aria-pressed="true" title="收起 / 展开左侧成员列表">查看成员</button>
+        <button class="ract" id="actFiles" type="button" title="这一间的共享文件">查看文件</button>
+        <button class="ract" id="actNotice" type="button" title="看公告 / 改公告">查看公告</button>
+        <button class="ract" id="actInvite" type="button" title="按编号邀请某人进来">邀请成员</button>
+        <button class="ract" id="actAudit" type="button" title="我发出的邀请：谁进来了、谁还没应">审核邀请</button>
+        <button class="ract" id="actExport" type="button" title="把公告、成员、聊天记录导成 Markdown">导出记录</button>
+      </div>
     </div>
     <div class="room-desc" id="roomDesc" hidden></div>
+    <div class="notice-bar" id="noticeBar" hidden>
+      <span class="nb-tag">公告</span>
+      <span class="nb-tx" id="noticeTx"></span>
+      <button class="nb-x" id="noticeEdit" type="button" title="改公告">改</button>
+    </div>
+    <section class="ai-card" id="aiCard" hidden aria-live="polite" aria-label="AI 中医师的答复">
+      <div class="ai-hd">
+        <span class="ai-av" aria-hidden="true">醫</span>
+        <div class="ai-who"><b>AI 中医师</b><span id="aiMeta">正在翻书…</span></div>
+        <button class="ai-x" id="aiX" type="button" aria-label="收起这次的答复">✕</button>
+      </div>
+      <p class="ai-q" id="aiQ" hidden></p>
+      <div class="ai-body" id="aiBody"></div>
+      <div class="ai-src" id="aiSrc"></div>
+    </section>
     <div class="invite-banner" id="invBanner" hidden>
       <span id="invBannerTxt"></span>
       <button class="invite-banner-x" id="invBannerX" type="button" aria-label="关闭">✕</button>
@@ -703,6 +1064,31 @@ try { if (localStorage.getItem("tcm.theme") === "dark") document.documentElement
     <div class="msgs" id="msgs">
       <p class="empty">还没有人开口。<br>说第一句吧。</p>
     </div>
+    <div class="searchbar" id="searchbar" hidden>
+      <input id="searchInput" type="search" maxlength="30" autocomplete="off" aria-label="搜索这一间的聊天记录">
+      <button class="btn sm" id="searchGo" type="button">搜索</button>
+      <span class="sb-info" id="searchInfo"></span>
+      <button class="sb-x" id="searchX" type="button" aria-label="关闭搜索">✕</button>
+    </div>
+    <div class="searchres" id="searchRes" hidden></div>
+    <div class="tools" id="toolbar">
+      <button class="tool" id="tbUpload" type="button" title="传文件到这一间（单个 ≤5 MB，最多 12 个）">
+        <span class="ti" aria-hidden="true">上</span>上传文件</button>
+      <button class="tool" id="tbSearch" type="button" title="搜这一间的聊天记录">
+        <span class="ti" aria-hidden="true">寻</span>搜索</button>
+      <button class="tool" id="tbNotice" type="button" title="写一条本间公告">
+        <span class="ti" aria-hidden="true">告</span>设置公告</button>
+      <button class="tool tool-ai" id="tbAsk" type="button" aria-pressed="false"
+              title="点一下切到提问：在下面的输入框写问题，答复显示在聊天记录上方">
+        <span class="ti" aria-hidden="true">醫</span>问AI中医师</button>
+      <input type="file" id="fileInput" multiple hidden>
+    </div>
+    <div class="reply-bar" id="replyBar" hidden>
+      <span class="rb-tag">引用</span>
+      <span class="rb-tx" id="replyTx"></span>
+      <button class="rb-x" id="replyX" type="button" aria-label="取消引用">✕</button>
+    </div>
+    <p class="ask-hint" id="askHint" hidden>这一句会问 AI 中医师，答复显示在聊天记录上方；再点一次「问AI中医师」退出。</p>
     <div class="composer">
       <textarea id="input" rows="1" maxlength="600" aria-label="输入消息"></textarea>
       <span class="cnt" id="cnt"></span>
@@ -710,6 +1096,50 @@ try { if (localStorage.getItem("tcm.theme") === "dark") document.documentElement
     </div>
   </section>
 </main>
+
+<div class="mem-menu" id="memMenu" hidden></div>
+
+<div class="invite" id="filesModal" hidden>
+  <div class="invite-card wide" role="dialog" aria-label="房间文件">
+    <div class="invite-hd"><b>房间文件</b><button class="invite-x" id="filesX" type="button" aria-label="关闭">✕</button></div>
+    <div class="invite-body">
+      <div class="file-drop" id="fileDrop">
+        把文件拖到这里，或 <button class="btn sm" id="filesPick" type="button">选择文件</button>
+        <div class="fd-note">单个 ≤5 MB，这一间最多 12 个</div>
+      </div>
+      <div class="file-list" id="fileList"></div>
+    </div>
+  </div>
+</div>
+
+<div class="invite" id="noticeModal" hidden>
+  <div class="invite-card" role="dialog" aria-label="房间公告">
+    <div class="invite-hd"><b>房间公告</b><button class="invite-x" id="noticeX" type="button" aria-label="关闭">✕</button></div>
+    <div class="invite-body">
+      <label class="invite-lb" for="noticeInput">写清楚这一间的规矩（300 字以内）</label>
+      <div class="invite-row"><textarea class="ask-box" id="noticeInput" maxlength="300" aria-label="公告内容"></textarea></div>
+      <p class="invite-note" id="noticeHint"></p>
+      <div class="invite-row end">
+        <button class="btn sm" id="noticeClear" type="button">撤下公告</button>
+        <button class="btn primary" id="noticeSave" type="button">存公告</button>
+      </div>
+      <details class="notice-hist" id="noticeHist" hidden>
+        <summary id="noticeHistSum">历史版本</summary>
+        <div id="noticeHistList"></div>
+      </details>
+    </div>
+  </div>
+</div>
+
+<div class="invite" id="auditModal" hidden>
+  <div class="invite-card wide" role="dialog" aria-label="审核邀请">
+    <div class="invite-hd"><b>审核邀请</b><button class="invite-x" id="auditX" type="button" aria-label="关闭">✕</button></div>
+    <div class="invite-body">
+      <p class="invite-note">这一间你发出的邀请：进没进房、还挂着哪几条。没回应的可以撤回。</p>
+      <div class="audit-list" id="auditList"></div>
+    </div>
+  </div>
+</div>
 
 <div class="invite" id="newRoom" hidden>
   <div class="invite-card" role="dialog" aria-label="新建聊天室">
@@ -745,6 +1175,7 @@ try { if (localStorage.getItem("tcm.theme") === "dark") document.documentElement
   </div>
   <div class="mprof-rows">
     <div class="mprof-row"><span>编码</span><b id="mprofId">—</b></div>
+    <div class="mprof-row"><span>角色</span><b id="mprofRole">成员</b></div>
     <div class="mprof-row"><span>在室</span><b id="mprofSeen">—</b></div>
     <div class="mprof-row"><span>发言</span><b id="mprofCount">0 条</b></div>
   </div>
@@ -854,6 +1285,14 @@ try { if (localStorage.getItem("tcm.theme") === "dark") document.documentElement
     try { document.dispatchEvent(new CustomEvent("tcm:guest", { detail: { id: id } })); } catch (e) {}
   }
   function create() { switchTo(newId(readList())); }
+  /* 在别的标签页换了身份：这边立刻跟上，别再用旧编号发言或发邀请 */
+  window.addEventListener("storage", function (e) {
+    if (!e || e.key !== CUR || !e.newValue) return;
+    var id = String(e.newValue);
+    if (!/^\d{5}$/.test(id)) return;
+    render();
+    try { document.dispatchEvent(new CustomEvent("tcm:guest", { detail: { id: id } })); } catch (err) {}
+  });
   function render() {
     var id = ensure(), nm = nameOf(id), i;
     var nodes = document.querySelectorAll("[data-um-name]");
@@ -921,10 +1360,19 @@ try { if (localStorage.getItem("tcm.theme") === "dark") document.documentElement
 (function () {
   var $ = function (id) { return document.getElementById(id); };
   var cursor = 0, myId = "", timer = null, sending = false, lastId = "", lastAt = 0, lastDay = "";
+  var asking = false, seenSeq = {}, aiSince = 0;
   var ROOM = "";
   try { ROOM = new URLSearchParams(location.search).get("room") || ""; } catch (e) {}
   var membersData = [], profFor = "";
   var booted = false;
+  var replyTo = null, meInfo = {}, memFor = "", unreadTotal = 0;
+  var VIEWABLE = { txt: 1, md: 1, csv: 1, tsv: 1, json: 1, log: 1, xml: 1,
+                   png: 1, jpg: 1, jpeg: 1, gif: 1, webp: 1, bmp: 1, pdf: 1 };   // 能在线看的后缀
+  function setTitle() {
+    var base = ($("roomName") && $("roomName").textContent.trim()) || "";
+    var head = unreadTotal > 0 ? "(" + (unreadTotal > 99 ? "99+" : unreadTotal) + ") " : "";
+    document.title = head + (base ? base + " · 聊天室" : "聊天室 · 方剂配伍 · 君臣佐使");
+  }
 
   function guestId() { return (window.tcmGuest && window.tcmGuest.current()) || ""; }
 
@@ -943,19 +1391,203 @@ try { if (localStorage.getItem("tcm.theme") === "dark") document.documentElement
     clearTimeout(t._h);
     t._h = setTimeout(function () { t.hidden = true; }, 2600);
   }
+  var liveWarned = false;
   function setLive(ok) {
-    var dot = $("liveDot"), txt = $("liveTxt");
-    if (dot) dot.className = "live-dot" + (ok ? "" : " off");
-    if (txt) txt.textContent = ok ? "已连接" : "连接中断，重试中";
+    // 原来右上角那盏「已连接」指示灯已撤掉；断线只在第一次失败时提一句
+    if (ok) { liveWarned = false; return; }
+    if (liveWarned) return;
+    liveWarned = true;
+    toast("连接中断，正在重试…");
   }
 
+  function qaNode(m) {
+    var wrap = document.createElement("div");
+    wrap.className = "msg qa" + (m.refused ? " refused" : "");
+    if (m.seq != null) wrap.dataset.seq = m.seq;
+    var av = document.createElement("span");
+    av.className = "ai-av sm";
+    av.textContent = "醫";
+    av.setAttribute("aria-hidden", "true");
+    var body = document.createElement("div");
+    body.className = "body";
+    var who = document.createElement("div");
+    who.className = "who";
+    var n = document.createElement("span");
+    n.textContent = "AI 中医师";
+    who.appendChild(n);
+    if (m.by_name) {
+      var w = document.createElement("span");
+      w.textContent = "答 " + m.by_name + " 的提问";
+      who.appendChild(w);
+    }
+    var t = document.createElement("span");
+    t.textContent = fmtTime(m.at);
+    who.appendChild(t);
+    body.appendChild(who);
+    if (m.q) {
+      var qd = document.createElement("div");
+      qd.className = "qa-q";
+      qd.textContent = "问：" + m.q;
+      body.appendChild(qd);
+    }
+    var bub = document.createElement("div");
+    bub.className = "bub";
+    bub.textContent = m.text;
+    body.appendChild(bub);
+    var cites = m.cites || [];
+    if (cites.length) {
+      var box = document.createElement("div");
+      box.className = "qa-src";
+      cites.forEach(function (c, i) {
+        var row = document.createElement("div");
+        row.className = "qa-src-row";
+        var meta = document.createElement("span");
+        meta.className = "qa-src-meta";
+        meta.textContent = ["[" + (i + 1) + "]", c.book ? "《" + c.book + "》" : "",
+                            c.line || ""].filter(Boolean).join(" ");
+        row.appendChild(meta);
+        if (c.quote) {
+          var qt = document.createElement("span");
+          qt.className = "qa-src-q";
+          qt.textContent = "「" + c.quote + "」";
+          row.appendChild(qt);
+        }
+        box.appendChild(row);
+      });
+      body.appendChild(box);
+    }
+    addReplyBtn(wrap, m);
+    wrap.appendChild(av);
+    wrap.appendChild(body);
+    return wrap;
+  }
+
+  /* —— 问 AI 中医师：答复落在聊天记录上方的卡片里，不再插进消息流 —— */
+  function askNow(text) {
+    var q = String(text || "").trim();
+    if (!q) { toast("先写一句要问的"); return; }
+    if (aiBusy) { toast("上一条还在查，稍等一下"); return; }
+    aiBusy = true;
+    aiSince = Date.now() / 1000;
+    aiShow(q);
+    var t0 = Date.now();
+    fetch("/api/chat/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ room: ROOM, id: guestId(), question: q, mode: "standard" })
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (d) {
+        if (!r.ok) throw new Error(d.detail || ("提问失败（" + r.status + "）"));
+        return d;
+      });
+    }).then(function (d) {
+      aiFill(d, Math.max(1, Math.round((Date.now() - t0) / 1000)));
+      if (d && d.message && d.message.seq != null) seenSeq[d.message.seq] = 1;
+      aiSince = 0;
+      clearTimeout(timer);
+      poll();
+    }).catch(function (e) {
+      var body = $("aiBody");
+      if (body) {
+        body.className = "ai-body";
+        body.textContent = e.message || "提问失败";
+      }
+      var meta = $("aiMeta");
+      if (meta) meta.textContent = "没查成";
+    }).then(function () { aiBusy = false; });
+  }
+
+  /* —— 引用 —— */
+  function quoteText(m) {
+    if (!m) return "";
+    return m.kind === "qa" ? (m.q || "") : (m.text || "");
+  }
+  function setReply(m) {
+    if (!m || m.seq == null) return;
+    replyTo = { seq: m.seq, name: m.kind === "qa" ? "AI 中医师" : (m.name || ""), text: quoteText(m) };
+    if ($("replyBar")) $("replyBar").hidden = false;
+    if ($("replyTx")) $("replyTx").textContent = replyTo.name + "：" + replyTo.text;
+    var t = $("input");
+    if (t) t.focus();
+  }
+  function clearReply() {
+    replyTo = null;
+    if ($("replyBar")) $("replyBar").hidden = true;
+  }
+  function quoteBlock(m) {
+    var q = document.createElement("div");
+    q.className = "bub-quote";
+    q.title = "跳到被引用的那一条";
+    q.textContent = (m.reply_name || "") + "：" + (m.reply_text || "");
+    q.addEventListener("click", function () { jumpTo(m.reply); });
+    return q;
+  }
+  function addReplyBtn(wrap, m) {
+    if (!m || m.seq == null) return;
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "msg-re";
+    b.textContent = "回";
+    b.title = "引用这一条";
+    b.setAttribute("aria-label", "引用这一条");
+    b.addEventListener("click", function (ev) { ev.stopPropagation(); setReply(m); });
+    wrap.appendChild(b);
+  }
+  function jumpTo(seq) {
+    var box = $("msgs");
+    var el = box && box.querySelector('[data-seq="' + seq + '"]');
+    if (!el) { toast("被引用的那条已经不在这一间了"); return; }
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    el.classList.add("hit");
+    setTimeout(function () { el.classList.remove("hit"); }, 1500);
+  }
+  /* —— @ 点名 —— */
+  function fillBubble(el, text) {
+    el.textContent = "";
+    String(text || "").split(/(@游客\d{5})/).forEach(function (piece) {
+      if (!piece) return;
+      if (/^@游客\d{5}$/.test(piece)) {
+        var s = document.createElement("span");
+        s.className = "at";
+        s.textContent = piece;
+        el.appendChild(s);
+      } else {
+        el.appendChild(document.createTextNode(piece));
+      }
+    });
+  }
+  function insertAt(name) {
+    var t = $("input");
+    if (!t) return;
+    var ins = (t.value && !/\s$/.test(t.value) ? " " : "") + "@" + name + " ";
+    var at = typeof t.selectionStart === "number" ? t.selectionStart : t.value.length;
+    t.value = t.value.slice(0, at) + ins + t.value.slice(at);
+    autoGrow();
+    t.focus();
+    try { t.setSelectionRange(at + ins.length, at + ins.length); } catch (e) {}
+  }
   function node(m, cont) {
+    if (m.kind === "qa") return qaNode(m);
     var wrap = document.createElement("div");
     wrap.className = "msg" + (m.id === myId ? " mine" : "") + (cont ? " cont" : "");
     wrap.dataset.id = m.id;                 // 归属只认这个，署名永远是服务端给的发送者
+    if (m.seq != null) wrap.dataset.seq = m.seq;
     var av = document.createElement("span");
     av.className = "um-avatar sm";
-    av.setAttribute("aria-hidden", "true");
+    av.setAttribute("data-prof", "1");
+    av.setAttribute("role", "button");
+    av.setAttribute("tabindex", "0");
+    av.title = "看 " + (m.name || ("游客" + m.id)) + " 的资料，可 @ 他";
+    av.setAttribute("aria-label", "查看 " + (m.name || ("游客" + m.id)) + " 的资料");
+    av.addEventListener("click", function (ev) {
+      ev.stopPropagation();
+      openProfile(m.id, av, m);
+    });
+    av.addEventListener("keydown", function (ev) {
+      if (ev.key !== "Enter" && ev.key !== " ") return;
+      ev.preventDefault();
+      openProfile(m.id, av, m);
+    });
     var body = document.createElement("div");
     body.className = "body";
     if (!cont) {
@@ -968,8 +1600,20 @@ try { if (localStorage.getItem("tcm.theme") === "dark") document.documentElement
     }
     var bub = document.createElement("div");
     bub.className = "bub";
-    bub.textContent = m.text;
+    fillBubble(bub, m.text);
+    if (m.reply) body.appendChild(quoteBlock(m));
     body.appendChild(bub);
+    if (m.mentions && m.mentions.indexOf(myId) >= 0) {
+      wrap.className += " for-me";
+      var who2 = body.querySelector(".who");
+      if (who2) {
+        var tag = document.createElement("span");
+        tag.className = "at-me";
+        tag.textContent = "＠你";
+        who2.insertBefore(tag, who2.lastChild);
+      }
+    }
+    addReplyBtn(wrap, m);
     wrap.appendChild(av); wrap.appendChild(body);
     return wrap;
   }
@@ -1002,6 +1646,15 @@ try { if (localStorage.getItem("tcm.theme") === "dark") document.documentElement
     var stick = nearBottom();
     for (i = 0; i < msgs.length; i++) {
       var m = msgs[i], at = Number(m.at) || 0;
+      if (m.seq != null) {                   // 自己刚贴过的那条，轮询再拿到就别贴第二遍
+        if (seenSeq[m.seq]) continue;
+        seenSeq[m.seq] = 1;
+      }
+      // 自己刚才问 AI 的那条：答复在上面卡片里，聊天流里不再重复贴
+      if (aiSince && m.kind === "qa" && m.by && m.by === guestId() &&
+          Number(m.at) >= aiSince - 1.5) {
+        continue;
+      }
       var day = new Date(at * 1000).toDateString();
       if (day !== lastDay) {                 // 跨天就插一条分节
         box.appendChild(daySep(at));
@@ -1031,14 +1684,26 @@ try { if (localStorage.getItem("tcm.theme") === "dark") document.documentElement
       box.innerHTML = '<div class="mem-empty">还没有人。</div>';
       return;
     }
+    var canAdmin = !!(meInfo.can_admin && !meInfo.official);
     box.innerHTML = rows.map(function (m) {
-      var me = m.id === myId;
+      var me = m.id === myId, tags = "";
+      if (m.role === "owner") tags += '<span class="role-tag">房主</span>';
+      else if (m.role === "admin") tags += '<span class="role-tag admin">管理员</span>';
+      if (m.muted) tags += '<span class="role-tag mute">禁言</span>';
+      var more = "";
+      if (canAdmin && !me && m.role !== "owner") {
+        more = '<button class="mem-more" type="button" data-more="' + m.id + '" ' +
+               'aria-label="管理 ' + (m.name || ("游客" + m.id)) + '">⋯</button>';
+      }
       return '<div class="mem' + (me ? " me" : "") + '" data-id="' + m.id + '" role="button" tabindex="0">' +
         '<span class="um-avatar" aria-hidden="true"></span>' +
-        '<span class="nm">' + (m.name || ("游客" + m.id)) + '</span>' +
+        '<span class="nm">' + (m.name || ("游客" + m.id)) + '</span>' + tags +
         '<span class="st' + (m.online ? " on" : "") + '">' + (m.online ? "在线" : fmtTime(m.at) + " 来过") + '</span>' +
-        '</div>';
+        more + '</div>';
     }).join("");
+    if (meInfo.official) {
+      box.insertAdjacentHTML("afterbegin", '<div class="mem-note">官方房不做成员管理，只登记在场。</div>');
+    }
     if (profFor && !$("mprof").hidden) {
       var still = rows.filter(function (m) { return m.id === profFor; })[0];
       if (still) fillProfile(still);
@@ -1050,16 +1715,25 @@ try { if (localStorage.getItem("tcm.theme") === "dark") document.documentElement
     $("mprofName").textContent = m.name || ("游客" + m.id);
     $("mprofState").textContent = m.online ? "在线" : ("最近 " + fmtTime(m.at) + " 来过");
     $("mprofId").textContent = m.id;
+    var role = m.role === "owner" ? "房主" : m.role === "admin" ? "管理员" : "成员";
+    $("mprofRole").textContent = role + (m.muted ? " · 禁言中" : "");
     $("mprofSeen").textContent = m.first ? ("首次 " + fmtTime(m.first)) : "刚刚";
     $("mprofCount").textContent = (Number(m.count) || 0) + " 条";
+    $("mprofAt").textContent = "@ " + (m.name || ("游客" + m.id));
   }
-  function openProfile(id, row) {
-    var p = $("mprof"), m = membersData.filter(function (x) { return x.id === id; })[0];
-    if (!p || !m || !row) return;
+  function openProfile(id, row, fallback) {
+    var p = $("mprof");
+    if (!p || !row) return;
+    var m = membersData.filter(function (x) { return x.id === id; })[0];
+    if (!m) {                       // 已经离开这一间的人：用消息里带的署名与时间兜底
+      if (!fallback) return;
+      m = { id: String(id), name: fallback.name || ("游客" + id), at: fallback.at || 0,
+            first: 0, count: 0, online: false, role: "", muted: false };
+    }
     profFor = id;
     fillProfile(m);
     p.hidden = false;
-    var r = row.getBoundingClientRect(), w = p.offsetWidth || 248, h = p.offsetHeight || 190;
+    var r = row.getBoundingClientRect(), w = p.offsetWidth || 248, h = p.offsetHeight || 210;
     var left = Math.min(r.left + 6, window.innerWidth - w - 10);
     var top = r.bottom + 6;
     if (top + h > window.innerHeight - 10) top = Math.max(10, r.top - h - 6);
@@ -1070,6 +1744,64 @@ try { if (localStorage.getItem("tcm.theme") === "dark") document.documentElement
     var p = $("mprof");
     if (p) p.hidden = true;
     profFor = "";
+  }
+
+  /* —— 成员管理菜单 —— */
+  function closeMemMenu() {
+    if ($("memMenu")) $("memMenu").hidden = true;
+    memFor = "";
+  }
+  function memberById(id) {
+    return membersData.filter(function (m) { return m.id === id; })[0];
+  }
+  function openMemMenu(btn, m) {
+    var menu = $("memMenu");
+    if (!menu || !m) return;
+    memFor = m.id;
+    var items = [];
+    if (meInfo.role === "owner") {
+      items.push({ act: "role", label: m.role === "admin" ? "取消管理员" : "设为管理员" });
+    }
+    items.push({ act: m.muted ? "unmute" : "mute", label: m.muted ? "解除禁言" : "禁言 10 分钟" });
+    items.push({ act: "kick", label: "移出这一间", danger: true });
+    menu.innerHTML = "";
+    items.forEach(function (it) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.textContent = it.label;
+      b.dataset.act = it.act;
+      if (it.danger) b.className = "danger";
+      b.addEventListener("click", function () { memAction(it.act, m); });
+      menu.appendChild(b);
+    });
+    var r = btn.getBoundingClientRect();
+    menu.hidden = false;
+    var w = menu.offsetWidth, h = menu.offsetHeight;
+    var left = Math.min(r.right - w, window.innerWidth - w - 8);
+    var top = r.bottom + 4;
+    if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 4);
+    menu.style.left = Math.max(8, left) + "px";
+    menu.style.top = Math.round(top) + "px";
+  }
+  function memAction(act, m) {
+    closeMemMenu();
+    var path = act === "role" ? "/api/chat/role" : act === "kick" ? "/api/chat/kick" : "/api/chat/mute";
+    var body = { room: ROOM, id: guestId(), target: m.id };
+    if (act === "role") body.role = m.role === "admin" ? "member" : "admin";
+    if (act === "mute") body.minutes = 10;
+    if (act === "unmute") body.minutes = 0;
+    fetch(path, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (d) {
+        if (!r.ok) throw new Error(d.detail || "没办成");
+        return d;
+      });
+    }).then(function (d) {
+      toast(d.text || d.role_text || "已处理");
+      clearTimeout(timer);
+      poll();
+    }).catch(function (e) { toast(e.message || "没办成"); });
   }
 
   /* —— 左边栏：全部聊天室 —— */
@@ -1085,12 +1817,20 @@ try { if (localStorage.getItem("tcm.theme") === "dark") document.documentElement
     }
     if (save !== false) { try { localStorage.setItem(RAIL_KEY, open ? "1" : "0"); } catch (e) {} }
   }
+  var railSig = "", lastRailAt = Date.now();
   function loadRail() {
-    fetch("/api/rooms", { cache: "no-store" })
+    fetch("/api/rooms?id=" + encodeURIComponent(guestId()), { cache: "no-store" })
       .then(function (r) { return r.json(); })
       .then(function (d) {
         var box = $("railList");
         if (!box) return;
+        var all = ((d && d.official) || []).concat((d && d.guest) || []);
+        var sig = guestId() + "|" + ROOM + "|" + all.map(function (r) {
+          return r.id + ":" + (r.online || 0) + ":" + r.name + ":" + (r.unread || 0);
+        }).join("|");
+        if (sig === railSig && box.firstChild) return;   // 没变化就别重排，滚动条会跳
+        railSig = sig;
+        var keepTop = box.scrollTop;
         box.innerHTML = "";
         function sec(t) {
           var s = document.createElement("div");
@@ -1103,13 +1843,22 @@ try { if (localStorage.getItem("tcm.theme") === "dark") document.documentElement
           a.className = "rail-item" + (r.id === ROOM ? " on" : "");
           a.href = "/lounge?room=" + encodeURIComponent(r.id);
           if (r.id === ROOM) a.setAttribute("aria-current", "page");
-          var dot = document.createElement("span");
-          dot.className = "dot" + (r.online ? " on" : "");
-          a.appendChild(dot);
+          var av = document.createElement("span");
+          av.className = "room-av";
+          av.innerHTML = ROOM_AV;
+          av.setAttribute("aria-hidden", "true");
+          a.appendChild(av);
           var nm = document.createElement("span");
           nm.className = "rt";
           nm.textContent = r.name;
           a.appendChild(nm);
+          if (r.unread > 0 && r.id !== ROOM) {
+            var bd = document.createElement("span");
+            bd.className = "rail-badge";
+            bd.textContent = r.unread > 99 ? "99+" : String(r.unread);
+            bd.title = r.unread + " 条没看";
+            a.appendChild(bd);
+          }
           if (r.kind === "guest" && r.owner === guestId()) {
             var del = document.createElement("button");
             del.className = "rail-del";
@@ -1133,6 +1882,11 @@ try { if (localStorage.getItem("tcm.theme") === "dark") document.documentElement
           sec("游客创建");
           gst.forEach(function (r) { box.appendChild(item(r)); });
         }
+        box.scrollTop = keepTop;
+        unreadTotal = all.reduce(function (n, r) {
+          return n + (r.id === ROOM ? 0 : (r.unread || 0));
+        }, 0);
+        setTitle();
       })
       .catch(function () {});
   }
@@ -1169,6 +1923,18 @@ try { if (localStorage.getItem("tcm.theme") === "dark") document.documentElement
       });
   }
 
+  function drawerSet(open) {
+    var rail = $("rail"), scrim = $("railScrim"), btn = $("railOpen");
+    if (!rail) return;
+    rail.classList.toggle("drawer-open", !!open);
+    if (scrim) scrim.hidden = !open;
+    if (btn) btn.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+  function drawerIsOpen() {
+    var rail = $("rail");
+    return !!(rail && rail.classList.contains("drawer-open"));
+  }
+
   function railInit() {
     var open = true;
     try { if (localStorage.getItem(RAIL_KEY) === "0") open = false; } catch (e) {}
@@ -1179,9 +1945,19 @@ try { if (localStorage.getItem("tcm.theme") === "dark") document.documentElement
     var tg = $("railTg");
     if (tg) {
       tg.addEventListener("click", function () {
+        if (window.matchMedia("(max-width: 820px)").matches) { drawerSet(false); return; }
         railSet($("viewRoom").classList.contains("rail-off"));
       });
     }
+    var ro = $("railOpen"), scrim = $("railScrim");
+    if (ro) ro.addEventListener("click", function () { drawerSet(true); });
+    if (scrim) scrim.addEventListener("click", function () { drawerSet(false); });
+    document.addEventListener("keydown", function (e) {
+      if ((e.key === "Escape" || e.key === "Esc") && drawerIsOpen()) drawerSet(false);
+    });
+    window.addEventListener("resize", function () {
+      if (drawerIsOpen() && !window.matchMedia("(max-width: 820px)").matches) drawerSet(false);
+    });
     var dx = $("delX"), dn = $("delNo"), dy = $("delYes"), dm = $("delRoom");
     if (dx) dx.addEventListener("click", function () { dm.hidden = true; });
     if (dn) dn.addEventListener("click", function () { dm.hidden = true; });
@@ -1209,7 +1985,7 @@ try { if (localStorage.getItem("tcm.theme") === "dark") document.documentElement
           de.textContent = d.desc;
           de.hidden = false;
         }
-        document.title = d.name + " · 聊天室";
+        setTitle();
       })
       .catch(function () {});
   }
@@ -1516,8 +2292,15 @@ try { if (localStorage.getItem("tcm.theme") === "dark") document.documentElement
   function bindRoom() {
     var box = $("members");
     box.addEventListener("click", function (ev) {
+      var more = ev.target.closest(".mem-more");
+      if (more) {
+        ev.stopPropagation();
+        closeProfile();
+        openMemMenu(more, memberById(more.dataset.more));
+        return;
+      }
       var row = ev.target.closest(".mem");
-      if (row) openProfile(row.dataset.id, row);
+      if (row) { closeMemMenu(); openProfile(row.dataset.id, row); }
     });
     box.addEventListener("keydown", function (ev) {
       if (ev.key !== "Enter" && ev.key !== " ") return;
@@ -1560,20 +2343,24 @@ try { if (localStorage.getItem("tcm.theme") === "dark") document.documentElement
       if (ev.target === $("invDone")) $("invDone").hidden = true;
     });
     $("mprofAt").addEventListener("click", function () {
-      var t = $("input"), nm = $("mprofName").textContent || "";
-      t.value = (t.value ? t.value + " " : "") + "@" + nm;
-      autoGrow();
+      insertAt($("mprofName").textContent || "");
       closeProfile();
-      t.focus();
     });
     document.addEventListener("click", function (ev) {
+      if (!$("memMenu").hidden && !ev.target.closest("#memMenu") && !ev.target.closest(".mem-more")) {
+        closeMemMenu();
+      }
       if ($("mprof").hidden) return;
-      if (!ev.target.closest("#mprof") && !ev.target.closest(".mem")) closeProfile();
+      if (!ev.target.closest("#mprof") && !ev.target.closest(".mem") &&
+          !ev.target.closest("[data-prof]")) closeProfile();
     });
+    window.addEventListener("resize", function () { closeMemMenu(); });
+    $("msgs").addEventListener("scroll", function () { closeMemMenu(); });
     document.addEventListener("keydown", function (ev) {
       if (ev.key !== "Escape") return;
       if (!$("invDone").hidden) { $("invDone").hidden = true; return; }
       if (!$("invite").hidden) { $("invite").hidden = true; return; }
+      if (!$("memMenu").hidden) { closeMemMenu(); return; }
       if (!$("mprof").hidden) closeProfile();
     });
   }
@@ -1600,7 +2387,19 @@ try { if (localStorage.getItem("tcm.theme") === "dark") document.documentElement
       addNotices(d.invites);
       toast("收到一条邀请，点右上角看。");
     }
-        if (d.messages && d.messages.length) append(d.messages);
+        if (d.me) meInfo = d.me;
+        if (d.messages && d.messages.length) {
+          append(d.messages);
+          var hitMe = d.messages.some(function (m) {
+            return (m.mentions || []).indexOf(myId) >= 0;
+          });
+          if (hitMe) toast("有人 @ 了你");
+        }
+        var tick = Date.now();
+        if (!lastRailAt || tick - lastRailAt > 9000) {    // 别人的新房、上下线，九秒内看得到
+          lastRailAt = tick;
+          loadRail();
+        }
         cursor = Number(d.seq) || 0;
         renderMembers(d.members, d.online);
         if (!booted) { booted = true; toBottom(); }
@@ -1621,12 +2420,26 @@ try { if (localStorage.getItem("tcm.theme") === "dark") document.documentElement
   function send() {
     var t = $("input"), text = t.value.trim();
     if (!text || sending) return;
+    if (aiAskMode) {                          // 提问模式：这句发给 AI 中医师，不进聊天流
+      t.value = "";
+      autoGrow();
+      setAskMode(false);
+      askNow(text);
+      return;
+    }
+    if (text.charAt(0) === "/") {              // / 开头：这句直接问 AI 中医师，不进聊天流
+      t.value = "";
+      autoGrow();
+      askNow(text.slice(1).trim());
+      return;
+    }
     sending = true;
     $("send").disabled = true;
     fetch("/api/chat/send", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ room: ROOM, id: guestId(), text: text })
+      body: JSON.stringify({ room: ROOM, id: guestId(), text: text,
+                             reply: replyTo ? replyTo.seq : 0 })
     }).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (d) {
         if (!r.ok) throw new Error(d.detail || ("发送失败（" + r.status + "）"));
@@ -1634,6 +2447,7 @@ try { if (localStorage.getItem("tcm.theme") === "dark") document.documentElement
       });
     }).then(function () {
       t.value = "";
+      clearReply();
       autoGrow();
       clearTimeout(timer);
       poll();
@@ -1669,12 +2483,16 @@ try { if (localStorage.getItem("tcm.theme") === "dark") document.documentElement
     var t = $("input");
     t.addEventListener("input", autoGrow);
     t.addEventListener("keydown", function (ev) {
+      if (ev.key === "Escape" && aiAskMode) { setAskMode(false); return; }
       if (ev.key === "Enter" && !ev.shiftKey && !ev.isComposing) {
         ev.preventDefault();
         send();
       }
     });
     $("send").addEventListener("click", send);
+    bindTools();
+    membersSet((function () { try { return localStorage.getItem(MEM_KEY) !== "0"; } catch (e) { return true; } })(), false);
+    loadNotice();
     document.addEventListener("tcm:guest", function (e) {
       myId = String(e.detail.id);
       // 只改「是不是我发的」，绝不改署名：署名一旦改写，历史消息就会串号
@@ -1686,6 +2504,521 @@ try { if (localStorage.getItem("tcm.theme") === "dark") document.documentElement
       cursor = cursor || 0;
     });
     poll();
+  }
+
+  /* —— 群头像：所有房间共用一个 —— */
+  var ROOM_AV = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">' +
+    '<rect x="0.8" y="0.8" width="22.4" height="22.4" rx="5.2" fill="#8c2f1d"/>' +
+    '<circle cx="9.2" cy="9.4" r="2.3" fill="#f3ddb4"/>' +
+    '<path d="M5.1 17.2c0-2.4 1.8-3.9 4.1-3.9s4.1 1.5 4.1 3.9z" fill="#f3ddb4"/>' +
+    '<circle cx="15.9" cy="9.9" r="1.9" fill="#f3ddb4" opacity=".78"/>' +
+    '<path d="M13.2 17.2c0-2.1 1.4-3.4 3-3.4 1.7 0 3.1 1.3 3.1 3.4z" fill="#f3ddb4" opacity=".78"/>' +
+    '</svg>';
+
+  /* —— 成员列表收起 —— */
+  var MEM_KEY = "tcm.lounge.members";
+  function membersOpen() {
+    var v = $("viewRoom");
+    return !!v && !v.classList.contains("members-off");
+  }
+  function membersSet(open, save) {
+    var v = $("viewRoom");
+    if (!v) return;
+    v.classList.toggle("members-off", !open);
+    var b = $("memTg");
+    if (b) {
+      b.textContent = open ? "收起" : "展开";
+      b.setAttribute("aria-expanded", open ? "true" : "false");
+      b.title = open ? "收起成员列表" : "展开成员列表";
+    }
+    var a = $("actMembers");
+    if (a) a.setAttribute("aria-pressed", open ? "true" : "false");
+    if (save !== false) { try { localStorage.setItem(MEM_KEY, open ? "1" : "0"); } catch (e) {} }
+  }
+
+  /* —— 弹层通用 —— */
+  function openModal(id) { var m = $(id); if (m) m.hidden = false; }
+  function closeModal(id) { var m = $(id); if (m) m.hidden = true; }
+  function bindModalClose(id, xid) {
+    var m = $(id);
+    if (!m) return;
+    m.addEventListener("click", function (ev) { if (ev.target === m) m.hidden = true; });
+    var x = $(xid);
+    if (x) x.addEventListener("click", function () { m.hidden = true; });
+  }
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key !== "Escape" && ev.key !== "Esc") return;
+    ["filesModal", "noticeModal", "auditModal"].forEach(function (id) {
+      var m = $(id);
+      if (m && !m.hidden) m.hidden = true;
+    });
+  });
+
+  /* —— 文件 —— */
+  function fmtSize(n) {
+    n = Number(n) || 0;
+    if (n < 1024) return n + " B";
+    if (n < 1048576) return (n / 1024).toFixed(n < 10240 ? 1 : 0) + " KB";
+    return (n / 1048576).toFixed(1) + " MB";
+  }
+  function loadFiles() {
+    fetch("/api/chat/files?room=" + encodeURIComponent(ROOM), { cache: "no-store" })
+      .then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (d) {
+          if (!r.ok) throw new Error(d.detail || "取文件清单失败");
+          return d;
+        });
+      })
+      .then(function (d) {
+        var box = $("fileList");
+        if (!box) return;
+        var rows = (d && d.files) || [];
+        box.innerHTML = "";
+        if (!rows.length) {
+          box.innerHTML = '<p class="file-empty">还没有人传过文件。</p>';
+          return;
+        }
+        rows.forEach(function (f) {
+          var row = document.createElement("div");
+          row.className = "file-row";
+          var nm = document.createElement("span");
+          nm.className = "fn";
+          nm.textContent = f.name;
+          nm.title = f.name;
+          var meta = document.createElement("span");
+          meta.className = "fm";
+          meta.textContent = fmtSize(f.size) + " · " + (f.by_name || "") + " · " + fmtTime(f.at);
+          var a = document.createElement("a");
+          a.className = "dl";
+          a.href = "/api/chat/files/" + encodeURIComponent(f.id) + "?room=" + encodeURIComponent(ROOM);
+          a.setAttribute("download", f.name);
+          a.textContent = "下载";
+          row.appendChild(nm);
+          row.appendChild(meta);
+          var ext = (String(f.name).split(".").pop() || "").toLowerCase();
+          if (VIEWABLE[ext]) {                 // 文本、图片、PDF 直接在浏览器里看
+            var vw = document.createElement("a");
+            vw.className = "dl view";
+            vw.href = a.href + "&inline=1";
+            vw.target = "_blank";
+            vw.rel = "noopener";
+            vw.textContent = "预览";
+            row.appendChild(vw);
+          }
+          row.appendChild(a);
+          box.appendChild(row);
+        });
+      })
+      .catch(function (e) { toast(e.message || "取文件清单失败"); });
+  }
+  function uploadFiles(files) {
+    if (!files || !files.length) return;
+    var list = Array.prototype.slice.call(files), done = 0, fail = 0;
+    list.forEach(function (f) {
+      var fd = new FormData();
+      fd.append("room", ROOM);
+      fd.append("id", guestId());
+      fd.append("file", f, f.name);
+      fetch("/api/chat/files", { method: "POST", body: fd })
+        .then(function (r) {
+          return r.json().catch(function () { return {}; }).then(function (d) {
+            if (!r.ok) throw new Error(d.detail || (f.name + " 上传失败"));
+            return d;
+          });
+        })
+        .catch(function (e) { fail++; toast(e.message || "上传失败"); })
+        .then(function () {
+          done++;
+          if (done < list.length) return;
+          loadFiles();
+          if (!fail) toast("已上传 " + done + " 个文件");
+        });
+    });
+  }
+
+  /* —— 搜索 —— */
+  function searchOpen(on) {
+    var bar = $("searchbar"), res = $("searchRes"), b = $("tbSearch");
+    if (!bar) return;
+    bar.hidden = !on;
+    if (b) b.classList.toggle("on", !!on);
+    if (!on) {
+      var inp = $("searchInput");
+      if (inp) inp.value = "";
+      var info = $("searchInfo");
+      if (info) info.textContent = "";
+      if (res) { res.hidden = true; res.innerHTML = ""; }
+      return;
+    }
+    setTimeout(function () { var i = $("searchInput"); if (i) i.focus(); }, 30);
+  }
+  function highlightMatch(text, q) {
+    var frag = document.createDocumentFragment();
+    var s = String(text || ""), needle = String(q || "");
+    if (!needle) { frag.appendChild(document.createTextNode(s)); return frag; }
+    var low = s.toLowerCase(), nl = needle.toLowerCase(), i = 0;
+    while (true) {
+      var k = low.indexOf(nl, i);
+      if (k < 0) { frag.appendChild(document.createTextNode(s.slice(i))); break; }
+      if (k > i) frag.appendChild(document.createTextNode(s.slice(i, k)));
+      var m = document.createElement("mark");
+      m.textContent = s.slice(k, k + needle.length);
+      frag.appendChild(m);
+      i = k + needle.length;
+    }
+    return frag;
+  }
+  function renderSearch(d) {
+    var box = $("searchRes"), info = $("searchInfo");
+    if (!box) return;
+    var rows = (d && d.rows) || [];
+    if (info) info.textContent = rows.length ? ("找到 " + rows.length + " 条") : "没找到";
+    box.innerHTML = "";
+    if (!rows.length) { box.hidden = true; return; }
+    rows.forEach(function (m) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "sr-row";
+      var hd = document.createElement("div");
+      hd.className = "sr-hd";
+      hd.textContent = (m.name || "") + " · " + fmtTime(m.at) + (m.kind === "qa" ? " · 问答" : "");
+      var tx = document.createElement("div");
+      tx.appendChild(highlightMatch(m.kind === "qa" ? ("问：" + (m.q || "") + " " + m.text) : m.text, d.q));
+      b.appendChild(hd);
+      b.appendChild(tx);
+      b.addEventListener("click", function () { jumpTo(m.seq); });
+      box.appendChild(b);
+    });
+    box.hidden = false;
+  }
+  function doSearch() {
+    var inp = $("searchInput");
+    var q = inp ? (inp.value || "").trim() : "";
+    if (!q) { toast("先写要搜的词"); return; }
+    fetch("/api/chat/search?room=" + encodeURIComponent(ROOM) + "&q=" + encodeURIComponent(q))
+      .then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (d) {
+          if (!r.ok) throw new Error(d.detail || "搜索失败");
+          return d;
+        });
+      })
+      .then(renderSearch)
+      .catch(function (e) { toast(e.message || "搜索失败"); });
+  }
+  function jumpTo(seq) {
+    var box = $("msgs");
+    var hit = box && seq != null ? box.querySelector('[data-seq="' + seq + '"]') : null;
+    searchOpen(false);
+    if (!hit) { toast("这条不在当前聊天记录里"); return; }
+    hit.scrollIntoView({ block: "center", behavior: "smooth" });
+    hit.classList.add("hit");
+    setTimeout(function () { hit.classList.remove("hit"); }, 1800);
+  }
+
+  /* —— 公告 —— */
+  function renderNotice(d) {
+    var bar = $("noticeBar"), tx = $("noticeTx");
+    if (!bar || !tx) return;
+    var text = (d && d.text) || "";
+    bar.hidden = !text;
+    if (!text) return;
+    tx.textContent = text + (d.by_name ? "（" + d.by_name + " " + fmtTime(d.at) + "）" : "");
+    var ed = $("noticeEdit");
+    if (ed) ed.hidden = !(d && d.can_manage);
+  }
+  function loadNotice() {
+    fetch("/api/chat/notice?room=" + encodeURIComponent(ROOM) +
+          "&id=" + encodeURIComponent(guestId()), { cache: "no-store" })
+      .then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (d) {
+          if (!r.ok) throw new Error(d.detail || "取公告失败");
+          return d;
+        });
+      })
+      .then(renderNotice)
+      .catch(function () {});
+  }
+  function renderNoticeHist(rows) {
+    var box = $("noticeHist"), list = $("noticeHistList"), sum = $("noticeHistSum");
+    if (!box || !list) return;
+    rows = rows || [];
+    list.innerHTML = "";
+    box.hidden = !rows.length;
+    if (!rows.length) return;
+    if (sum) sum.textContent = "历史版本（" + rows.length + "）";
+    rows.forEach(function (x) {
+      var row = document.createElement("div");
+      row.className = "nh-row";
+      row.appendChild(document.createTextNode(x.text || ""));
+      var meta = document.createElement("span");
+      meta.className = "nh-meta";
+      meta.textContent = (x.by_name || ("游客" + (x.by || ""))) + " 于 " + fmtTime(x.at) + " 设" +
+                         (x.replaced_at ? " · " + fmtTime(x.replaced_at) + " 换下" : "");
+      row.appendChild(meta);
+      list.appendChild(row);
+    });
+  }
+  function openNoticeEdit() {
+    fetch("/api/chat/notice?room=" + encodeURIComponent(ROOM) +
+          "&id=" + encodeURIComponent(guestId()), { cache: "no-store" })
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (d) {
+        d = d || {};
+        var can = !!d.can_manage;
+        var ta = $("noticeInput");
+        if (ta) { ta.value = d.text || ""; ta.disabled = !can; }
+        var hint = $("noticeHint");
+        if (hint) hint.textContent = can ? "存下后全房间都能看到，署名留给你。" : "只有房主能改这一间的公告，你看到的是内容。";
+        ["noticeSave", "noticeClear"].forEach(function (id) {
+          var b = $(id);
+          if (b) b.disabled = !can;
+        });
+        renderNoticeHist(d.history || []);
+        openModal("noticeModal");
+        if (can && ta) setTimeout(function () { ta.focus(); }, 30);
+      })
+      .catch(function (e) { toast(e.message || "取公告失败"); });
+  }
+  function saveNotice(clear) {
+    var ta = $("noticeInput");
+    var text = clear ? "" : ((ta && ta.value) || "").trim();
+    fetch("/api/chat/notice", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ room: ROOM, id: guestId(), text: text })
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (d) {
+        if (!r.ok) throw new Error(d.detail || "保存失败");
+        return d;
+      });
+    }).then(function () {
+      closeModal("noticeModal");
+      toast(clear ? "公告已撤下" : "公告已更新");
+      loadNotice();
+    }).catch(function (e) { toast(e.message || "保存失败"); });
+  }
+
+  /* —— 审核邀请 —— */
+  function loadAudit() {
+    fetch("/api/chat/invites/sent?id=" + encodeURIComponent(guestId()) +
+          "&room=" + encodeURIComponent(ROOM), { cache: "no-store" })
+      .then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (d) {
+          if (!r.ok) throw new Error(d.detail || "取邀请失败");
+          return d;
+        });
+      })
+      .then(function (d) {
+        var box = $("auditList");
+        if (!box) return;
+        var rows = (d && d.invites) || [];
+        box.innerHTML = "";
+        if (!rows.length) {
+          box.innerHTML = '<p class="audit-empty">这一间你还没发出过邀请。</p>';
+          return;
+        }
+        rows.forEach(function (x) {
+          var row = document.createElement("div");
+          row.className = "audit-row";
+          var tx = document.createElement("div");
+          tx.className = "ar-tx";
+          var b = document.createElement("b");
+          b.textContent = x.to_name || ("游客" + x.to);
+          var s = document.createElement("span");
+          s.className = "ar-st" + (x.joined ? " ok" : "");
+          s.textContent = x.joined ? (x.online ? "已进房 · 在线" : "已进房") :
+            (x.status === "pending" ? "待回应" : (x.status_text || ""));
+          var tm = document.createElement("span");
+          tm.className = "ar-t";
+          tm.textContent = fmtTime(x.at);
+          tx.appendChild(b);
+          tx.appendChild(s);
+          tx.appendChild(tm);
+          row.appendChild(tx);
+          if (!x.joined && x.status === "pending") {
+            var rv = document.createElement("button");
+            rv.type = "button";
+            rv.className = "btn sm";
+            rv.textContent = "撤回";
+            rv.addEventListener("click", function () { revokeInvite(x.id); });
+            row.appendChild(rv);
+          }
+          box.appendChild(row);
+        });
+      })
+      .catch(function (e) { toast(e.message || "取邀请失败"); });
+  }
+  function revokeInvite(id) {
+    fetch("/api/chat/invites/revoke", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ invite: id, id: guestId() })
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (d) {
+        if (!r.ok) throw new Error(d.detail || "撤回失败");
+        return d;
+      });
+    }).then(function () {
+      toast("已撤回");
+      loadAudit();
+    }).catch(function (e) { toast(e.message || "撤回失败"); });
+  }
+
+  /* —— AI 中医师：点按钮就切到提问，直接在聊天输入框里写 —— */
+  var aiBusy = false, aiAskMode = false;
+  function setAskMode(on) {
+    aiAskMode = !!on;
+    var b = $("tbAsk"), t = $("input"), h = $("askHint");
+    if (b) {
+      b.classList.toggle("on", aiAskMode);
+      b.setAttribute("aria-pressed", aiAskMode ? "true" : "false");
+    }
+    if (t) {
+      t.classList.toggle("ask", aiAskMode);
+      if (aiAskMode) {
+        t.placeholder = "问 AI 中医师：哪味药、哪个方、哪一段原文…";
+        if (t.focus) t.focus();
+      } else {
+        t.removeAttribute("placeholder");
+      }
+    }
+    if (h) h.hidden = !aiAskMode;
+  }
+  function aiShow(q) {
+    var c = $("aiCard");
+    if (!c) return;
+    c.hidden = false;
+    var qe = $("aiQ");
+    if (qe) { qe.hidden = !q; qe.textContent = q ? ("问：" + q) : ""; }
+    var meta = $("aiMeta");
+    if (meta) meta.textContent = "检索古籍中…";
+    var body = $("aiBody");
+    if (body) { body.className = "ai-body pending"; body.textContent = "正在翻书…"; }
+    var src = $("aiSrc");
+    if (src) src.innerHTML = "";
+  }
+  function aiFill(d, secs) {
+    var msg = (d && d.message) || {};
+    var cites = msg.cites || [];
+    var meta = $("aiMeta");
+    if (meta) {
+      meta.textContent = (secs ? secs + " 秒" : "") +
+        (secs && cites.length ? " · " : "") +
+        (cites.length ? "出处 " + cites.length + " 条" : "");
+    }
+    var body = $("aiBody");
+    if (body) {
+      body.className = "ai-body" + (d && d.refused ? " refused" : "");
+      body.textContent = "";
+      String(msg.text || "这次没有取到答案。").split(/(〔未核〕)/).forEach(function (piece) {
+        if (piece === "〔未核〕") {
+          var s = document.createElement("span");
+          s.className = "unchecked";
+          s.textContent = piece;
+          body.appendChild(s);
+        } else if (piece) {
+          body.appendChild(document.createTextNode(piece));
+        }
+      });
+      var sc = (d && d.self_check) || {};
+      if (sc.ran && sc.note) {
+        var note = document.createElement("span");
+        note.className = "sc-note";
+        note.textContent = "—— 自查：" + sc.note;
+        body.appendChild(note);
+      }
+    }
+    var src = $("aiSrc");
+    if (!src) return;
+    src.innerHTML = "";
+    cites.forEach(function (c, i) {
+      var row = document.createElement("div");
+      row.className = "row";
+      var m = document.createElement("span");
+      m.className = "m";
+      m.textContent = ["[" + (i + 1) + "]", c.book ? "《" + c.book + "》" : "", c.line || ""]
+        .filter(Boolean).join(" ");
+      row.appendChild(m);
+      if (c.quote) {
+        var q = document.createElement("span");
+        q.className = "q";
+        q.textContent = "「" + c.quote + "」";
+        row.appendChild(q);
+      }
+      src.appendChild(row);
+    });
+  }
+
+  /* —— 面板接线 —— */
+  function bindTools() {
+    var up = $("tbUpload"), fi = $("fileInput");
+    if (up && fi) {
+      up.addEventListener("click", function () {
+        openModal("filesModal");          // 先开面板：传完能立刻看到清单
+        loadFiles();
+        fi.click();
+      });
+      fi.addEventListener("change", function () { uploadFiles(fi.files); fi.value = ""; });
+    }
+    var pick = $("filesPick");
+    if (pick && fi) pick.addEventListener("click", function () { fi.click(); });
+    var drop = $("fileDrop");
+    if (drop) {
+      ["dragenter", "dragover"].forEach(function (t) {
+        drop.addEventListener(t, function (ev) { ev.preventDefault(); drop.classList.add("over"); });
+      });
+      ["dragleave", "drop"].forEach(function (t) {
+        drop.addEventListener(t, function (ev) { ev.preventDefault(); drop.classList.remove("over"); });
+      });
+      drop.addEventListener("drop", function (ev) {
+        if (ev.dataTransfer && ev.dataTransfer.files) uploadFiles(ev.dataTransfer.files);
+      });
+    }
+    var tbs = $("tbSearch");
+    if (tbs) tbs.addEventListener("click", function () { searchOpen(!!$("searchbar").hidden); });
+    var sx = $("searchX");
+    if (sx) sx.addEventListener("click", function () { searchOpen(false); });
+    var sg = $("searchGo");
+    if (sg) sg.addEventListener("click", doSearch);
+    var si = $("searchInput");
+    if (si) si.addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter") { ev.preventDefault(); doSearch(); }
+      if (ev.key === "Escape") searchOpen(false);
+    });
+    var tbn = $("tbNotice");
+    if (tbn) tbn.addEventListener("click", openNoticeEdit);
+    var ne = $("noticeEdit");
+    if (ne) ne.addEventListener("click", openNoticeEdit);
+    var ns = $("noticeSave");
+    if (ns) ns.addEventListener("click", function () { saveNotice(false); });
+    var nc = $("noticeClear");
+    if (nc) nc.addEventListener("click", function () { saveNotice(true); });
+    var rx = $("replyX");
+    if (rx) rx.addEventListener("click", function () { clearReply(); $("input").focus(); });
+    var ax2 = $("actExport");
+    if (ax2) ax2.addEventListener("click", function () {
+      window.location.href = "/api/chat/export?room=" + encodeURIComponent(ROOM) +
+                             "&id=" + encodeURIComponent(guestId());
+      toast("正在导出这一间的记录");
+    });
+    var ta = $("tbAsk");
+    if (ta) ta.addEventListener("click", function () { setAskMode(!aiAskMode); });
+    var ax = $("aiX");
+    if (ax) ax.addEventListener("click", function () { closeModal("aiCard"); $("aiCard").hidden = true; });
+    var am = $("actMembers"), mt = $("memTg");
+    if (am) am.addEventListener("click", function () { membersSet(!membersOpen()); });
+    if (mt) mt.addEventListener("click", function () { membersSet(!membersOpen()); });
+    var af = $("actFiles");
+    if (af) af.addEventListener("click", function () { openModal("filesModal"); loadFiles(); });
+    var an = $("actNotice");
+    if (an) an.addEventListener("click", openNoticeEdit);
+    var ai2 = $("actInvite");
+    if (ai2) ai2.addEventListener("click", function () { openInvite(); });
+    var aa = $("actAudit");
+    if (aa) aa.addEventListener("click", function () { openModal("auditModal"); loadAudit(); });
+    bindModalClose("filesModal", "filesX");
+    bindModalClose("noticeModal", "noticeX");
+    bindModalClose("auditModal", "auditX");
   }
 
   /* 主题切换 */

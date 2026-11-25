@@ -81,3 +81,6 @@ data/screenshots/
 data/chat_rooms.json
 data/chat_rooms.json.tmp
 data/chat_rooms.json.bad-*
+
+# 聊天室成员上传的附件（运行时数据，不进仓库）
+data/room_files/
