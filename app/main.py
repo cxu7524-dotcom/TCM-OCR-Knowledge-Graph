@@ -58,6 +58,8 @@ from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile  # noqa
 from fastapi import Response                                                # noqa: E402
 from fastapi.responses import FileResponse, JSONResponse                  # noqa: E402
 from fastapi.staticfiles import StaticFiles                              # noqa: E402
+from fastapi.exceptions import RequestValidationError                        # noqa: E402
+from starlette.exceptions import HTTPException as StarletteHTTPException     # noqa: E402
 
 from app.config import CONFIG                                            # noqa: E402
 from app.demo import demo_flags, load_demo_ocr, load_demo_questions        # noqa: E402
@@ -418,6 +420,40 @@ def rag_rebuild(payload: Dict[str, Any] = Body(default={})):
         raise HTTPException(status_code=500, detail=f"重建失败：{type(exc).__name__}: {exc}")
 
 
+# ---------------- 统一错误态：框架层的英文报错翻成可读中文 ----------------
+# 评委与用户最常撞到的是 422（字段缺失 / 类型不对）：FastAPI 默认给
+# {"detail":[{"type":"missing","loc":["body","question"],...}]}，前端只会看到一串英文。
+# 这里统一成一句话，并保留定位信息（哪个字段），方便报错时对照。
+_VALIDATION_TEXT = "请求参数不完整或格式不对"
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation_error_handler(request, exc):
+    errs = exc.errors() or []
+    where = ""
+    if errs:
+        loc = [str(x) for x in (errs[0].get("loc") or [])
+               if x not in ("body", "query", "path")]
+        if loc:
+            where = "（" + ".".join(loc) + "）"
+    return JSONResponse(status_code=422,
+                        content={"detail": _VALIDATION_TEXT + where, "errors": len(errs)})
+
+
+@app.exception_handler(StarletteHTTPException)
+async def _http_error_handler(request, exc):
+    """只翻译 /api/* 的英文默认文案；页面与静态文件的 404 原样返回。"""
+    detail = exc.detail
+    path = getattr(getattr(request, "url", None), "path", "") or ""
+    if path.startswith("/api/") and isinstance(detail, str):
+        if exc.status_code == 404 and detail == "Not Found":
+            detail = "接口不存在（404）：检查路径与方法是否写对"
+        elif exc.status_code == 405 and detail == "Method Not Allowed":
+            detail = "这个接口不支持该请求方法（405）"
+    return JSONResponse(status_code=exc.status_code, content={"detail": detail},
+                        headers=getattr(exc, "headers", None))
+
+
 @app.get("/api/health")
 def health():
     """配置快照与模块状态；不含密钥、不含任何实测指标。"""
@@ -484,6 +520,50 @@ _METRIC_ORDER = [
 ]
 
 
+@app.get("/api/lexicon/variants")
+def api_lexicon_variants():
+    """字形层对照表（繁简 / 异体 / 通假），供演示台在正文里加「原文形 → 正字」悬浮卡。
+
+    只读 data/lexicon/异体字表.json：不改写原文、不改抽取结果、不参与评测计分。
+    前端按「多字优先」匹配，单字条目不标（古籍里单字误标率高）。
+    """
+    path = CONFIG.paths.data_dir / "lexicon" / "异体字表.json"
+    if not path.exists():
+        return {"version": "", "entries": [], "count": 0,
+                "note": "异体字表未随仓库提供，正文不做字形标注"}
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise HTTPException(status_code=503, detail="异体字表读取失败：%s" % exc)
+    conf = raw.get("置信等级") or {}
+    conf_map = {}
+    if isinstance(conf, dict):
+        conf_map = {str(k): str(v) for k, v in conf.items()}
+    elif isinstance(conf, list):
+        for item in conf:
+            if isinstance(item, (list, tuple)) and len(item) >= 2:
+                conf_map[str(item[0])] = str(item[1])
+    entries, seen = [], set()
+    for kind in ("繁简", "异体", "通假"):   # 同一原文形只留先出现的分类（繁简 > 异体 > 通假）
+        table = raw.get(kind) or {}
+        if not isinstance(table, dict):
+            continue
+        for src, dst in table.items():
+            if not isinstance(src, str) or not isinstance(dst, str) or not src or not dst:
+                continue
+            if src in seen:
+                continue
+            seen.add(src)
+            entries.append({"from": src, "to": dst, "kind": kind,
+                            "confidence": conf_map.get(kind, "")})
+    entries.sort(key=lambda e: (-len(e["from"]), e["from"]))
+    return {"version": str(raw.get("版本") or ""),
+            "source": raw.get("来源") or [],
+            "confidence": conf_map,
+            "entries": entries,
+            "count": len(entries)}
+
+
 @app.get("/api/metrics")
 def metrics():
     """读取 eval/run_all.py 产出的 data/reports/评测明细.json，供前端展示评测概览。
@@ -513,11 +593,20 @@ def metrics():
                       "detail": r.get("detail")})
     if not items:
         return {"available": False, "items": [], "notice": "评测明细没有可展示的指标"}
+    extras = []
+    for _key, _label, _note in (
+        ("variant_hit", "异体字命中率", "字形对照命中，参考项，不计入达标判定"),
+        ("field_f1_legacy", "字段级 F1（修正前对照）", "原值对齐口径，用来对照正式口径的提升"),
+    ):
+        _r = results.get(_key)
+        if isinstance(_r, dict) and _r.get("value") is not None:
+            extras.append({"key": _key, "label": _label, "value": _r.get("value"),
+                           "detail": _r.get("detail"), "note": _note})
     dataset = data.get("dataset")
     if not isinstance(dataset, dict):
         dataset = {}
     test_pages = results.get("test_pages")
-    return {"available": True, "items": items,
+    return {"available": True, "items": items, "extras": extras,
             "generated_at": data.get("generated_at"),
             "gt_version": data.get("gt_version"),
             "test_only": results.get("test_only"),

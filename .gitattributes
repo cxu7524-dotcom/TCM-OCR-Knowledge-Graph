@@ -1,0 +1,3 @@
+# 统一 shell 脚本的换行符：Windows 默认 core.autocrlf=true 会把 .sh 存成 CRLF，
+# 在 Linux / macOS 上跑会报「$'\r': command not found」。这里只固定 .sh，不动其它文件。
+*.sh text eol=lf

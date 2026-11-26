@@ -506,7 +506,163 @@
   .home-banner-text b { font-family: var(--kai); font-size: 16px; letter-spacing: 2px; }
   .home-banner-btn { border-radius: 2px; letter-spacing: 2px; }
 
-  /* —— 指标墙（C）：大号宋体数字 + 细线分栏 —— */
+  /* —— 评测明细抽屉 —— */
+.md-wrap { position: fixed; inset: 0; z-index: 110; }
+.md-wrap[hidden] { display: none; }
+.md-mask { position: absolute; inset: 0; background: rgba(30, 24, 18, .38); }
+.md-panel {
+  position: absolute; top: 0; right: 0; bottom: 0; width: min(680px, 96vw);
+  display: flex; flex-direction: column; background: var(--paper-2);
+  border-left: 1px solid var(--line); box-shadow: -12px 0 40px rgba(0, 0, 0, .18);
+}
+.md-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px 12px; border-bottom: 1px solid var(--line-soft);
+}
+.md-head h3 { margin: 0; font-family: var(--wei); font-size: 16px; letter-spacing: 4px; color: var(--ink); font-weight: 400; }
+.md-x { border: 0; background: transparent; font-size: 16px; color: var(--muted); cursor: pointer; }
+.md-x:hover { color: var(--cinnabar); }
+.md-body { padding: 14px 20px 22px; overflow: auto; font-family: var(--fang); font-size: 12.5px; color: var(--ink); }
+.md-body h4 { margin: 18px 0 8px; font-family: var(--wei); font-size: 12px; letter-spacing: 3px; color: var(--gold); font-weight: 400; }
+.md-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.md-table th, .md-table td { border: 1px solid var(--line-soft); padding: 6px 8px; text-align: left; vertical-align: top; }
+.md-table th { background: var(--paper-3); font-weight: 400; color: var(--ink-soft); white-space: nowrap; }
+.md-table .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.md-table .note { color: var(--ink-soft); line-height: 1.6; }
+.md-facts { margin: 0; padding-left: 1.1em; line-height: 1.9; color: var(--ink-soft); }
+.md-facts code, .md-body code { font-family: var(--serif); font-size: 11.5px; background: var(--paper-3); padding: 0 3px; }
+.md-notice { margin: 12px 0 0; padding-top: 10px; border-top: 1px dashed var(--line-soft); color: var(--muted); font-size: 11px; line-height: 1.7; }
+.md-foot { padding: 10px 20px 14px; border-top: 1px solid var(--line-soft); color: var(--muted); font-size: 11px; }
+body.md-open { overflow: hidden; }
+html[data-theme="dark"] .md-panel { background: #241f18; }
+
+/* —— 使用须知（首访一次）—— */
+.notice {
+  position: fixed; inset: 0; z-index: 120; display: grid; place-items: center;
+  padding: 20px; background: rgba(30, 24, 18, .45);
+}
+.notice[hidden] { display: none; }
+.notice-card {
+  position: relative; width: min(560px, 100%); max-height: 92vh; overflow: auto;
+  background: var(--paper-2); border: 1px solid var(--line);
+  border-top: 3px solid var(--cinnabar); padding: 26px 28px 20px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .28);
+}
+.notice-card h3 {
+  margin: 0 0 12px; font-family: var(--wei); font-size: 17px;
+  letter-spacing: 6px; color: var(--ink); font-weight: 400;
+}
+.notice-card ol {
+  margin: 0; padding-left: 1.3em; font-family: var(--fang);
+  font-size: 13px; line-height: 2; color: var(--ink-soft);
+}
+.notice-card li + li { margin-top: 5px; }
+.notice-card li b { color: var(--cinnabar-dark); font-weight: 400; }
+.notice-seal {
+  position: absolute; right: 22px; top: 22px; font-family: var(--kai);
+  font-size: 14px; color: var(--cinnabar); border: 1px solid var(--cinnabar);
+  padding: 2px 7px; letter-spacing: 2px;
+}
+.notice-ok {
+  margin-top: 18px; border: 1px solid var(--cinnabar); background: transparent;
+  color: var(--cinnabar-dark); font-family: var(--fang); font-size: 13px;
+  letter-spacing: 2px; padding: 7px 22px; border-radius: 2px; cursor: pointer; transition: .15s;
+}
+.notice-ok:hover { background: var(--cinnabar); color: #fff; }
+.notice-open {
+  border: 0; background: transparent; color: var(--muted); font-family: var(--fang);
+  font-size: 11px; letter-spacing: 1px; cursor: pointer; text-decoration: underline;
+  padding: 0 2px;
+}
+.notice-open:hover { color: var(--cinnabar); }
+body.notice-open { overflow: hidden; }
+html[data-theme="dark"] .notice-card { background: #241f18; }
+
+/* —— 答案里的引用角标：可点，跳到对应原文块 —— */
+.cite {
+  border: 0; background: transparent; color: var(--cinnabar); font: inherit;
+  padding: 0 1px; cursor: pointer; text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+.cite:hover { background: var(--cinnabar-soft); }
+.jump-back {
+  position: fixed; right: 26px; bottom: 26px; z-index: 40;
+  border: 1px solid var(--cinnabar); background: var(--paper-2); color: var(--cinnabar-dark);
+  font-family: var(--fang); font-size: 12px; letter-spacing: 1px;
+  padding: 7px 14px; border-radius: 2px; cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .14);
+}
+.jump-back[hidden] { display: none; }
+.jump-back:hover { background: var(--cinnabar); color: #fff; }
+html[data-theme="dark"] .jump-back { background: #241f18; }
+
+/* —— 术语悬浮卡（A：字形层）—— */
+.term {
+  border-bottom: 1px dashed var(--cinnabar);
+  padding-bottom: 1px;
+  cursor: help;
+}
+.term:hover, .term:focus-visible { background: var(--cinnabar-soft); outline: none; }
+.term-card {
+  position: fixed; z-index: 80; width: max-content; max-width: min(340px, 92vw);
+  padding: 9px 12px 10px; background: var(--paper-2);
+  border: 1px solid var(--line); border-left: 3px solid var(--cinnabar);
+  border-radius: 2px; box-shadow: 0 6px 18px rgba(0, 0, 0, .12);
+  font-family: var(--serif); font-size: 12.5px; line-height: 1.8; color: var(--ink);
+}
+.term-card[hidden] { display: none; }
+.term-card .tc-hd { display: flex; align-items: baseline; gap: 6px; margin-bottom: 4px; }
+.term-card .tc-f { font-family: var(--kai); font-size: 17px; color: var(--ink); }
+.term-card .tc-k { font-size: 10.5px; color: var(--cinnabar-dark); letter-spacing: 1px; }
+.term-card .tc-row { color: var(--ink-soft); }
+.term-card .tc-row b { font-weight: 600; color: var(--ink); }
+.term-card .tc-src {
+  margin-top: 5px; padding-top: 5px; border-top: 1px dashed var(--line-soft);
+  font-size: 11px; color: var(--muted);
+}
+html[data-theme="dark"] .term-card { background: #241f18; }
+
+/* —— 指标带：把实测数字提到首屏 —— */
+.metric-strip {
+  display: flex; align-items: center; flex-wrap: wrap;
+  margin: 10px 24px 0; padding: 7px 2px;
+  border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft);
+  font-size: 12px; color: var(--ink-soft);
+}
+.metric-strip .ms-item {
+  display: flex; align-items: baseline; gap: 5px;
+  padding: 0 14px; border-left: 1px solid var(--line-soft);
+}
+.metric-strip .ms-item:first-child { border-left: 0; padding-left: 2px; }
+.metric-strip .ms-l { font-family: var(--kai); letter-spacing: 1px; color: var(--muted); }
+.metric-strip .ms-v {
+  font-family: var(--serif); font-weight: 700; font-size: 13.5px;
+  font-variant-numeric: tabular-nums; color: var(--ink);
+}
+.metric-strip .ms-t { font-size: 10.5px; color: var(--muted); }
+.metric-strip .ms-t.ms-ok, .metric-strip .ms-t.ms-bad { color: var(--ink-soft); }
+.metric-strip .ms-t.ms-ok::before,
+.metric-strip .ms-t.ms-bad::before {
+  content: ""; display: inline-block; width: 6px; height: 6px;
+  border-radius: 50%; margin-right: 4px; vertical-align: 1px;
+}
+.metric-strip .ms-t.ms-ok::before { background: var(--qing); }
+.metric-strip .ms-t.ms-bad::before { background: var(--cinnabar); }
+.metric-strip .ms-more {
+  margin-left: auto; padding-right: 2px; font-family: var(--serif);
+  font-size: 11px; color: var(--muted); text-decoration: none;
+  border-bottom: 1px solid var(--line-soft);
+}
+.metric-strip .ms-more:hover { color: var(--cinnabar-dark); border-bottom-color: var(--cinnabar); }
+@media (max-width: 860px) {
+  .metric-strip { margin-inline: 12px; padding: 6px 0; row-gap: 4px; }
+  .metric-strip .ms-item { padding: 0 9px; }
+  .metric-strip .ms-more { margin-left: 0; }
+}
+html[data-theme="dark"] .metric-strip .ms-v { color: #f1e6cf; }
+html[data-theme="dark"] .metric-strip .ms-t.ms-ok::before { background: #6fa8a0; }
+
+/* —— 指标墙（C）：大号宋体数字 + 细线分栏 —— */
   .metrics { margin-block: 24px 0; }
   .metrics-head { border-top: 1px solid var(--gold); padding-top: 16px; gap: 16px; }
   .metrics-head h2 { font-family: var(--kai); font-size: 18px; letter-spacing: 3px; font-weight: 400; }
@@ -1190,6 +1346,28 @@
   <span class="grow" id="bannerText">本系统为赛事研发原型，所有内容不构成诊断、用药或治疗建议，不得用于临床决策。</span>
 </div>
 
+<div class="metric-strip" id="metricStrip" aria-label="实测指标" hidden></div>
+
+<div class="term-card" id="termCard" role="tooltip" hidden></div>
+
+<!-- 使用须知：首次进入弹一次（localStorage 记住），页脚「使用须知」可重看 -->
+<div class="notice" id="notice" hidden>
+  <div class="notice-card" role="dialog" aria-modal="true" aria-labelledby="noticeTitle">
+    <span class="notice-seal" aria-hidden="true">须知</span>
+    <h3 id="noticeTitle">使用须知</h3>
+    <ol>
+      <li><b>只认原文</b>：回答依据所收古籍的原文、页码与行号；库中没有依据时如实拒答，不做推断。演示页上的方剂表与实体均标了来源，可点回原图核对。</li>
+      <li><b>非诊疗</b>：全部内容仅供参考，不构成诊断、用药或处方建议；身体不适请及时就医，不要据此自行服药。</li>
+      <li><b>识别有误差</b>：古籍为扫描件识别结果，个别字符可能有误；评测数据为<strong>合成示意</strong>，非命题单位样本，不得外传。</li>
+    </ol>
+    <button type="button" class="notice-ok" id="noticeOk">我已知悉</button>
+  </div>
+</div>
+
+<button type="button" class="jump-back" id="jumpBack" hidden>↩ 回到答案</button>
+
+
+
 <!-- 智能问答首页入口横幅 -->
 <div class="home-banner">
   <div class="home-banner-inner">
@@ -1294,7 +1472,7 @@
           <h2>方剂表还原 <span class="badge gray" id="tableCount">0</span></h2>
           <p class="hint" style="margin:0">正文按方剂分表，原书规整表保留原有行列。点击方名、药材或剂量可核对原图与 OCR；待核和原文未载如有上下文，可点击查看相关位置。</p>
         </div>
-        <span class="badge gray" id="tableSrc">—</span>
+        <div class="row"><button type="button" class="btn sm" id="btnExportTables" title="导出本页方剂表（CSV，Excel 可直接打开）">导出 CSV</button><span class="badge gray" id="tableSrc">—</span></div>
       </div>
       <div id="formulaContinuation" class="formula-continuation" hidden></div>
       <div class="tbl-tabs" id="tableTabs" hidden></div>
@@ -1322,7 +1500,8 @@
         <div class="block-list" id="blockList"></div>
       </div>
       <div class="card">
-        <h2>结构化抽取</h2>
+        <div class="row" style="justify-content:space-between;align-items:baseline"><h2>结构化抽取</h2>
+          <button type="button" class="btn sm" id="btnExportStruct" title="导出本页 OCR 文本块、实体、三元组、方剂表与审计记录（JSON）">导出 JSON</button></div>
         <p class="hint">实体与三元组由 <code>extract/rules.py</code> 的确定性规则产出（词典 + 模式，未接入 LLM）；每个对象都带 page_id / bbox / line_id / quote / source_hash，<code>is_demo</code> 从页面透传。</p>
         <h3>实体 <span class="badge gray" id="entCount">0</span></h3>
         <label class="row entity-filter">实体类型
@@ -1343,7 +1522,7 @@
       <div class="row" style="justify-content:space-between">
         <div><h2>步骤三 · 知识图谱可视化</h2>
           <p class="hint" style="margin:0" id="graphHint">原生 Canvas 力导向图，零 CDN、零外部依赖；点击节点查看出处。</p></div>
-        <div class="row"><span class="badge" id="graphBadge" style="display:none"></span><button class="btn sm" id="btnReloadGraph">重新载入</button><button class="btn sm" id="btnNext3">下一步：可溯源问答</button></div>
+        <div class="row"><span class="badge" id="graphBadge" style="display:none"></span><button type="button" class="btn sm" id="btnExportGraphJson" title="导出本页图谱节点与边（JSON）">导出 JSON</button><button type="button" class="btn sm" id="btnExportGraphPng" title="导出图谱画布（PNG）">导出 PNG</button><button class="btn sm" id="btnReloadGraph">重新载入</button><button class="btn sm" id="btnNext3">下一步：可溯源问答</button></div>
       </div>
     </div>
     <div class="grid two" style="margin-top:16px">
@@ -1449,13 +1628,31 @@
   <div class="metrics-head">
     <h2 id="metricsTitle">评测概览</h2>
     <p id="metricsScope">合成示意集 · 工程自测 · 非命题单位样本 · 非官方评测结果</p>
+    <button type="button" class="btn sm" id="metricsDetailBtn" style="margin-left:auto"
+      title="逐条看每个指标的实测值、阈值与口径">看逐条明细</button>
   </div>
   <div class="mgrid" id="metricsGrid"></div>
   <p class="metric-note" id="metricsNote" role="status">正在读取本地评测明细…</p>
 </section>
 
+<!-- 评测明细抽屉：逐条口径，来自 data/reports/评测明细.json（只读不重算） -->
+<div class="md-wrap" id="metricsDetail" hidden>
+  <div class="md-mask" data-md-close></div>
+  <aside class="md-panel" role="dialog" aria-modal="true" aria-labelledby="mdTitle">
+    <div class="md-head">
+      <h3 id="mdTitle">评测明细</h3>
+      <button type="button" class="md-x" data-md-close aria-label="关闭评测明细">✕</button>
+    </div>
+    <div class="md-body" id="mdBody"></div>
+    <div class="md-foot" id="mdFootNote"></div>
+  </aside>
+</div>
+
+
+
 <footer>
   <b>仅供参考、非诊疗建议</b>。命题单位脱敏样本仅限赛事研发使用。真实扫描页与人工标注均在本地保管。
+ <button type="button" class="notice-open" data-notice-open>使用须知</button>
 </footer>
 <!-- 反馈成功 -->
 <div class="fb-done" id="fbDone" hidden>
@@ -1495,10 +1692,12 @@ async function api(path, opts) {
 function errText(e) {
   const s = e.status, m = e.message || "";
   if (s === 400) return "文件/请求不合法（400）：" + m;
-  if (s === 413) return "文件过大（413）：" + m;
+  if (s === 422) return "参数不完整（422）：" + m;
+  if (s === 413) return m || "文件过大（413）";
   if (s === 404) return "页面不存在（404）：" + m;
-  if (s === 503) return "OCR 不可用（503）：" + m;
+  if (s === 503) return m || "服务暂时不可用（503）";
   if (s === 500) return "服务端异常（500）：" + m;
+  if (s === 429) return m || "操作太快了，稍等再试";
   return "请求失败：" + m;
 }
 // 页头与步骤角标上不再显示这两类冗余标注：
@@ -1538,6 +1737,16 @@ $("btnNext1").onclick = () => goto(2);
 $("btnNext2").onclick = () => goto(3);
 $("btnNext3").onclick = () => goto(4);
 $("btnReloadGraph").onclick = () => loadGraph();
+$("btnExportStruct").onclick = exportStructureJson;
+$("btnExportTables").onclick = exportTablesCsv;
+$("btnExportGraphJson").onclick = exportGraphJson;
+$("btnExportGraphPng").onclick = exportGraphPng;
+$("metricsDetailBtn").onclick = openMetricsDetail;
+document.querySelectorAll("#metricsDetail [data-md-close]").forEach(el => el.onclick = closeMetricsDetail);
+document.addEventListener("keydown", e => {
+  const w = $("metricsDetail");
+  if (e.key === "Escape" && w && !w.hidden) closeMetricsDetail();
+});
 
 /* ---------------- 初始化 ---------------- */
 async function init() {
@@ -1563,6 +1772,7 @@ async function init() {
     $("healthDot").classList.add("on");
     renderChips(m.questions || []);
     await loadPages();
+    await loadTerms();
     // 处理 URL 参数 ?page=PAGE_ID&step=N：自动切换页面并跳到指定步骤（step 可单独使用）
     const params = new URLSearchParams(location.search);
     const urlPage = params.get("page");
@@ -1951,6 +2161,7 @@ async function loadOcr() {
     $("s2sub").textContent = r.is_demo
       ? "示例数据无原图，此处为重排文字框（bbox 来自示例标注）。"
       : "原图 + bbox 叠加：悬停查看识别文本，点击框可查看对应的文本块与溯源字段。";
+    if (TERM.map.size) $("s2sub").textContent += " 朱线虚字可悬停看字形对照（原文不改写）。";
     renderPreview(r.page || {}, r.blocks || []);
     renderBlocks(r.blocks || []);
     renderEntities(r.entities || [], r.triples || []);
@@ -1998,7 +2209,7 @@ function renderPreview(page, blocks) {
 }
 function renderBlocks(blocks) {
   $("blockList").innerHTML = blocks.map((b, i) =>
-    `<div class="block-item" data-i="${i}"><div class="txt">${esc(b.text)}</div>
+    `<div class="block-item" data-i="${i}"><div class="txt">${markTerms(b.text)}</div>
      <div class="meta">${esc(b.line_id)} · 列 ${esc(b.col_id)} · 序 ${esc(b.reading_order)} · ${esc(b.kind)} · conf ${esc(b.conf)}
      · bbox ${esc(fmt(b.bbox))} · ${esc(b.block_ref)}</div></div>`).join("");
   $("blockList").querySelectorAll(".block-item").forEach(el => el.onclick = () => selectBlock(+el.dataset.i));
@@ -2012,7 +2223,7 @@ function selectBlocks(indices) {
   document.querySelectorAll(".bbox, .block-item").forEach(el => el.classList.toggle("sel", keys.has(el.dataset.i)));
   $("blockDetail").innerHTML = picked.map(i => {
     const b = blocks[i];
-    return `<div><b>${esc(b.line_id)} · OCR 原文：</b>${esc(b.text)}<br>` +
+    return `<div><b>${esc(b.line_id)} · OCR 原文：</b>${markTerms(b.text)}<br>` +
       `text_norm：${esc(b.text_norm)} · quote：${esc(b.quote)} · page_id：${esc(b.page_id)} · bbox：${esc(fmt(b.bbox))} · block_ref：${esc(b.block_ref)} · 阅读顺序：${esc(b.reading_order)} · source_hash：${esc(b.source_hash)} · kind/conf：${esc(b.kind)} / ${esc(b.conf)}</div>`;
   }).join("");
 }
@@ -2238,7 +2449,7 @@ function renderOneTable(t, index) {
       const resolved = textTable ? fieldSources(t,r,c) : { indices: [blockIndexOfRef(ref,text)].filter(i=>i>=0), scope: "原文字段" };
       const short = textTable ? (t.cell_refs_multi?.[r]?.[c] || []).map(refShort).join("、") : refShort(ref);
       const label = resolved.indices.length ? (resolved.scope === "配伍上下文" ? "查看上下文 · " : "") + short : "无法定位";
-      return `<td role="button" tabindex="0" class="cell ${resolved.indices.length ? "" : "noloc"}" data-t="${index}" data-r="${r}" data-c="${c}" title="${resolved.indices.length ? "点击核对原图" : "无法核对出处"}"><span class="ctext">${esc(text)}</span><span class="ref ${resolved.indices.length ? "" : "noloc"}">${esc(label)}</span></td>`;
+      return `<td role="button" tabindex="0" class="cell ${resolved.indices.length ? "" : "noloc"}" data-t="${index}" data-r="${r}" data-c="${c}" title="${resolved.indices.length ? "点击核对原图" : "无法核对出处"}"><span class="ctext">${markTerms(text)}</span><span class="ref ${resolved.indices.length ? "" : "noloc"}">${esc(label)}</span></td>`;
     }).join("");
     return `<tr>${textTable ? "" : `<th>行${r+1}</th>`}${cells}</tr>`;
   }).join("");
@@ -2408,6 +2619,86 @@ function drawGraph() {
   };
 }
 
+/* ---------------- 引用角标 → 原文块 ----------------
+   答案里的 [1][2] 是出处序号；点一下跳到步骤二，选中对应的文本块并滚到位。
+   跨页引用会顺带切页（切页时表格与审计会按新页重载），答案本身保留，右下角可点回。
+   定位优先用 line_id，其次 line_span 覆盖的行，最后用引文开头 8 字比对。 */
+S.sources = []; S.evidences = [];
+function linkCites(html, srcs, evs) {
+  srcs = srcs || []; evs = evs || [];
+  const byNum = n => srcs.find(s => Number(s.index) === Number(n)) || evs[Number(n) - 1] || null;
+  let out = String(html);
+  // 演示页的答案按「【出处】页 / 行」标注，没有 [n]；先把这种也能点
+  out = out.replace(/(<[^>]+>)|【出处】\s*([^\s<>。，]+)\s*\/\s*([^\s<>。，]+)/g,
+    (m, tag, page, line) => {
+      if (tag) return tag;
+      return '<button type="button" class="cite" data-page="' + page + '" data-line="' + line +
+        '" title="点这里跳到这条出处对应的原文块">【出处】' + page + " / " + line + "</button>";
+    });
+  out = out.replace(/(<[^>]+>)|\[(\d{1,2})\]/g, (m, tag, num) => {
+    if (tag) return tag;
+    const n = Number(num);
+    return byNum(n)
+      ? '<button type="button" class="cite" data-n="' + n +
+        '" title="点这里跳到这条出处对应的原文块">[' + n + "]</button>"
+      : m;
+  });
+  return out;
+}
+function findBlockIndex(blocks, src) {
+  const lid = String(src.line_id || "");
+  const span = String(src.line_span || "");
+  const quote = String(src.quote || "").replace(/\s+/g, "");
+  let i = blocks.findIndex(b => String(b.line_id || "") === lid);
+  if (i >= 0) return i;
+  if (span) {
+    i = blocks.findIndex(b => b.line_id && span.indexOf(String(b.line_id)) >= 0);
+    if (i >= 0) return i;
+  }
+  if (quote) {
+    const head = quote.slice(0, 8);
+    i = blocks.findIndex(b => String(b.quote || "").replace(/\s+/g, "").slice(0, 8) === head);
+  }
+  return i;
+}
+function waitOcr(pid, timeout) {
+  return new Promise(resolve => {
+    const t0 = Date.now();
+    (function poll() {
+      const cur = S.ocr && S.ocr.page ? S.ocr.page.page_id : "";
+      if (cur === pid || Date.now() - t0 > (timeout || 8000)) return resolve(cur === pid);
+      setTimeout(poll, 120);
+    })();
+  });
+}
+function citationTarget(n) {
+  return (S.sources || []).find(s => Number(s.index) === Number(n))
+    || (S.evidences || [])[Number(n) - 1] || null;
+}
+async function jumpToSource(src) {
+  if (!src) { toast("这条出处没有可定位的原文"); return; }
+  const pid = src.page_id || S.pageId;
+  if (!pid) { toast("这条引用没有页码，无法定位"); return; }
+  if (pid !== S.pageId) {                        // 轻量切页：保住答案，goto(2) 时表格与审计会按新页重载
+    S.pageId = pid; S.ocr = null; S.pendingHighlight = null;
+    try { recordRecent(pid); } catch (e) {}
+    loadPages();
+  }
+  goto(2);
+  const ok = await waitOcr(pid);
+  if (!ok) { toast("这一页还没加载出来，稍后再点一次"); return; }
+  const blocks = (S.ocr && S.ocr.blocks) || [];
+  const i = findBlockIndex(blocks, src);
+  if (i < 0) { toast("原文块里没找到这条出处，可能跨页引用"); return; }
+  selectBlocks([i]);
+  const bb = document.querySelector('.bbox[data-i="' + i + '"]');
+  const item = document.querySelector('.block-item[data-i="' + i + '"]');
+  (bb || item)?.scrollIntoView({ block: "center", behavior: "smooth" });
+  const back = $("jumpBack");
+  if (back) back.hidden = false;
+  toast("已定位到 " + (src.line_span || src.line_id || "") + " 的原文块；右下角可回答案");
+}
+
 /* ---------------- 步骤四：问答 ---------------- */
 function clearAnswer(message) {
   $("answerBox").textContent = message || "已切换页面：问答按当前页生效，请重新提问。";
@@ -2417,6 +2708,13 @@ function clearAnswer(message) {
   $("traceBox").textContent = "（暂无）";
 }
 $("btnAsk").onclick = () => { const q = $("qInput").value.trim(); if (q) ask(q); };
+$("answerBox").addEventListener("click", e => {
+  const b = e.target.closest(".cite");
+  if (!b) return;
+  if (b.dataset.n) jumpToSource(citationTarget(+b.dataset.n));
+  else if (b.dataset.page) jumpToSource({ page_id: b.dataset.page, line_id: b.dataset.line });
+});
+$("jumpBack").onclick = () => { goto(4); $("jumpBack").hidden = true; };
 $("qInput").addEventListener("keydown", e => { if (e.key === "Enter") $("btnAsk").click(); });
 async function ask(q) {
   $("answerBox").textContent = "检索中…"; $("evList").innerHTML = ""; $("objList").innerHTML = "";
@@ -2426,7 +2724,9 @@ async function ask(q) {
       body: JSON.stringify({ question: q, page_id: S.pageId })
     });
     const box = $("answerBox");
-    box.textContent = r.text;
+    S.sources = r.sources || [];
+    S.evidences = r.evidences || [];
+    box.innerHTML = linkCites(markTerms(r.text), S.sources, S.evidences);
     box.classList.toggle("refused", !!r.refused);
     if (r.badge) {
       setBadge($("demoChip"), r);
@@ -2470,7 +2770,7 @@ async function ask(q) {
     const srcCards = srcs.length ? srcs.map(s => {
       const tag = s.cited ? "答案引用" : "备选出处";
       return `<div class="ev-card" data-line="${esc(s.line_id)}" data-page="${esc(s.page_id)}" style="cursor:pointer" title="点击定位到步骤二的原文块">
-       <div class="q">[${s.index}] 「${esc(s.quote)}」<span class="ev-badge">${tag}</span></div>
+       <div class="q">[${s.index}] 「${markTerms(s.quote)}」<span class="ev-badge">${tag}</span></div>
        <div class="loc">出处：《${esc(s.book)}》 ${esc(s.page_id)} · ${esc(s.line_span || s.line_id)}<br>
        相似度: ${Number(s.score || 0).toFixed(2)} · bbox: ${esc(fmt(s.bbox))} · source_hash: ${esc(s.source_hash)}<br>
        <span style="color:var(--ink)">点击此卡片可高亮对应原文块</span></div></div>`;
@@ -2480,7 +2780,7 @@ async function ask(q) {
       const role = e.role === "subject" ? "主体引文" : (isGraph ? "关系引文" : "文本证据");
       const badge = `<span class="ev-badge ${e.role === "subject" ? "subj" : (isGraph ? "rel" : "")}">${role}</span>`;
       return `<div class="ev-card" data-line="${esc(e.line_id)}" data-page="${esc(e.page_id)}" style="cursor:pointer" title="点击定位到步骤二的原文块">
-       <div class="q">[${i + 1}] 「${esc(e.quote)}」${badge}</div>
+       <div class="q">[${i + 1}] 「${markTerms(e.quote)}」${badge}</div>
        <div class="loc">page_id: ${esc(e.page_id)} · line_id: ${esc(e.line_id)} · bbox: ${esc(fmt(e.bbox))}<br>
        检索得分: ${esc(e.score)} · 通道: ${esc(e.channel)}${isGraph ? " · 角色: " + role : ""} · block_ref: ${esc(e.block_ref)}<br>
        source_hash: ${esc(e.source_hash)}<br><span style="color:var(--ink)">点击此卡片可高亮对应原文块</span></div></div>`;
@@ -2499,12 +2799,284 @@ async function ask(q) {
   }
 }
 
+/* ---------------- 评测明细抽屉 ----------------
+   点「看逐条明细」拉开右侧抽屉：每个指标的实测值、阈值、判定与口径，
+   外加两项参考值（异体字命中率、修正前 F1）和数据规模、复现命令。
+   数据只读 /api/metrics（即 data/reports/评测明细.json），页面不重算。 */
+function mdValue(v, key) {
+  if (v == null) return "—";
+  const n = Number(v);
+  if (!isFinite(n)) return String(v);
+  return (Math.abs(n) <= 1.5) ? n.toFixed(4) : String(n);
+}
+async function openMetricsDetail() {
+  const wrap = $("metricsDetail");
+  if (!wrap) return;
+  wrap.hidden = false;
+  document.body.classList.add("md-open");
+  $("mdBody").innerHTML = '<p class="empty">正在读取本地评测明细…</p>';
+  try {
+    const d = await api("/api/metrics");
+    if (!d.available) {
+      $("mdBody").innerHTML = '<p class="empty">' + esc(d.notice || "尚无评测明细") +
+        '：先运行 <code>python eval/run_all.py</code></p>';
+      $("mdFootNote").textContent = "";
+      return;
+    }
+    const items = d.items || [], extras = d.extras || [], cnt = d.counts || {};
+    const row = it => "<tr><td>" + esc(it.label) + '</td><td class="num">' + mdValue(it.value, it.key) +
+      '</td><td class="num">' + (it.threshold == null ? "—" : mdValue(it.threshold, it.key)) +
+      "</td><td>" + esc(it.judge || it.status || "—") + '</td><td class="note">' + esc(it.detail || "") + "</td></tr>";
+    const extraRows = extras.map(e => "<tr><td>" + esc(e.label) + '</td><td class="num">' + mdValue(e.value, e.key) +
+      '</td><td class="note">' + esc(e.note || "") + (e.detail ? " · " + esc(e.detail) : "") + "</td></tr>").join("");
+    $("mdBody").innerHTML =
+      '<table class="md-table"><thead><tr><th>指标</th><th>实测</th><th>阈值</th><th>判定</th><th>口径</th></tr></thead><tbody>' +
+      items.map(row).join("") + "</tbody></table>" +
+      (extras.length
+        ? '<h4>参考项（不计入达标判定）</h4><table class="md-table"><thead><tr><th>指标</th><th>实测</th><th>说明</th></tr></thead><tbody>' +
+          extraRows + "</tbody></table>"
+        : "") +
+      '<h4>数据规模与口径</h4><ul class="md-facts">' +
+      "<li>测试页 " + esc(d.test_pages == null ? "—" : d.test_pages) + " / 全书 " +
+        esc(d.pages_total == null ? "—" : d.pages_total) + " 页" + (d.test_only ? "（仅测试划分）" : "") +
+        "；生成于 " + esc(d.generated_at || "—") + "</li>" +
+      "<li>文本块 " + esc(cnt.ocr == null ? "—" : cnt.ocr) + " · 实体 " + esc(cnt.entities == null ? "—" : cnt.entities) +
+        " · 关系 " + esc(cnt.relations == null ? "—" : cnt.relations) + " · 方剂表 " + esc(cnt.tables == null ? "—" : cnt.tables) +
+        " · 有据问答 " + esc(cnt.qa_gold == null ? "—" : cnt.qa_gold) + " · 无据问题 " +
+        esc(cnt.qa_no_evidence == null ? "—" : cnt.qa_no_evidence) + "</li>" +
+      "<li>真值版本 <code>" + esc(d.gt_version || "—") + "</code></li>" +
+      "<li>复现：<code>" + esc(d.reproduce || "python eval/run_all.py") + "</code></li>" +
+      "</ul>" +
+      (d.notice ? '<p class="md-notice">' + esc(d.notice) + "</p>" : "");
+    $("mdFootNote").textContent = "明细来自 data/reports/评测明细.json；页面只读不重算，口径与 qa/generate.py 一致。";
+  } catch (e) {
+    $("mdBody").innerHTML = '<p class="empty">读取失败：' + esc(e.message) + "</p>";
+    $("mdFootNote").textContent = "";
+  }
+}
+function closeMetricsDetail() {
+  const wrap = $("metricsDetail");
+  if (!wrap) return;
+  wrap.hidden = true;
+  document.body.classList.remove("md-open");
+}
+
+/* ---------------- 导出（纯前端，不新增后端接口） ----------------
+   三处导出都直接读页面已加载的数据（S.ocr / S.tables / S.graph），
+   不重新请求、不改后端；CSV 带 BOM，Excel 直接打开不乱码。 */
+function downloadFile(name, content, mime) {
+  const blob = new Blob([content], { type: mime || "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+function csvText(rows) {
+  const cell = v => {
+    const s = String(v == null ? "" : v);
+    return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  return "\ufeff" + rows.map(r => r.map(cell).join(",")).join("\r\n");
+}
+function exportStamp() {
+  const d = new Date(), p = n => String(n).padStart(2, "0");
+  return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + "-" + p(d.getHours()) + p(d.getMinutes());
+}
+function exportStructureJson() {
+  const o = S.ocr;
+  if (!o || !(o.blocks || []).length) { toast("先加载一页古籍再导出"); return; }
+  const pid = (o.page && o.page.page_id) || S.pageId || "page";
+  const payload = {
+    page_id: pid,
+    exported_at: new Date().toISOString(),
+    source: { engine: o.engine || null, rec_model: o.rec_model || null, is_demo: !!o.is_demo,
+              note: "结构由确定性规则抽取，仅用于演示与工程自测" },
+    page: o.page || null,
+    blocks: o.blocks || [],
+    entities: o.entities || [],
+    triples: o.triples || [],
+    tables: (S.tables || []).map(x => x.t),
+    audit_unconfirmed: S.audit || [],
+  };
+  downloadFile("TCM_" + pid + "_结构化_" + exportStamp() + ".json", JSON.stringify(payload, null, 2), "application/json;charset=utf-8");
+  toast("已导出本页结构化结果（JSON）");
+}
+function exportTablesCsv() {
+  // 表格在 OCR 载荷的 tables 里；S.tables 是渲染用的包装，行数据以 S.ocr.tables 为准
+  const list = (S.ocr && Array.isArray(S.ocr.tables) && S.ocr.tables.length)
+    ? S.ocr.tables
+    : (S.tables || []).map(x => x.t).filter(Boolean);
+  if (!list.length) { toast("当前页没有方剂表可导出"); return; }
+  const rows = [["表序", "表类型", "行", "列", "内容", "出处"]];
+  list.forEach((t, ti) => {
+    (t.rows || []).forEach((row, ri) => {
+      (row || []).forEach((cell, ci) => {
+        const ref = (t.cell_refs && t.cell_refs[ri] && t.cell_refs[ri][ci]) || "";
+        const multi = (t.cell_refs_multi && t.cell_refs_multi[ri] && t.cell_refs_multi[ri][ci]) || [];
+        rows.push([ti + 1, t.source_type || "", ri + 1, ci + 1, cell, ref || multi.join("、")]);
+      });
+    });
+  });
+  downloadFile("TCM_" + (S.pageId || "page") + "_方剂表_" + exportStamp() + ".csv", csvText(rows), "text/csv;charset=utf-8");
+  toast("已导出方剂表（CSV）");
+}
+function exportGraphJson() {
+  const g = S.graph;
+  if (!g) { toast("先载入图谱再导出"); return; }
+  const payload = {
+    page_id: S.pageId || "page",
+    exported_at: new Date().toISOString(),
+    badge: g.badge || "",
+    stats: { nodes: (g.nodes || []).length, links: (g.links || []).length },
+    nodes: g.nodes || [],
+    links: g.links || [],
+  };
+  downloadFile("TCM_" + (S.pageId || "page") + "_图谱_" + exportStamp() + ".json", JSON.stringify(payload, null, 2), "application/json;charset=utf-8");
+  toast("已导出图谱（JSON）");
+}
+function exportGraphPng() {
+  const cv = $("graphCanvas");
+  if (!cv || !cv.width || !S.nodes.length) { toast("先载入图谱再导出"); return; }
+  const a = document.createElement("a");
+  a.href = cv.toDataURL("image/png");
+  a.download = "TCM_" + (S.pageId || "page") + "_图谱_" + exportStamp() + ".png";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  toast("已导出图谱（PNG）");
+}
+
+/* ---------------- 术语悬浮卡（A：字形层）----------------
+   数据来自 GET /api/lexicon/variants（data/lexicon/异体字表.json：繁简 / 异体 / 通假）。
+   只做「原文形 → 正字」的对照展示：不改写原文、不动抽取结果；悬停或聚焦即可看依据与置信。 */
+const TERM = { map: new Map(), lens: [], meta: { version: "", confidence: {} } };
+async function loadTerms() {
+  try {
+    const r = await api("/api/lexicon/variants");
+    (r.entries || []).forEach(e => { if (e && e.from && e.to) TERM.map.set(e.from, e); });
+    TERM.lens = [...new Set((r.entries || []).map(e => e.from.length))].sort((a, b) => b - a);
+    TERM.meta = { version: r.version || "", confidence: r.confidence || {} };
+  } catch (e) { /* 词表拿不到就退回纯文本：不提示、不打断演示 */ }
+}
+function markTerms(raw) {
+  const s = String(raw == null ? "" : raw);
+  if (!TERM.map.size) return esc(s);
+  let out = "", plain = "", i = 0;
+  const flush = () => { if (plain) { out += esc(plain); plain = ""; } };
+  while (i < s.length) {
+    let hit = null;
+    for (const L of TERM.lens) {
+      if (L < 2) continue;                       // 单字条目不标：古籍里单字误标率高
+      if (i + L > s.length) continue;
+      const seg = s.slice(i, i + L), e = TERM.map.get(seg);
+      if (e) { hit = { seg, e, L }; break; }
+    }
+    if (hit) {
+      flush();
+      const tip = hit.e.kind + "：" + hit.seg + " → " + hit.e.to +
+        "（异体字表 " + (TERM.meta.version || "") + "）";
+      out += '<span class="term" tabindex="0" title="' + esc(tip) +
+        '" data-f="' + esc(hit.seg) + '" data-t="' + esc(hit.e.to) +
+        '" data-k="' + esc(hit.e.kind) + '" data-c="' + esc(hit.e.confidence || "") +
+        '">' + esc(hit.seg) + "</span>";
+      i += hit.L;
+    } else { plain += s[i]; i += 1; }
+  }
+  flush();
+  return out;
+}
+function termCardShow(el) {
+  const card = $("termCard");
+  if (!card || !el) return;
+  const kind = el.dataset.k || "", conf = el.dataset.c || "";
+  card.innerHTML =
+    '<div class="tc-hd"><span class="tc-f">' + esc(el.dataset.f) + "</span>" +
+    '<span class="tc-k">' + esc(kind) + "</span></div>" +
+    '<div class="tc-row">正字：<b>' + esc(el.dataset.t) + "</b></div>" +
+    '<div class="tc-src">依据：异体字表 ' + esc(TERM.meta.version || "") +
+    (conf ? " · 置信 " + esc(conf) : "") + " · 原文不改写，仅叠加对照</div>";
+  card.hidden = false;
+  const r = el.getBoundingClientRect(), c = card.getBoundingClientRect();
+  let top = r.top - c.height - 8;
+  if (top < 8) top = r.bottom + 8;
+  let left = r.left + r.width / 2 - c.width / 2;
+  left = Math.max(8, Math.min(left, window.innerWidth - c.width - 8));
+  card.style.top = Math.round(top) + "px";
+  card.style.left = Math.round(left) + "px";
+}
+function termCardHide() { const c = $("termCard"); if (c) c.hidden = true; }
+document.addEventListener("pointerover", e => {
+  const t = e.target.closest && e.target.closest(".term");
+  if (t) termCardShow(t);
+});
+document.addEventListener("pointerout", e => {
+  const t = e.target.closest && e.target.closest(".term");
+  if (t) termCardHide();
+});
+document.addEventListener("focusin", e => {
+  const t = e.target.closest && e.target.closest(".term");
+  if (t) termCardShow(t);
+});
+document.addEventListener("focusout", e => {
+  if (e.target.closest && e.target.closest(".term")) termCardHide();
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape") termCardHide(); });
+window.addEventListener("scroll", termCardHide, { passive: true });
+
+/* 指标带：首屏就能看到四项实测与阈值；口径在页末「评测概览」 */
+const STRIP_KEYS = { field_f1: "字段F1", table_structure: "表格还原",
+                     traceability: "可溯源", refusal: "无依据拒答", answer_rate: "应答题" };
+function renderMetricStrip(items) {
+  const strip = $("metricStrip");
+  if (!strip) return;
+  const picked = (items || []).filter(m => STRIP_KEYS[m.key]);
+  if (!picked.length) { strip.hidden = true; return; }
+  strip.replaceChildren(...picked.map(metric => {
+    const item = document.createElement("span");
+    item.className = "ms-item";
+    const label = document.createElement("span");
+    label.className = "ms-l";
+    label.textContent = STRIP_KEYS[metric.key];
+    const value = document.createElement("b");
+    value.className = "ms-v";
+    value.textContent = Number.isFinite(metric.value) ? metric.value.toFixed(3) : "—";
+    item.append(label, value);
+    if (Number.isFinite(metric.threshold)) {
+      const th = document.createElement("span");
+      const ok = metric.judge === "达标";
+      const bad = metric.judge === "未达标";
+      th.className = "ms-t" + (ok ? " ms-ok" : bad ? " ms-bad" : "");
+      th.textContent = (metric.better === "lower" ? "≤ " : "≥ ") + metric.threshold.toFixed(2) +
+                       (metric.judge ? " " + metric.judge : "");
+      item.append(th);
+    } else if (metric.judge) {
+      const th = document.createElement("span");
+      th.className = "ms-t";
+      th.textContent = metric.judge;
+      item.append(th);
+    }
+    if (metric.detail) item.title = metric.detail;
+    return item;
+  }));
+  const more = document.createElement("a");
+  more.className = "ms-more";
+  more.href = "#metricsTitle";
+  more.textContent = "口径与明细 ↓";
+  strip.append(more);
+  strip.hidden = false;
+}
+
 async function loadMetrics() {
   const note = $("metricsNote");
   try {
     const report = await api("/api/metrics");
     if (!report.available) {
       note.textContent = report.notice;
+      $("metricStrip").hidden = true;
       return;
     }
 
@@ -2536,6 +3108,7 @@ async function loadMetrics() {
       return card;
     });
     $("metricsGrid").replaceChildren(...cards);
+    renderMetricStrip(report.items);
     const scope = [report.notice || $("metricsScope").textContent];
     if (report.test_only === true && Number.isInteger(report.test_pages)) {
       scope.push("计分范围：测试集 " + report.test_pages + " 页");
@@ -3078,6 +3651,34 @@ loadMetrics();
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();
+})();
+</script>
+<script>
+/* 使用须知：同一浏览器只弹一次；页脚「使用须知」或 ?notice=1 可重看 */
+(function () {
+  var KEY = "tcm.notice.v1";
+  var box = document.getElementById("notice");
+  if (!box) return;
+  var seen = false;
+  try { seen = localStorage.getItem(KEY) === "1"; } catch (e) {}
+  function show() { box.hidden = false; document.body.classList.add("notice-open"); }
+  function hide() {
+    box.hidden = true;
+    document.body.classList.remove("notice-open");
+    try { localStorage.setItem(KEY, "1"); } catch (e) {}
+    var ok = document.getElementById("noticeOk");
+    if (ok) try { ok.focus(); } catch (e) {}
+  }
+  if (!seen || /(?:^|[?&])notice=1(?:&|$)/.test(location.search)) setTimeout(show, 380);
+  var okBtn = document.getElementById("noticeOk");
+  if (okBtn) okBtn.onclick = hide;
+  box.addEventListener("click", function (e) { if (e.target === box) hide(); });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && !box.hidden) hide();
+  });
+  document.querySelectorAll("[data-notice-open]").forEach(function (el) {
+    el.onclick = function (ev) { ev.preventDefault(); show(); };
+  });
 })();
 </script>
 </body>
