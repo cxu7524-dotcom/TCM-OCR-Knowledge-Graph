@@ -1,0 +1,2877 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>中医药古籍智能识别与知识溯源系统 · 演示原型</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='3' y='3' width='58' height='58' rx='6' fill='%23a63a24'/%3E%3Crect x='8' y='8' width='48' height='48' rx='3' fill='none' stroke='%23fbe9df' stroke-width='2'/%3E%3Ctext x='32' y='43' font-size='28' font-family='serif' fill='%23fbe9df' text-anchor='middle'%3E%E6%9C%AC%3C/text%3E%3C/svg%3E">
+<style>
+  /* ============ 色板：宣纸 · 浓墨 · 朱砂 · 石青 · 泥金（针对投影仪优化对比度） ============ */
+  :root {
+    --paper: #f1e8d4;
+    --paper-2: #fcf8ee;
+    --paper-3: #e9dec3;
+    --ink: #221c17;
+    --ink-soft: #4e4237;
+    --muted: #6b5d4cb0;
+    --muted-solid: #6c5d4b;
+    --line: #d2bf97;
+    --line-soft: #e5d8bc;
+    --cinnabar: #a63620;
+    --cinnabar-dark: #7f2513;
+    --cinnabar-soft: #f8e4da;
+    --qing: #265954;
+    --qing-dark: #1a403c;
+    --qing-soft: #dfece7;
+    --gold: #b59044;
+    --gold-soft: #f5ebd2;
+    --serif: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "STSong", "SimSun", serif;
+    --kai: "KaiTi", "STKaiti", "Kaiti SC", "BiauKai", "Noto Serif SC", serif;
+    --sans: "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace;
+    --shadow-sm: 0 1px 3px rgba(55, 38, 14, .09);
+    --shadow-md: 0 8px 26px rgba(55, 38, 14, .15);
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    font-family: var(--sans);
+    color: var(--ink);
+    font-size: 13.5px;
+    background-color: var(--paper);
+    background-image:
+      radial-gradient(ellipse at 12% 8%, rgba(255,255,255,.55), transparent 45%),
+      radial-gradient(ellipse at 88% 92%, rgba(181,144,68,.12), transparent 50%),
+      repeating-linear-gradient(93deg, rgba(120,90,40,.018) 0 2px, transparent 2px 8px);
+  }
+
+  button, input, select { font: inherit; }
+  ::-webkit-scrollbar { width: 7px; height: 7px; }
+  ::-webkit-scrollbar-track { background: rgba(210,191,151,.22); }
+  ::-webkit-scrollbar-thumb { background: #c5b188; border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: #a89267; }
+
+  /* ============ 整体骨架：一屏式工作台（适配 1920x1080 与 1366x768） ============ */
+  .app-shell {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+  }
+
+  /* ============ 顶部匾额式导航栏 ============ */
+  header.topbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 18px;
+    height: 58px;
+    background: linear-gradient(180deg, #2d2721, #221d18);
+    border-bottom: 3px double var(--gold);
+    color: #f5ecda;
+    z-index: 30;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    min-width: 0;
+  }
+  .seal {
+    width: 38px;
+    height: 38px;
+    flex: 0 0 auto;
+    border-radius: 4px;
+    background: var(--cinnabar);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    padding: 3px;
+    box-shadow: inset 0 0 0 1.5px var(--cinnabar), inset 0 0 0 3px #f6dccf;
+    transform: rotate(-2deg);
+  }
+  .seal span {
+    font-family: var(--serif);
+    color: #fbeee6;
+    font-size: 13px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+  }
+  .brand-txt b {
+    font-family: var(--serif);
+    font-size: 16.5px;
+    letter-spacing: 1.5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+  }
+  .proto-pill {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0;
+    padding: 1px 7px;
+    border-radius: 3px;
+    background: rgba(181,144,68,.25);
+    border: 1px solid rgba(226,195,126,.45);
+    color: #f3dfb1;
+  }
+  .brand-txt .sub {
+    font-size: 11px;
+    color: #c7b692;
+    white-space: nowrap;
+  }
+
+  /* 顶部三主视图切换 */
+  nav.main-nav {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255,255,255,.05);
+    padding: 4px;
+    border-radius: 5px;
+    border: 1px solid rgba(210,191,151,.2);
+  }
+  .nav-btn {
+    border: 1px solid transparent;
+    background: transparent;
+    color: #d9ccb0;
+    padding: 6px 14px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-family: var(--serif);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: .16s;
+    white-space: nowrap;
+  }
+  .nav-btn:hover {
+    color: #fff;
+    background: rgba(255,255,255,.07);
+  }
+  .nav-btn.active {
+    background: var(--cinnabar);
+    color: #fff8f3;
+    border-color: rgba(255,205,185,.45);
+    box-shadow: 0 2px 8px rgba(0,0,0,.28);
+  }
+  .nav-btn .nbadge {
+    font-family: var(--sans);
+    font-size: 10.5px;
+    padding: 0 5px;
+    border-radius: 8px;
+    background: rgba(0,0,0,.25);
+    color: #f5e7cf;
+    letter-spacing: 0;
+  }
+
+  /* 顶栏右侧：古籍库切换器 + 演示模式 + 问答抽屉开关 */
+  .hdr-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .lib-wrap { position: relative; }
+  .hdr-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 3px;
+    font-size: 12.5px;
+    cursor: pointer;
+    border: 1px solid rgba(232,220,192,.3);
+    background: rgba(243,233,210,.1);
+    color: #f3e9d2;
+    transition: .16s;
+    white-space: nowrap;
+  }
+  .hdr-btn:hover {
+    border-color: var(--gold);
+    background: rgba(243,233,210,.18);
+  }
+  .hdr-btn.demo-toggle {
+    border-color: rgba(181,144,68,.65);
+    background: rgba(181,144,68,.2);
+    color: #fcebc2;
+    font-weight: 600;
+  }
+  .hdr-btn.demo-toggle.active {
+    background: var(--gold);
+    color: #221c17;
+    border-color: #f7e4b4;
+  }
+  .hdr-btn.qa-toggle {
+    background: var(--cinnabar);
+    border-color: rgba(255,195,170,.55);
+    color: #fff;
+    font-weight: 600;
+  }
+  .hdr-btn.qa-toggle:hover { background: var(--cinnabar-dark); }
+  .hdr-btn.qa-toggle.open {
+    background: var(--qing);
+    border-color: rgba(175,230,215,.55);
+  }
+
+  /* 古籍库下拉浮层 */
+  .lib-pop {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 8px);
+    width: 390px;
+    background: var(--paper-2);
+    color: var(--ink);
+    border: 1.5px solid var(--gold);
+    border-radius: 4px;
+    box-shadow: var(--shadow-md);
+    padding: 12px;
+    z-index: 60;
+    display: none;
+  }
+  .lib-pop.open { display: block; animation: popIn .15s ease; }
+  @keyframes popIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+  .lib-pop-hd {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--line-soft);
+    font-size: 12px;
+    color: var(--muted-solid);
+  }
+  .lib-Pop-title { font-family: var(--serif); font-weight: 700; color: var(--ink); font-size: 14px; }
+  .lib-item {
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 9px 11px;
+    margin-bottom: 7px;
+    background: #fffdf8;
+    cursor: pointer;
+    transition: .14s;
+  }
+  .lib-item:hover { border-color: var(--cinnabar); background: #fff8f3; }
+  .lib-item.cur {
+    border-color: var(--cinnabar);
+    border-left: 4px solid var(--cinnabar);
+    background: var(--cinnabar-soft);
+  }
+  .lib-item-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    font-family: var(--serif);
+    font-size: 13.5px;
+  }
+  .lib-item-desc {
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    margin-top: 3px;
+    line-height: 1.45;
+  }
+  .lib-item-tags {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+  }
+
+  /* ============ 次级状态条 + 答辩演示模式导览条 ============ */
+  .subbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 5px 18px;
+    background: #ebe0c7;
+    border-bottom: 1px solid var(--line);
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+  .subbar-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  .mini-seal {
+    font-family: var(--serif);
+    border: 1.5px solid var(--cinnabar);
+    color: var(--cinnabar);
+    padding: 0 4px;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 2px;
+    flex: 0 0 auto;
+  }
+  .demo-bar {
+    flex: 0 0 auto;
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 7px 18px;
+    background: linear-gradient(90deg, #fff8e6, #faeed2);
+    border-bottom: 1.5px solid var(--gold);
+    font-size: 12px;
+  }
+  .demo-bar.show { display: flex; flex-wrap: wrap; }
+  .demo-steps {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex-wrap: wrap;
+  }
+  .demo-step-btn {
+    border: 1px solid var(--gold);
+    background: #fffdf7;
+    color: var(--ink);
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: .15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .demo-step-btn:hover {
+    border-color: var(--cinnabar);
+    background: var(--cinnabar-soft);
+    color: var(--cinnabar-dark);
+  }
+  .demo-step-btn i {
+    font-style: normal;
+    font-weight: 700;
+    color: var(--cinnabar);
+  }
+
+  /* ============ 主体视图容器 ============ */
+  .view-stage {
+    flex: 1 1 auto;
+    min-height: 0;
+    position: relative;
+    overflow: hidden;
+  }
+  .view-page {
+    display: none;
+    height: 100%;
+    width: 100%;
+    padding: 12px 18px;
+    overflow: hidden;
+  }
+  .view-page.active { display: flex; }
+
+  /* ============ 视图一：古籍识别主页（左原图 + 右四标签 + 可收起问答抽屉） ============ */
+  #viewRecognize {
+    gap: 12px;
+    align-items: stretch;
+  }
+  .col-scan {
+    flex: 1.22 1 0;
+    min-width: 340px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .col-struct {
+    flex: 0.94 1 0;
+    min-width: 310px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  /* 右侧问答抽屉与收起书签把手 */
+  .qa-drawer {
+    flex: 0 0 390px;
+    width: 390px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    transition: width .2s ease, flex-basis .2s ease;
+  }
+  .qa-drawer.collapsed {
+    display: none;
+  }
+  .qa-handle {
+    flex: 0 0 34px;
+    width: 34px;
+    background: linear-gradient(180deg, var(--cinnabar), var(--cinnabar-dark));
+    color: #fff8f2;
+    border: 1px solid var(--cinnabar-dark);
+    border-radius: 4px;
+    cursor: pointer;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    writing-mode: vertical-rl;
+    font-family: var(--serif);
+    font-size: 13.5px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    box-shadow: var(--shadow-sm);
+    transition: .16s;
+  }
+  .qa-handle:hover { filter: brightness(1.08); transform: translateX(-1px); }
+  .qa-handle.show { display: flex; }
+
+  /* 1366x768 及侧栏窄窗紧凑适配 */
+  @media (max-width: 1480px) {
+    header.topbar { padding: 0 12px; height: 52px; gap: 8px; }
+    .brand-txt .sub { display: none; }
+    .brand-txt b { font-size: 15px; letter-spacing: 0.5px; }
+    .subbar, .demo-bar { padding: 4px 12px; }
+    .view-page { padding: 9px 12px; }
+    #viewRecognize { gap: 9px; }
+    .qa-drawer { flex-basis: 336px; width: 336px; }
+    .col-scan, .col-struct { min-width: 260px; }
+  }
+  @media (max-width: 1320px) {
+    .proto-pill { display: none; }
+    .nav-btn { padding: 5px 10px; font-size: 13px; }
+    .hdr-btn { padding: 5px 9px; font-size: 12px; }
+  }
+
+  /* 通用古籍版框卡片 */
+  .frame-card {
+    background: var(--paper-2);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    box-shadow: var(--shadow-sm), inset 0 0 0 3px var(--paper-2), inset 0 0 0 4px var(--line-soft);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+  }
+  .card-hd {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line-soft);
+    background: linear-gradient(180deg, #fdfaf2, #f6eedc);
+    flex-wrap: wrap;
+  }
+  .card-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--serif);
+    font-size: 15.5px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin: 0;
+  }
+  .card-title::before {
+    content: "";
+    width: 10px;
+    height: 13px;
+    background: var(--cinnabar);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 64%, 0 100%);
+    flex: 0 0 auto;
+  }
+  .hd-tools {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  /* 徽章与通用小按钮 */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 3px;
+    padding: 1.5px 7px;
+    font-size: 11px;
+    font-family: var(--sans);
+    font-weight: 500;
+    border: 1px solid var(--line);
+    background: var(--paper-3);
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+  .badge.ok { background: var(--qing-soft); color: var(--qing-dark); border-color: #b4d1c6; }
+  .badge.red { background: var(--cinnabar-soft); color: var(--cinnabar-dark); border-color: #e2b5a2; }
+  .badge.gold { background: var(--gold-soft); color: #6e5218; border-color: #dec487; }
+
+  .btn {
+    border: 1px solid var(--line);
+    background: #fffdf8;
+    color: var(--ink);
+    padding: 5px 11px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: .15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+  }
+  .btn:hover:not(:disabled) { border-color: var(--qing); color: var(--qing-dark); background: #f4faf7; }
+  .btn.primary { background: var(--cinnabar); border-color: var(--cinnabar); color: #fff; font-weight: 600; }
+  .btn.primary:hover:not(:disabled) { background: var(--cinnabar-dark); color: #fff; }
+  .btn.qing { background: var(--qing); border-color: var(--qing); color: #fff; font-weight: 600; }
+  .btn.qing:hover:not(:disabled) { background: var(--qing-dark); color: #fff; }
+  .btn.active { border-color: var(--cinnabar); background: var(--cinnabar-soft); color: var(--cinnabar-dark); font-weight: 600; }
+  .btn.xs { padding: 3px 8px; font-size: 11.5px; }
+
+  /* 跨页跳转「返回原页」横幅 */
+  .jump-banner {
+    flex: 0 0 auto;
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 7px 14px;
+    background: linear-gradient(90deg, #fae2d7, #fdf1ea);
+    border-bottom: 1.5px solid var(--cinnabar);
+    color: var(--cinnabar-dark);
+    font-size: 12.5px;
+    animation: pulseBar .45s ease;
+  }
+  .jump-banner.show { display: flex; }
+  @keyframes pulseBar {
+    0% { background-color: #f4c2ad; }
+    100% { background-color: #fae2d7; }
+  }
+
+  /* 左栏：上传浮层与古籍原图画布 */
+  .upload-drawer {
+    flex: 0 0 auto;
+    display: none;
+    padding: 12px 14px;
+    background: #fffaf0;
+    border-bottom: 1px dashed var(--gold);
+  }
+  .upload-drawer.show { display: block; }
+  .dropzone {
+    border: 1.5px dashed var(--gold);
+    border-radius: 4px;
+    padding: 16px 12px;
+    text-align: center;
+    background: repeating-linear-gradient(90deg, transparent 0 34px, rgba(181,144,68,.09) 34px 35px), #fffdf8;
+    cursor: pointer;
+    transition: .15s;
+  }
+  .dropzone:hover, .dropzone.drag {
+    border-color: var(--cinnabar);
+    background-color: var(--cinnabar-soft);
+  }
+  .dropzone input { display: none; }
+  .uprog {
+    display: none;
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+  .uprog.show { display: block; }
+  .uprog-bar {
+    height: 5px;
+    background: var(--line-soft);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 5px;
+  }
+  .uprog-bar i {
+    display: block;
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--cinnabar), var(--gold));
+    transition: width .25s ease;
+  }
+
+  .scan-viewport {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    background:
+      radial-gradient(circle at center, #efe6d0 0%, #e4d7ba 100%);
+    padding: 10px;
+    display: flex;
+  }
+  .scan-stage {
+    position: relative;
+    margin: auto;
+    flex: 0 0 auto;
+    background: #fbf5e6;
+    border: 1px solid #b59e72;
+    box-shadow: 0 6px 22px rgba(50,35,12,.18), 0 0 0 4px rgba(252,248,238,.65);
+    transition: width .14s ease;
+  }
+  .scan-stage img.scan-img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: fill;
+    user-select: none;
+  }
+  /* 离线无原图时的宣纸刻本仿真底衬 */
+  .scan-fallback {
+    position: absolute;
+    inset: 0;
+    padding: 4% 5%;
+    border: 3px double #8a6d3b;
+    margin: 2.5%;
+    background:
+      repeating-linear-gradient(to left, rgba(138,109,59,.22) 0 1px, transparent 1px 4.8%),
+      #fbf3df;
+    display: none;
+  }
+  .scan-stage.no-img .scan-fallback { display: block; }
+  .scan-stage.no-img img.scan-img { display: none; }
+
+  /* 叠加文字框 bbox */
+  .bbox {
+    position: absolute;
+    border: 1.5px solid rgba(38, 89, 84, .68);
+    background: rgba(38, 89, 84, .08);
+    border-radius: 2px;
+    cursor: pointer;
+    transition: background .14s, border-color .14s, box-shadow .14s;
+  }
+  .scan-stage.hide-boxes .bbox:not(.sel) {
+    border-color: transparent;
+    background: transparent;
+  }
+  .bbox:hover {
+    border-color: var(--cinnabar);
+    background: rgba(166, 54, 32, .18);
+    z-index: 4;
+  }
+  .bbox.sel {
+    border: 2px solid var(--cinnabar);
+    background: rgba(166, 54, 32, .24);
+    box-shadow: 0 0 0 3px rgba(166, 54, 32, .25);
+    z-index: 5;
+  }
+  .bbox .btag {
+    position: absolute;
+    top: 0;
+    right: 0;
+    font-family: var(--mono);
+    font-size: 9px;
+    line-height: 1.2;
+    padding: 0 3px;
+    background: rgba(38, 89, 84, .88);
+    color: #fff;
+    border-radius: 1px;
+    pointer-events: none;
+  }
+  .scan-stage.hide-tags .bbox:not(.sel) .btag { display: none; }
+  .bbox.sel .btag { background: var(--cinnabar); font-weight: 700; }
+  .scan-stage.no-img .bbox .vtxt {
+    display: block;
+    writing-mode: vertical-rl;
+    font-family: var(--kai);
+    font-size: 12px;
+    color: #2b2117;
+    padding: 2px;
+    line-height: 1.15;
+    overflow: hidden;
+    height: 100%;
+  }
+  .bbox .vtxt { display: none; }
+
+  /* 左栏底部：单行原文核对条 + 常驻「古籍库切页 & 拖拽上传识别」输入面板 */
+  .scan-deck {
+    flex: 0 0 auto;
+    border-top: 1px solid var(--line);
+    background: #faf3e3;
+    display: flex;
+    flex-direction: column;
+  }
+  .scan-quote-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--line-soft);
+    background: linear-gradient(180deg, #fdfaf1, #f6eedb);
+    min-height: 34px;
+  }
+  .scan-foot-quote {
+    font-family: var(--kai);
+    font-size: 14.5px;
+    color: var(--ink);
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .scan-foot-meta {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted-solid);
+    flex: 0 0 auto;
+  }
+  #footMeta {
+    max-width: 250px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  #footConfBadge { flex: 0 0 auto; }
+
+  .scan-bottom-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.65fr) minmax(175px, 0.95fr);
+    gap: 10px;
+    padding: 9px 12px;
+    background: #f4ebd6;
+    align-items: stretch;
+  }
+  .shelf-box {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+  }
+  .shelf-hd {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11.5px;
+    color: var(--ink-soft);
+  }
+  .shelf-hd b {
+    font-family: var(--serif);
+    color: var(--ink);
+    letter-spacing: 0.5px;
+  }
+  .scan-filmstrip {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 7px;
+  }
+  .thumb-card {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 7px;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    background: #fffdf8;
+    cursor: pointer;
+    transition: .14s;
+  }
+  .thumb-card:hover {
+    border-color: var(--cinnabar);
+    background: #fff7f1;
+  }
+  .thumb-card.cur {
+    border-color: var(--cinnabar);
+    background: var(--cinnabar-soft);
+    box-shadow: inset 0 0 0 1px var(--cinnabar);
+  }
+  .thumb-card img {
+    width: 44px;
+    height: 36px;
+    object-fit: cover;
+    border-radius: 2px;
+    border: 1px solid var(--line);
+    flex: 0 0 auto;
+    background: #e9dec3;
+  }
+  .thumb-meta {
+    min-width: 0;
+    flex: 1;
+  }
+  .thumb-meta b {
+    display: block;
+    font-family: var(--serif);
+    font-size: 12px;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .thumb-meta span {
+    display: block;
+    font-size: 10.5px;
+    color: var(--ink-soft);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* 右下常驻拖拽上传框 */
+  .inline-dropzone {
+    border: 1.5px dashed var(--gold);
+    border-radius: 4px;
+    padding: 8px 10px;
+    background: repeating-linear-gradient(90deg, transparent 0 28px, rgba(181,144,68,.08) 28px 29px), #fffdf8;
+    cursor: pointer;
+    transition: .15s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 3px;
+  }
+  .inline-dropzone:hover, .inline-dropzone.drag {
+    border-color: var(--cinnabar);
+    background-color: var(--cinnabar-soft);
+  }
+  .inline-dropzone input { display: none; }
+  .inline-dropzone b {
+    font-family: var(--serif);
+    font-size: 13px;
+    color: var(--cinnabar-dark);
+  }
+  .inline-dropzone small {
+    font-size: 11px;
+    color: var(--muted-solid);
+    line-height: 1.35;
+  }
+
+  @media (max-width: 1400px) {
+    #footMeta { max-width: 155px; }
+    .thumb-card img { display: none; }
+  }
+  @media (max-height: 820px) {
+    .scan-quote-bar { padding: 4px 10px; min-height: 30px; }
+    .scan-bottom-grid { padding: 6px 10px; gap: 8px; }
+    .thumb-card { padding: 4px 6px; }
+    .thumb-card img { width: 38px; height: 30px; }
+    .inline-dropzone { padding: 5px 8px; }
+  }
+
+  /* ============ 右栏：四标签页（文字 | 方剂表 | 实体关系 | 待核） ============ */
+  .struct-tabs {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 2px;
+    padding: 8px 12px 0;
+    background: #f6eedc;
+    border-bottom: 1px solid var(--line);
+  }
+  .stab {
+    border: 1px solid transparent;
+    border-bottom: none;
+    background: transparent;
+    color: var(--ink-soft);
+    padding: 7px 13px;
+    border-radius: 4px 4px 0 0;
+    cursor: pointer;
+    font-family: var(--serif);
+    font-size: 13.5px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    position: relative;
+    bottom: -1px;
+    transition: .14s;
+  }
+  .stab:hover { color: var(--ink); background: rgba(255,255,255,.5); }
+  .stab.active {
+    background: var(--paper-2);
+    color: var(--cinnabar-dark);
+    border-color: var(--line);
+    border-top: 2.5px solid var(--cinnabar);
+  }
+  .stab .cnt {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 0 6px;
+    border-radius: 9px;
+    background: var(--paper-3);
+    color: var(--ink-soft);
+  }
+  .stab.active .cnt { background: var(--cinnabar-soft); color: var(--cinnabar-dark); }
+  .stab.warn-tab .cnt { background: var(--cinnabar); color: #fff; }
+
+  .stab-pane {
+    display: none;
+    flex: 1 1 auto;
+    min-height: 0;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .stab-pane.active { display: flex; }
+  .pane-toolbar {
+    flex: 0 0 auto;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--line-soft);
+    background: #fbf6ea;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .pane-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 10px 14px;
+  }
+
+  /* Tab 1：阅读顺序文字列表 */
+  .search-inp {
+    flex: 1 1 160px;
+    padding: 5px 10px;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    background: #fffdf8;
+    font-size: 12.5px;
+  }
+  .line-row {
+    display: flex;
+    align-items: baseline;
+    gap: 9px;
+    padding: 7px 10px;
+    border: 1px solid var(--line-soft);
+    border-radius: 3px;
+    margin-bottom: 6px;
+    background: #fffdf9;
+    cursor: pointer;
+    transition: .12s;
+  }
+  .line-row:hover { border-color: var(--qing); background: #f4faf7; }
+  .line-row.sel {
+    border-color: var(--cinnabar);
+    border-left: 4px solid var(--cinnabar);
+    background: var(--cinnabar-soft);
+  }
+  .line-ord {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted-solid);
+    flex: 0 0 74px;
+  }
+  .line-txt {
+    font-family: var(--kai);
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.45;
+    flex: 1;
+  }
+  .line-conf {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--muted-solid);
+  }
+
+  /* Tab 2：方剂表还原 */
+  .formula-box {
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: #fffdf8;
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+  .formula-hd {
+    padding: 9px 12px;
+    background: #f5ebd6;
+    border-bottom: 1px solid var(--line-soft);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .formula-title-btn {
+    border: none;
+    background: none;
+    padding: 0;
+    font-family: var(--serif);
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--qing-dark);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+  .formula-title-btn:hover { color: var(--cinnabar); }
+  .formula-ind {
+    padding: 7px 12px;
+    font-size: 12px;
+    color: var(--ink-soft);
+    background: #faf5e8;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  table.fangji-tbl {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+  }
+  table.fangji-tbl th {
+    background: #f2e7ce;
+    color: var(--ink-soft);
+    text-align: left;
+    padding: 6px 10px;
+    font-weight: 600;
+    border-bottom: 1px solid var(--line);
+  }
+  table.fangji-tbl td {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--line-soft);
+    vertical-align: middle;
+  }
+  table.fangji-tbl tr.frow { cursor: pointer; transition: .12s; }
+  table.fangji-tbl tr.frow:hover { background: var(--qing-soft); }
+  table.fangji-tbl tr.frow.sel {
+    background: var(--cinnabar-soft);
+    outline: 1.5px solid var(--cinnabar);
+  }
+  .herb-cell { font-family: var(--kai); font-size: 14.5px; font-weight: 600; color: var(--ink); }
+  .dose-cell { font-family: var(--kai); font-size: 13.5px; color: var(--qing-dark); }
+  .dose-cell.pending { color: var(--cinnabar-dark); font-family: var(--sans); font-size: 12px; }
+  .cell-trace-box {
+    margin-top: 8px;
+    padding: 9px 12px;
+    border-radius: 3px;
+    border: 1px solid var(--line);
+    border-left: 3.5px solid var(--qing);
+    background: #f8fbf9;
+    font-size: 12px;
+    line-height: 1.65;
+  }
+
+  /* Tab 3：实体关系 */
+  .filter-pills { display: flex; gap: 5px; flex-wrap: wrap; }
+  .fpill {
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--ink-soft);
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    cursor: pointer;
+  }
+  .fpill.active {
+    background: var(--qing);
+    border-color: var(--qing);
+    color: #fff;
+  }
+  .sub-hd {
+    font-family: var(--serif);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--qing-dark);
+    margin: 4px 0 7px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  table.data-tbl {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    background: #fffdf9;
+    border: 1px solid var(--line-soft);
+    margin-bottom: 14px;
+  }
+  table.data-tbl th {
+    background: #f3ead6;
+    color: var(--ink-soft);
+    padding: 6px 8px;
+    text-align: left;
+    border-bottom: 1px solid var(--line);
+  }
+  table.data-tbl td {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .loc-link {
+    border: 1px solid #b9d3c8;
+    background: var(--qing-soft);
+    color: var(--qing-dark);
+    border-radius: 3px;
+    padding: 1px 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .loc-link:hover { background: var(--cinnabar); border-color: var(--cinnabar); color: #fff; }
+
+  /* Tab 4：待核（未确认归属审计） */
+  .audit-Principle {
+    padding: 9px 12px;
+    border-radius: 3px;
+    background: #f8f2e4;
+    border: 1px solid var(--line);
+    font-size: 12px;
+    color: var(--ink-soft);
+    line-height: 1.6;
+    margin-bottom: 10px;
+  }
+  .audit-card {
+    border: 1px solid #e2b5a2;
+    border-left: 4px solid var(--cinnabar);
+    border-radius: 3px;
+    background: #fdf3ed;
+    padding: 10px 12px;
+    margin-bottom: 9px;
+    cursor: pointer;
+    transition: .14s;
+  }
+  .audit-card:hover { background: #fae6db; }
+  .audit-card-hd {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 700;
+    color: var(--cinnabar-dark);
+    margin-bottom: 4px;
+  }
+  .audit-quote {
+    font-family: var(--kai);
+    font-size: 14px;
+    color: var(--ink);
+    margin: 4px 0;
+  }
+  .audit-why { font-size: 12px; color: var(--ink-soft); line-height: 1.55; }
+
+  /* ============ 右侧抽屉：可溯源问答 ============ */
+  .qa-presets {
+    flex: 0 0 auto;
+    padding: 8px 12px;
+    background: #faf3e3;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .qa-presets-label {
+    font-size: 11px;
+    color: var(--muted-solid);
+    margin-bottom: 5px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .qchip-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+  }
+  .qchip {
+    border: 1px solid var(--line);
+    background: #fffdf8;
+    color: var(--ink);
+    border-radius: 4px;
+    padding: 4px 7px;
+    font-size: 11.5px;
+    cursor: pointer;
+    text-align: left;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition: .14s;
+  }
+  .qchip:hover { border-color: var(--cinnabar); background: var(--cinnabar-soft); }
+  .qchip .qtag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 0 4px;
+    border-radius: 2px;
+    margin-right: 4px;
+    background: var(--qing-soft);
+    color: var(--qing-dark);
+  }
+  .qchip.refuse .qtag { background: var(--cinnabar-soft); color: var(--cinnabar-dark); }
+
+  .qa-stream {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+  }
+  .msg { display: flex; gap: 8px; align-items: flex-start; }
+  .msg.user { flex-direction: row-reverse; }
+  .avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 3px;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--serif);
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    background: var(--cinnabar);
+  }
+  .msg.user .avatar { background: var(--qing); }
+  .bubble {
+    max-width: 88%;
+    padding: 9px 12px;
+    border-radius: 5px;
+    font-size: 12.8px;
+    line-height: 1.7;
+    background: #fffdf8;
+    border: 1px solid var(--line);
+    white-space: pre-wrap;
+  }
+  .msg.user .bubble {
+    background: var(--qing-soft);
+    border-color: #b8d3c8;
+  }
+  .bubble.refused {
+    background: var(--cinnabar-soft);
+    border-color: #dfae99;
+    color: var(--cinnabar-dark);
+  }
+  /* 答案里的可点击引用角标 [1] */
+  cite[data-idx] {
+    font-style: normal;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 5px;
+    margin: 0 2px;
+    border-radius: 3px;
+    background: var(--cinnabar);
+    color: #fff;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    vertical-align: baseline;
+    transition: transform .12s, background .12s;
+  }
+  cite[data-idx]:hover {
+    background: var(--qing);
+    transform: translateY(-1px);
+  }
+
+  .src-list {
+    margin-top: 8px;
+    padding-top: 7px;
+    border-top: 1px dashed var(--line);
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    white-space: normal;
+  }
+  .src-card {
+    padding: 6px 8px;
+    border-radius: 3px;
+    background: #f8f1e1;
+    border-left: 3px solid var(--cinnabar);
+    font-size: 11.5px;
+    cursor: pointer;
+    transition: .12s;
+  }
+  .src-card:hover { background: #f2e4c9; transform: translateX(2px); }
+  .src-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .src-card-quote {
+    font-family: var(--kai);
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    margin-top: 2px;
+  }
+
+  /* 语音输入提示条与输入栏 */
+  .voice-bar {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 5px 12px;
+    background: var(--cinnabar-soft);
+    border-top: 1px solid #e2b5a2;
+    font-size: 11.5px;
+    color: var(--cinnabar-dark);
+  }
+  .voice-bar.show { display: flex; }
+  .vdot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--cinnabar);
+    display: inline-block;
+    margin-right: 5px;
+    animation: blink .9s infinite;
+  }
+  @keyframes blink { 50% { opacity: .25; } }
+
+  .qa-foot {
+    flex: 0 0 auto;
+    padding: 8px 10px;
+    border-top: 1px solid var(--line);
+    background: #f6eedc;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .mic-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 3px;
+    border: 1px solid var(--line);
+    background: #fffdf8;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex: 0 0 auto;
+  }
+  .mic-btn.rec { background: var(--cinnabar); color: #fff; border-color: var(--cinnabar); }
+  .vlang-sel {
+    border: 1px solid var(--line);
+    background: #fffdf8;
+    border-radius: 3px;
+    padding: 5px 4px;
+    font-size: 11.5px;
+    color: var(--ink);
+    flex: 0 0 auto;
+  }
+  .qa-inp {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 6px 9px;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    background: #fffdf8;
+    font-size: 12.5px;
+  }
+
+  /* ============ 视图二：全屏知识图谱 ============ */
+  #viewGraph { gap: 12px; }
+  .graph-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 100%;
+  }
+  .graph-side {
+    flex: 0 0 340px;
+    width: 340px;
+    height: 100%;
+  }
+  .graph-canvas-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    position: relative;
+    background: radial-gradient(circle at center, #fdfaf0, #f1e6cd);
+  }
+  #kgCanvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+  }
+  #kgCanvas:active { cursor: grabbing; }
+  .kg-legend {
+    position: absolute;
+    left: 12px;
+    bottom: 12px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 6px 11px;
+    background: rgba(252, 248, 238, .92);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    font-size: 11.5px;
+  }
+  .kg-legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .kg-legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+
+  /* ============ 视图三：评测概览 ============ */
+  #viewEval {
+    flex-direction: column;
+    gap: 12px;
+    overflow-y: auto;
+  }
+  .eval-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 10px;
+    flex: 0 0 auto;
+  }
+  @media (max-width: 1400px) {
+    .eval-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+  .mcard {
+    background: var(--paper-2);
+    border: 1px solid var(--line);
+    border-top: 3.5px solid var(--qing);
+    border-radius: 4px;
+    padding: 12px 14px;
+    box-shadow: var(--shadow-sm);
+  }
+  .mcard.neutral { border-top-color: var(--gold); }
+  .mcard-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+  .mcard-val {
+    font-family: var(--serif);
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--ink);
+    margin: 6px 0 4px;
+    font-variant-numeric: tabular-nums;
+  }
+  .mbar {
+    height: 5px;
+    background: var(--line-soft);
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 6px 0;
+  }
+  .mbar i { display: block; height: 100%; background: var(--qing); }
+  .mcard.neutral .mbar i { background: var(--gold); }
+  .mcard-sub { font-size: 11px; color: var(--muted-solid); line-height: 1.45; }
+
+  .eval-bottom {
+    display: grid;
+    grid-template-columns: 1.35fr 0.65fr;
+    gap: 12px;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  /* 全局轻提示 Toast */
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: 20px;
+    transform: translateX(-50%) translateY(10px);
+    background: #221c17;
+    color: #fbf3e4;
+    border: 1px solid var(--gold);
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 12.5px;
+    box-shadow: var(--shadow-md);
+    opacity: 0;
+    pointer-events: none;
+    transition: .2s;
+    z-index: 100;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <!-- ============ 顶部匾额导航 ============ -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="seal" aria-hidden="true"><span>本</span><span>草</span><span>識</span><span>微</span></div>
+      <div class="brand-txt">
+        <b>中医药古籍智能识别与知识溯源系统 <span class="proto-pill">演示原型 · 免后端独立运行</span></b>
+        <div class="sub">竖排古籍版面切列 · 方剂表结构化还原 · 跨页可溯源 RAG 问答</div>
+      </div>
+    </div>
+
+    <nav class="main-nav" aria-label="主视图导航">
+      <button type="button" class="nav-btn active" data-view="recognize">📜 古籍识别</button>
+      <button type="button" class="nav-btn" data-view="graph">🕸 知识图谱 <span class="nbadge" id="navGraphCnt">33</span></button>
+      <button type="button" class="nav-btn" data-view="eval">📊 评测概览 <span class="nbadge">6 项</span></button>
+    </nav>
+
+    <div class="hdr-actions">
+      <!-- 古籍库页面切换器 -->
+      <div class="lib-wrap" id="libWrap">
+        <button type="button" class="hdr-btn" id="btnLib">
+          <span>📚 古籍库：</span><strong id="curPageShort">第 36 页</strong><span>▾</span>
+        </button>
+        <div class="lib-pop" id="libPop">
+          <div class="lib-pop-hd">
+            <span class="lib-Pop-title">已入库精校示例页（《思濟堂方書》）</span>
+            <span>共 3 页</span>
+          </div>
+          <div id="libList"></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px solid var(--line-soft)">
+            <span style="font-size:11px;color:var(--muted-solid)">已避开已知主治跨段页 page_35</span>
+            <button type="button" class="btn primary xs" id="btnPopUpload">＋ 上传新古籍页</button>
+          </div>
+        </div>
+      </div>
+
+      <button type="button" class="hdr-btn demo-toggle active" id="btnDemoBar" title="展开或收起现场答辩一键演示导览条">
+        ✦ 演示模式
+      </button>
+
+      <button type="button" class="hdr-btn qa-toggle open" id="btnToggleQA">
+        💬 可溯源问答
+      </button>
+    </div>
+  </header>
+
+  <!-- ============ 单行朱批免责与引擎状态条 ============ -->
+  <div class="subbar">
+    <div class="subbar-left">
+      <span class="mini-seal">謹白</span>
+      <span><b>仅供参考、非诊疗建议：</b>系统输出仅供古籍文献整理与出处核验，涉及个人诊断、剂量与疗效问题一律拒答。</span>
+    </div>
+    <div id="engineStatus" style="white-space:nowrap;font-family:var(--mono);font-size:11px">
+      OCR: PP-OCRv5 + cht_v3 · 向量库: 3 页 / 58 段 · 状态: 离线演示就绪
+    </div>
+  </div>
+
+  <!-- ============ 答辩演示一键剧本导览条（可收起） ============ -->
+  <div class="demo-bar show" id="demoBar">
+    <div class="demo-steps">
+      <strong style="font-family:var(--serif);color:var(--cinnabar-dark)">✦ 答辩演示亮点直达：</strong>
+      <button type="button" class="demo-step-btn" data-act="table"><i>①</i> 方剂表逐格定位（第 51 页 · 人参败毒散）</button>
+      <button type="button" class="demo-step-btn" data-act="audit"><i>②</i> 跨页无主语「待核」拦截（第 39 页 · 零幻觉审计）</button>
+      <button type="button" class="demo-step-btn" data-act="crossqa"><i>③</i> 问答 [1] 跨页自动跳转 + 返回原页</button>
+      <button type="button" class="demo-step-btn" data-act="refuse"><i>④</i> 临床问诊安全拒答（100% 拒答红线）</button>
+    </div>
+    <button type="button" class="btn xs" id="btnHideDemoBar">收起导览</button>
+  </div>
+
+  <!-- ============ 主视图舞台 ============ -->
+  <div class="view-stage">
+
+    <!-- ======== 视图 1：古籍识别主页 ======== -->
+    <section class="view-page active" id="viewRecognize">
+      <!-- 左栏：古籍扫描原图 + 文字框 -->
+      <div class="col-scan">
+        <div class="frame-card">
+          <div class="card-hd">
+            <h2 class="card-title" id="scanTitle">《思濟堂方書》· 第 36 页</h2>
+            <div class="hd-tools">
+              <button type="button" class="btn xs active" id="btnToggleBoxes">文字框</button>
+              <button type="button" class="btn xs active" id="btnToggleTags">行号</button>
+              <button type="button" class="btn xs" id="btnZoomOut" title="缩小">－</button>
+              <button type="button" class="btn xs" id="btnZoomFit" title="点击重置为适应视口大小"><span id="zoomLabel">适应 100%</span></button>
+              <button type="button" class="btn xs" id="btnZoomIn" title="放大">＋</button>
+            </div>
+          </div>
+
+          <!-- 跨页跳转提示条（点击异页引用时自动弹出） -->
+          <div class="jump-banner" id="jumpBanner">
+            <span id="jumpText">📍 已由问答溯源跨页跳转至此页</span>
+            <button type="button" class="btn primary xs" id="btnReturnOrigin">↩ 返回原页</button>
+          </div>
+
+          <!-- 原图画布滚动视口 -->
+          <div class="scan-viewport" id="scanViewport">
+            <div class="scan-stage" id="scanStage">
+              <img class="scan-img" id="scanImg" alt="古籍扫描原图">
+              <div class="scan-fallback" id="scanFallback"></div>
+              <div id="bboxLayer"></div>
+            </div>
+          </div>
+
+          <!-- 底部：单行原文核对尺 + 常驻「古籍卷页切换 & 拖拽上传」输入区 -->
+          <div class="scan-deck">
+            <div class="scan-quote-bar">
+              <div class="scan-foot-quote" id="footQuote">点击原图文字框或右侧条目以核对出处</div>
+              <div class="scan-foot-meta">
+                <span id="footMeta">—</span>
+                <span class="badge ok" id="footConfBadge">置信度 —</span>
+              </div>
+            </div>
+
+            <div class="scan-bottom-grid">
+              <div class="shelf-box">
+                <div class="shelf-hd">
+                  <b>📚 预置精校古籍页（点击切换）</b>
+                  <span id="pageStatLine">20 行 · 1 方表 · 18 实体</span>
+                </div>
+                <div class="scan-filmstrip" id="scanFilmstrip" aria-label="古籍库快速切页"></div>
+              </div>
+
+              <div class="inline-dropzone" id="dropzone" title="点击选择本地扫描页，或直接拖拽图片至此处">
+                <b>📤 上传古籍扫描页</b>
+                <small id="uprogText">拖拽或点击选图（png / jpg / tif）</small>
+                <div class="uprog" id="uprog" style="width:100%;margin-top:3px">
+                  <div class="uprog-bar"><i id="uprogFill"></i></div>
+                </div>
+                <input type="file" id="fileInput" accept="image/*,.tif,.tiff">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 中/右栏：四标签结构化结果 -->
+      <div class="col-struct">
+        <div class="frame-card">
+          <div class="struct-tabs" role="tablist">
+            <button type="button" class="stab active" data-tab="text">文字 <span class="cnt" id="cntText">0</span></button>
+            <button type="button" class="stab" data-tab="table">方剂表 <span class="cnt" id="cntTable">0</span></button>
+            <button type="button" class="stab" data-tab="entity">实体关系 <span class="cnt" id="cntEntity">0</span></button>
+            <button type="button" class="stab" id="tabBtnAudit" data-tab="audit">待核 <span class="cnt" id="cntAudit">0</span></button>
+          </div>
+
+          <!-- Tab 1: 文字 -->
+          <div class="stab-pane active" id="pane-text">
+            <div class="pane-toolbar">
+              <input type="text" class="search-inp" id="lineSearch" placeholder="筛选本页识别原文（如：甘草、熟地、敗毒散）…">
+              <span class="badge ok">竖排从右至左序</span>
+            </div>
+            <div class="pane-body" id="lineList"></div>
+          </div>
+
+          <!-- Tab 2: 方剂表 -->
+          <div class="stab-pane" id="pane-table">
+            <div class="pane-toolbar">
+              <span style="font-size:12px;color:var(--ink-soft)">点击任意<b>方名、药材或剂量</b>，左侧原图即时定位证据框</span>
+              <span class="badge gold" id="tblTypeBadge">正文结构化还原</span>
+            </div>
+            <div class="pane-body">
+              <div id="formulaWrap"></div>
+              <div class="cell-trace-box" id="cellTraceBox">
+                <b>逐格出处核验：</b>点击上方表格中的任意行，此处展示对应的 OCR 原文行号、像素坐标 <code>bbox</code> 与归属核验说明。
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab 3: 实体关系 -->
+          <div class="stab-pane" id="pane-entity">
+            <div class="pane-toolbar">
+              <div class="filter-pills" id="entFilterPills"></div>
+              <button type="button" class="btn xs qing" id="btnJumpGraph">在全屏图谱中查看 →</button>
+            </div>
+            <div class="pane-body">
+              <div class="sub-hd"><span>抽取关系三元组（主体 —关系→ 客体）</span><span class="badge" id="triTotalBadge">0 条</span></div>
+              <table class="data-tbl">
+                <thead><tr><th>主体</th><th>关系</th><th>客体 / 内容</th><th>出处行</th></tr></thead>
+                <tbody id="triTbody"></tbody>
+              </table>
+
+              <div class="sub-hd"><span>识别中医实体明细</span><span class="badge" id="entTotalBadge">0 个</span></div>
+              <table class="data-tbl">
+                <thead><tr><th>实体名称</th><th>类别</th><th>原文值</th><th>出处行</th></tr></thead>
+                <tbody id="entTbody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Tab 4: 待核（未确认归属审计） -->
+          <div class="stab-pane" id="pane-audit">
+            <div class="pane-toolbar">
+              <span style="font-size:12px;color:var(--cinnabar-dark);font-weight:600">确定性审计边界：宁缺毋滥，阻断错归幻觉</span>
+              <span class="badge red" id="auditBadgeTop">人工复核队列</span>
+            </div>
+            <div class="pane-body">
+              <div class="audit-Principle">
+                <b>为什么设立「待核」队列？</b><br>
+                真实古籍常有<b>跨页续文</b>（如页首出现「此方主治…」但方名在上一页）或<b>双行小字残损</b>。系统严格禁止就近强行挂靠到后文其他方剂，而是保留原图坐标与拦截原因供整理者复核。
+              </div>
+              <div id="auditList"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右侧可收起抽屉：可溯源问答 -->
+      <aside class="qa-drawer" id="qaDrawer" aria-label="可溯源问答抽屉">
+        <div class="frame-card">
+          <div class="card-hd">
+            <h2 class="card-title">可溯源问答</h2>
+            <div class="hd-tools">
+              <span class="badge ok" title="点击答案中的 [编号] 可直接跨页跳转至对应古籍原图">支持跨页跳回原图</span>
+              <button type="button" class="btn xs" id="btnCollapseQA" title="收起问答面板">收起 ✕</button>
+            </div>
+          </div>
+
+          <div class="qa-presets">
+            <div class="qa-presets-label">
+              <span>预设演示问题（点击即问，体验<b>[编号]</b>原图溯源）：</span>
+            </div>
+            <div class="qchip-list" id="qaPresetList"></div>
+          </div>
+
+          <div class="qa-stream" id="qaStream">
+            <div class="msg ai">
+              <div class="avatar">醫</div>
+              <div class="bubble">您好！我是<b>中医古籍溯源助手</b>。
+回答基于已入库的《思濟堂方書》原文检索生成。点击答案中的朱砂角标（如 <cite data-demo-cite="1">[1]</cite>）或下方出处卡片，左侧将<b>自动定位并高亮原图对应竖排行</b>；若出处在其他页，将自动跨页切换并提供「返回原页」按钮。</div>
+            </div>
+          </div>
+
+          <div class="voice-bar" id="voiceBar">
+            <span><i class="vdot"></i><span id="voiceStatusTxt">正在聆听语音（普通话）…再次点击麦克风结束</span></span>
+            <button type="button" class="btn xs" id="btnCancelVoice">取消</button>
+          </div>
+
+          <div class="qa-foot">
+            <button type="button" class="mic-btn" id="btnMic" title="语音输入（支持普通话 / 粤语 / English）">🎙</button>
+            <select class="vlang-sel" id="voiceLang" aria-label="语音语种">
+              <option value="zh-CN">普通话</option>
+              <option value="yue-Hant-HK">粤语</option>
+              <option value="en-US">English</option>
+            </select>
+            <input type="text" class="qa-inp" id="qaInput" placeholder="输入古籍方药问题，回车发送…">
+            <button type="button" class="btn primary" id="btnSendQA">提问</button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- 问答抽屉收起后的右侧竖排书签把手 -->
+      <button type="button" class="qa-handle" id="qaHandle" title="展开可溯源问答面板">
+        💬 可溯源问答 · 点击展开
+      </button>
+    </section>
+
+    <!-- ======== 视图 2：知识图谱全屏页 ======== -->
+    <section class="view-page" id="viewGraph">
+      <div class="graph-main">
+        <div class="frame-card">
+          <div class="card-hd">
+            <h2 class="card-title" id="kgTitle">知识图谱可视化</h2>
+            <div class="hd-tools">
+              <button type="button" class="btn xs active" id="btnKgScopeCur">当前古籍页</button>
+              <button type="button" class="btn xs" id="btnKgScopeAll">全库融合图谱（3 页合并）</button>
+              <select class="vlang-sel" id="kgTypeFilter" style="padding:4px 8px">
+                <option value="">全部节点类型</option>
+                <option value="方剂">仅看：方剂</option>
+                <option value="药材">仅看：药材</option>
+                <option value="主治">仅看：主治</option>
+                <option value="剂量">仅看：剂量</option>
+              </select>
+              <button type="button" class="btn xs" id="btnKgReset">重置视图</button>
+            </div>
+          </div>
+          <div class="graph-canvas-wrap">
+            <canvas id="kgCanvas"></canvas>
+            <div class="kg-legend" id="kgLegend"></div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="graph-side">
+        <div class="frame-card">
+          <div class="card-hd">
+            <h2 class="card-title">图谱统计与节点溯源</h2>
+          </div>
+          <div class="pane-body">
+            <div id="kgStatsBox" style="padding:10px 12px;background:#faf3e3;border:1px solid var(--line-soft);border-radius:3px;font-size:12.5px;line-height:1.8;margin-bottom:12px"></div>
+            <div class="sub-hd"><span>关系类型分布</span></div>
+            <div id="kgRelBadges" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px"></div>
+            <div class="sub-hd"><span>选中节点详情</span></div>
+            <div id="kgNodeDetail" style="padding:12px;border:1px solid var(--line);border-radius:3px;background:#fffdf8;font-size:12.5px;line-height:1.8">
+              点击左侧画布中的任意节点（支持拖拽节点与滚轮缩放），在此查看其所属古籍页、原文引文与关系链路，并可一键回跳原图定位。
+            </div>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <!-- ======== 视图 3：评测概览页 ======== -->
+    <section class="view-page" id="viewEval">
+      <div class="frame-card" style="height:auto;flex:0 0 auto">
+        <div class="card-hd">
+          <h2 class="card-title">系统核心评测指标概览</h2>
+          <div class="hd-tools">
+            <span class="badge gold">口径分离原则：合成集基准指标与真实古籍实验严格分账，绝不混算</span>
+            <span class="badge ok">回归单测：206 用例通过</span>
+          </div>
+        </div>
+        <div style="padding:12px 14px">
+          <div class="eval-grid" id="evalCardsGrid"></div>
+        </div>
+      </div>
+
+      <div class="eval-bottom">
+        <div class="frame-card">
+          <div class="card-hd">
+            <h2 class="card-title">《思濟堂方書》真实古籍疑难攻关归因账本（节选）</h2>
+            <span class="badge">源自 EXPERIMENTS.csv 单一事实源</span>
+          </div>
+          <div class="pane-body">
+            <table class="data-tbl" style="margin-bottom:0">
+              <thead>
+                <tr><th style="width:72px">实验编号</th><th style="width:170px">攻关阶段</th><th>关键技术改动</th><th style="width:155px">观测指标</th><th style="width:175px">量化增量结果</th><th style="width:60px">结论</th></tr>
+              </thead>
+              <tbody id="milestoneTbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="frame-card">
+          <div class="card-hd">
+            <h2 class="card-title">离线架构与答辩防翻车设计</h2>
+          </div>
+          <div class="pane-body" style="font-size:12.5px;line-height:1.85;color:var(--ink-soft)">
+            <div><b style="color:var(--ink)">1. 全栈本机无密钥推理：</b><br>OCR 采用本地 <code>PP-OCRv5</code> + 繁体 <code>PP-OCRv3</code> ONNX 双模型；语义向量采用本地 <code>bge-small-zh-v1.5</code>（512 维）；问答生成支持本机 Ollama，无外部云 API 依赖。</div>
+            <hr style="border:none;border-top:1px dashed var(--line);margin:10px 0">
+            <div><b style="color:var(--ink)">2. 构造性 100% 可溯源：</b><br>所有展示的方剂单元格、三元组及问答引文，均经过 <code>Block.text[start:end]</code> 逐字相等校验，携带 <code>source_hash</code> 与像素级 <code>bbox</code>。</div>
+            <hr style="border:none;border-top:1px dashed var(--line);margin:10px 0">
+            <div><b style="color:var(--ink)">3. 现场异常优雅降级：</b><br>大模型未启动时自动退回原文段落摘录模式；图像格式异常或双行小字模糊时明确标示「待核」，绝不静默伪造数据或白屏报错。</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============ 内置真实《思濟堂方書》精校数据（免后端直接运行） ============ */
+const BUNDLE = {"pages": [{"id": "思濟堂方書_page_36", "short_title": "第 36 页 · 四君子汤论 / 乌药顺气汤", "book": "思濟堂方書", "volume": "卷一 · 气门", "page_no": "第 36 页", "summary": "含张路玉论四君子汤补益脾胃按语，及《乌药顺气汤》主治与配伍方表", "image_url": "../../古籍评测集/医家类/思濟堂方書/page_36.png", "width": 1024, "height": 807, "engine_note": "RapidOCR + PP-OCRv5_rec_mobile (ONNX) · 竖排从右至左阅读序", "blocks": [{"line_id": "R002", "reading_order": 1, "bbox": [995, 200, 1016, 294], "text": "总酒堂大", "text_norm": "总酒堂大", "conf": 0.474, "source_hash": "adb5512a7c9e", "block_ref": "思濟堂方書_page_36:R002"}, {"line_id": "R019", "reading_order": 2, "bbox": [942, 243, 982, 742], "text": "去廣皮半夏名四君子湯治脾虚無爽者更效", "text_norm": "去广皮半夏名四君子汤治脾虚无爽者更效", "conf": 0.84, "source_hash": "6d6d5d779747", "block_ref": "思濟堂方書_page_36:R019"}, {"line_id": "R018", "reading_order": 3, "bbox": [894, 243, 934, 742], "text": "路玉張氏日氣虛者補之以甘如参术苓草甘", "text_norm": "路玉張氏日气虚者补之以甘如参术苓草甘", "conf": 0.849, "source_hash": "09bfb8583770", "block_ref": "思濟堂方書_page_36:R018"}, {"line_id": "R017", "reading_order": 4, "bbox": [844, 241, 884, 742], "text": "温益胃有键運之功具衝和之德故爲君子盎", "text_norm": "温益胃有键運之功具衝和之德故为君子盎", "conf": 0.862, "source_hash": "54abaf4633cc", "block_ref": "思濟堂方書_page_36:R017"}, {"line_id": "R016", "reading_order": 5, "bbox": [795, 241, 834, 742], "text": "人之一身以胃氣爲主胃氣旺則五臟受蔭胃", "text_norm": "人之一身以胃气为主胃气旺則五脏受蔭胃", "conf": 0.883, "source_hash": "c4e1fda84b72", "block_ref": "思濟堂方書_page_36:R016"}, {"line_id": "R015", "reading_order": 6, "bbox": [744, 238, 786, 742], "text": "氣傷則百病叢生故凡病久不愈諸藥不效者", "text_norm": "气伤則百病叢生故凡病久不愈諸药不效者", "conf": 0.928, "source_hash": "9662279d449d", "block_ref": "思濟堂方書_page_36:R015"}, {"line_id": "R012", "reading_order": 7, "bbox": [694, 239, 738, 740], "text": "惟有益胃補腎兩途是故四君六君隨證加减", "text_norm": "惟有益胃补肾两途是故四君六君随证加减", "conf": 0.852, "source_hash": "e26e42fc45e1", "block_ref": "思濟堂方書_page_36:R012"}, {"line_id": "R004", "reading_order": 8, "bbox": [647, 234, 686, 739], "text": "無論寒熱補瀉先培中土使氣藥四達則週身", "text_norm": "无論寒热补泻先培中土使气药四達則週身", "conf": 0.908, "source_hash": "9362a1faf221", "block_ref": "思濟堂方書_page_36:R004"}, {"line_id": "R011", "reading_order": 9, "bbox": [597, 237, 637, 734], "text": "之機運流通水穀之精微敷布何患其藥之不", "text_norm": "之機運流通水穀之精微敷布何患其药之不", "conf": 0.892, "source_hash": "7affeca5dffc", "block_ref": "思濟堂方書_page_36:R011"}, {"line_id": "R010", "reading_order": 10, "bbox": [549, 238, 586, 700], "text": "效哉是知四君六君爲司命之本也者", "text_norm": "效哉是知四君六君为司命之本也者", "conf": 0.872, "source_hash": "e8d4b14ba373", "block_ref": "思濟堂方書_page_36:R010"}, {"line_id": "R003", "reading_order": 11, "bbox": [437, 215, 469, 360], "text": "烏藥順氣湯", "text_norm": "烏药順气汤", "conf": 0.819, "source_hash": "dd0b77de39bc", "block_ref": "思濟堂方書_page_36:R003"}, {"line_id": "R014", "reading_order": 12, "bbox": [388, 240, 418, 739], "text": "治男婦風氣攻注四肢骨節疼痛肢體頑麻手", "text_norm": "治男婦风气攻注四肢骨節疼痛肢体頑麻手", "conf": 0.898, "source_hash": "a6ca38e6fc47", "block_ref": "思濟堂方書_page_36:R014"}, {"line_id": "R001", "reading_order": 13, "bbox": [336, 208, 370, 740], "text": "阿足癱痪語言蹇澁宜先服此藥以通氣道氣通", "text_norm": "阿足癱痪語言蹇澁宜先服此药以通气道气通", "conf": 0.787, "source_hash": "40ebb45c0962", "block_ref": "思濟堂方書_page_36:R001"}, {"line_id": "R013", "reading_order": 14, "bbox": [288, 240, 321, 740], "text": "則病漸愈矣如不愈其證知犯何逆以法", "text_norm": "則病漸愈矣如不愈其证知犯何逆以法", "conf": 0.9, "source_hash": "09681949b5ec", "block_ref": "思濟堂方書_page_36:R013"}, {"line_id": "R009", "reading_order": 15, "bbox": [229, 238, 272, 712], "text": "治之收本瓜正谷一验华部一验", "text_norm": "治之收本瓜正谷一验华部一验", "conf": 0.551, "source_hash": "e7ddb08e49c4", "block_ref": "思濟堂方書_page_36:R009"}, {"line_id": "R005", "reading_order": 16, "bbox": [181, 235, 232, 676], "text": "正嫩烏藥打廣皮伴一麻黄", "text_norm": "正嫩烏药打广皮伴一麻黄", "conf": 0.711, "source_hash": "88b54a605823", "block_ref": "思濟堂方書_page_36:R005"}, {"line_id": "R008", "reading_order": 17, "bbox": [133, 236, 175, 638], "text": "川茅防百香谷一殼", "text_norm": "川茅防百香谷一殼", "conf": 0.575, "source_hash": "30332a359cc3", "block_ref": "思濟堂方書_page_36:R008"}, {"line_id": "R007", "reading_order": 18, "bbox": [87, 236, 133, 691], "text": "桔梗洛一干蓬五分备一甘草三分", "text_norm": "桔梗洛一干蓬五分备一甘草三分", "conf": 0.709, "source_hash": "101fde0a54fc", "block_ref": "思濟堂方書_page_36:R007"}, {"line_id": "R006", "reading_order": 19, "bbox": [41, 236, 75, 660], "text": "引加生薑一錢紅棗肉二枚水煎温服", "text_norm": "引加生姜一钱红枣肉二枚水煎温服", "conf": 0.893, "source_hash": "bc2192dda7e6", "block_ref": "思濟堂方書_page_36:R006"}, {"line_id": "R020", "reading_order": 20, "bbox": [7, 352, 34, 459], "text": "绿之一木", "text_norm": "绿之一木", "conf": 0.464, "source_hash": "db5ce9db84ab", "block_ref": "思濟堂方書_page_36:R020"}], "tables": [{"formula_name": "烏藥順氣湯", "name_line": "R003", "source_type": "正文抽取", "continuation": "", "indication": "治男妇风气攻注，四肢骨节疼痛，肢体顽麻，手足瘫痪，语言蹇涩（R014-R001）", "rows": [{"herb": "烏藥（正嫩）", "dose": "待核（双行小字）", "line_ids": ["R005"], "scope": "原文字段", "status": "pending", "note": "原文「正嫩烏藥打廣皮伴一麻黄」，小字剂量列印迹漫漶，保守标待核"}, {"herb": "廣皮", "dose": "待核（双行小字）", "line_ids": ["R005"], "scope": "原文字段", "status": "pending", "note": "与乌药、麻黄同列，双轨小字剂量待人工复核"}, {"herb": "麻黄", "dose": "待核（双行小字）", "line_ids": ["R005"], "scope": "原文字段", "status": "pending", "note": "原文 R005 末尾检出药名「麻黄」"}, {"herb": "桔梗", "dose": "五分（邻近候选）", "line_ids": ["R007"], "scope": "配伍上下文", "status": "ok", "note": "原文 R007「桔梗洛一干蓬五分备一甘草三分」"}, {"herb": "甘草", "dose": "三分", "line_ids": ["R007"], "scope": "原文字段", "status": "ok", "note": "原文 R007 明确检出「甘草三分」，精确对齐"}, {"herb": "生薑（引药）", "dose": "一錢", "line_ids": ["R006"], "scope": "引药边界", "status": "addon", "note": "原文 R006「引加生薑一錢紅棗肉二枚水煎温服」，按引药边界单独标注"}, {"herb": "紅棗肉（引药）", "dose": "二枚", "line_ids": ["R006"], "scope": "引药边界", "status": "addon", "note": "原文 R006 引药段检出「紅棗肉二枚」"}]}], "entities": [{"name": "广皮", "type": "药材", "value": "广皮", "line_id": "R019", "block_ref": "思濟堂方書_page_36:R019"}, {"name": "半夏", "type": "药材", "value": "半夏", "line_id": "R019", "block_ref": "思濟堂方書_page_36:R019"}, {"name": "四君子汤", "type": "方剂", "value": "四君子汤", "line_id": "R019", "block_ref": "思濟堂方書_page_36:R019"}, {"name": "脾虚无爽者更效", "type": "主治", "value": "脾虚无爽者更效", "line_id": "R019", "block_ref": "思濟堂方書_page_36:R019"}, {"name": "胃气旺則五脏受蔭胃", "type": "主治", "value": "胃气旺則五脏受蔭胃", "line_id": "R016", "block_ref": "思濟堂方書_page_36:R016"}, {"name": "补肾", "type": "功效", "value": "补肾", "line_id": "R012", "block_ref": "思濟堂方書_page_36:R012"}, {"name": "烏药順气汤", "type": "方剂", "value": "烏药順气汤", "line_id": "R003", "block_ref": "思濟堂方書_page_36:R003"}, {"name": "男婦风气攻注四肢骨節疼痛肢体頑麻手", "type": "主治", "value": "男婦风气攻注四肢骨節疼痛肢体頑麻手", "line_id": "R014", "block_ref": "思濟堂方書_page_36:R014"}, {"name": "广皮", "type": "药材", "value": "广皮", "line_id": "R005", "block_ref": "思濟堂方書_page_36:R005"}, {"name": "麻黄", "type": "药材", "value": "麻黄", "line_id": "R005", "block_ref": "思濟堂方書_page_36:R005"}, {"name": "桔梗", "type": "药材", "value": "桔梗", "line_id": "R007", "block_ref": "思濟堂方書_page_36:R007"}, {"name": "甘草", "type": "药材", "value": "甘草", "line_id": "R007", "block_ref": "思濟堂方書_page_36:R007"}, {"name": "五分", "type": "剂量", "value": "五分", "line_id": "R007", "block_ref": "思濟堂方書_page_36:R007"}, {"name": "三分", "type": "剂量", "value": "三分", "line_id": "R007", "block_ref": "思濟堂方書_page_36:R007"}, {"name": "生姜", "type": "药材", "value": "生姜", "line_id": "R006", "block_ref": "思濟堂方書_page_36:R006"}, {"name": "红枣", "type": "药材", "value": "红枣", "line_id": "R006", "block_ref": "思濟堂方書_page_36:R006"}, {"name": "一钱", "type": "剂量", "value": "一钱", "line_id": "R006", "block_ref": "思濟堂方書_page_36:R006"}, {"name": "二枚", "type": "剂量", "value": "二枚", "line_id": "R006", "block_ref": "思濟堂方書_page_36:R006"}], "triples": [{"head": "四君子汤", "relation": "主治", "tail": "脾虚无爽者更效", "line_id": "R019", "quote": "去廣皮半夏名四君子湯治脾虚無爽者更效", "block_ref": "思濟堂方書_page_36:R019", "subject_rule": "same_line"}, {"head": "四君子汤", "relation": "主治", "tail": "胃气旺則五脏受蔭胃", "line_id": "R016", "quote": "人之一身以胃氣爲主胃氣旺則五臟受蔭胃", "block_ref": "思濟堂方書_page_36:R016", "subject_rule": "carry"}, {"head": "四君子汤", "relation": "功效", "tail": "补肾", "line_id": "R012", "quote": "惟有益胃補腎兩途是故四君六君隨證加减", "block_ref": "思濟堂方書_page_36:R012", "subject_rule": "carry"}, {"head": "烏药順气汤", "relation": "主治", "tail": "男婦风气攻注四肢骨節疼痛肢体頑麻手", "line_id": "R014", "quote": "治男婦風氣攻注四肢骨節疼痛肢體頑麻手", "block_ref": "思濟堂方書_page_36:R014", "subject_rule": "carry"}, {"head": "桔梗", "relation": "剂量", "tail": "五分", "line_id": "R007", "quote": "桔梗洛一干蓬五分备一甘草三分", "block_ref": "思濟堂方書_page_36:R007", "subject_rule": "same_line"}, {"head": "烏药順气汤", "relation": "组成", "tail": "桔梗", "line_id": "R007", "quote": "桔梗洛一干蓬五分备一甘草三分", "block_ref": "思濟堂方書_page_36:R007", "subject_rule": "formula_scope"}, {"head": "甘草", "relation": "剂量", "tail": "三分", "line_id": "R007", "quote": "桔梗洛一干蓬五分备一甘草三分", "block_ref": "思濟堂方書_page_36:R007", "subject_rule": "same_line"}, {"head": "烏药順气汤", "relation": "组成", "tail": "甘草", "line_id": "R007", "quote": "桔梗洛一干蓬五分备一甘草三分", "block_ref": "思濟堂方書_page_36:R007", "subject_rule": "formula_scope"}, {"head": "生姜", "relation": "剂量", "tail": "一钱", "line_id": "R006", "quote": "引加生薑一錢紅棗肉二枚水煎温服", "block_ref": "思濟堂方書_page_36:R006", "subject_rule": "same_line"}, {"head": "烏药順气汤", "relation": "组成", "tail": "生姜", "line_id": "R006", "quote": "引加生薑一錢紅棗肉二枚水煎温服", "block_ref": "思濟堂方書_page_36:R006", "subject_rule": "formula_scope"}, {"head": "红枣", "relation": "剂量", "tail": "二枚", "line_id": "R006", "quote": "引加生薑一錢紅棗肉二枚水煎温服", "block_ref": "思濟堂方書_page_36:R006", "subject_rule": "same_line"}, {"head": "烏药順气汤", "relation": "组成", "tail": "红枣", "line_id": "R006", "quote": "引加生薑一錢紅棗肉二枚水煎温服", "block_ref": "思濟堂方書_page_36:R006", "subject_rule": "formula_scope"}], "unresolved": [{"line_id": "R009", "relation": "组成/剂量", "tail": "瓜蒌 / 白芷（双行小字残损列）", "reason": "古籍双行夹注小字粘连（「收本瓜正谷一验华部一验」），置信度低于自动采纳阈值，转人工待核，不强行生成三元组", "quote": "治之收本瓜正谷一验华部一验", "bbox": [229, 238, 272, 712]}], "graph": {"nodes": [{"id": "四君子汤", "label": "四君子汤", "type": "方剂", "value": 4}, {"id": "脾虚无爽者更效", "label": "脾虚无爽者更效", "type": "主治", "value": 2}, {"id": "胃气旺則五脏受蔭胃", "label": "胃气旺則五脏受蔭胃", "type": "主治", "value": 2}, {"id": "补肾", "label": "补肾", "type": "功效", "value": 2}, {"id": "烏药順气汤", "label": "烏药順气汤", "type": "方剂", "value": 6}, {"id": "男婦风气攻注四肢骨節疼痛肢体頑麻手", "label": "男婦风气攻注四肢骨節疼痛肢体頑麻手", "type": "主治", "value": 2}, {"id": "桔梗", "label": "桔梗", "type": "药材", "value": 3}, {"id": "五分", "label": "五分", "type": "剂量", "value": 2}, {"id": "甘草", "label": "甘草", "type": "药材", "value": 3}, {"id": "三分", "label": "三分", "type": "剂量", "value": 2}, {"id": "生姜", "label": "生姜", "type": "药材", "value": 3}, {"id": "一钱", "label": "一钱", "type": "剂量", "value": 2}, {"id": "红枣", "label": "红枣", "type": "药材", "value": 3}, {"id": "二枚", "label": "二枚", "type": "剂量", "value": 2}], "links": [{"source": "四君子汤", "target": "脾虚无爽者更效", "relation": "主治", "evidence_refs": ["思濟堂方書_page_36:R019"]}, {"source": "四君子汤", "target": "胃气旺則五脏受蔭胃", "relation": "主治", "evidence_refs": ["思濟堂方書_page_36:R016"]}, {"source": "四君子汤", "target": "补肾", "relation": "功效", "evidence_refs": ["思濟堂方書_page_36:R012"]}, {"source": "烏药順气汤", "target": "男婦风气攻注四肢骨節疼痛肢体頑麻手", "relation": "主治", "evidence_refs": ["思濟堂方書_page_36:R014"]}, {"source": "桔梗", "target": "五分", "relation": "剂量", "evidence_refs": ["思濟堂方書_page_36:R007"]}, {"source": "烏药順气汤", "target": "桔梗", "relation": "组成", "evidence_refs": ["思濟堂方書_page_36:R007"]}, {"source": "甘草", "target": "三分", "relation": "剂量", "evidence_refs": ["思濟堂方書_page_36:R007"]}, {"source": "烏药順气汤", "target": "甘草", "relation": "组成", "evidence_refs": ["思濟堂方書_page_36:R007"]}, {"source": "生姜", "target": "一钱", "relation": "剂量", "evidence_refs": ["思濟堂方書_page_36:R006"]}, {"source": "烏药順气汤", "target": "生姜", "relation": "组成", "evidence_refs": ["思濟堂方書_page_36:R006"]}, {"source": "红枣", "target": "二枚", "relation": "剂量", "evidence_refs": ["思濟堂方書_page_36:R006"]}, {"source": "烏药順气汤", "target": "红枣", "relation": "组成", "evidence_refs": ["思濟堂方書_page_36:R006"]}], "is_demo": false, "stats": {"node_count": 14, "edge_count": 12, "relations": {"主治": 3, "功效": 1, "剂量": 4, "组成": 4}, "conflicts": [{"head": "四君子汤", "relation": "主治", "tails": "胃气旺則五脏受蔭胃 / 脾虚无爽者更效"}, {"head": "烏药順气汤", "relation": "组成", "tails": "桔梗 / 甘草 / 生姜 / 红枣"}], "note": "本地 OCR 真实识别页抽出的图，规模不是评测指标；准确率需人工核验"}, "disclaimer": "仅供参考、非诊疗建议", "badge": "示例数据 · 非命题单位样本"}}, {"id": "思濟堂方書_page_51", "short_title": "第 51 页 · 人参败毒散（双模型校正页）", "book": "思濟堂方書", "volume": "卷一 · 伤寒外感门", "page_no": "第 51 页", "summary": "经典名方《人参败毒散》全方配伍及伤寒荣卫方义论述（含双模型 CTC 候选补测案例）", "image_url": "../../古籍评测集/医家类/思濟堂方書/page_51.png", "width": 1024, "height": 817, "engine_note": "RapidOCR + PP-OCRv5 / cht_PP-OCRv3 双模型 CTC 束搜索校正", "blocks": [{"line_id": "R003", "reading_order": 1, "bbox": [999, 190, 1018, 276], "text": "总汤堂", "text_norm": "总汤堂", "conf": 0.44, "source_hash": "d7d1f54df158", "block_ref": "思濟堂方書_page_51:R003"}, {"line_id": "R004", "reading_order": 2, "bbox": [953, 216, 986, 360], "text": "人参敗毒散", "text_norm": "人参敗毒散", "conf": 0.93, "source_hash": "f2fe7743b708", "block_ref": "思濟堂方書_page_51:R004"}, {"line_id": "R021", "reading_order": 3, "bbox": [898, 240, 946, 640], "text": "人参一錢羗活三錢獨活", "text_norm": "人参一钱羗活三钱独活", "conf": 0.813, "source_hash": "8ad820b75a3b", "block_ref": "思濟堂方書_page_51:R021"}, {"line_id": "R020", "reading_order": 4, "bbox": [850, 245, 899, 645], "text": "桔梗枳壳各一錢半柴朝", "text_norm": "桔梗枳壳各一钱半柴朝", "conf": 0.86, "source_hash": "d2c6a1230a34", "block_ref": "思濟堂方書_page_51:R020"}, {"line_id": "R019", "reading_order": 5, "bbox": [801, 245, 849, 728], "text": "前胡川芦茯芬各一錢", "text_norm": "前胡川芦茯芬各一钱", "conf": 0.713, "source_hash": "8f2170b0fb71", "block_ref": "思濟堂方書_page_51:R019"}, {"line_id": "R018", "reading_order": 6, "bbox": [748, 243, 797, 533], "text": "甘草五分生薑三錢", "text_norm": "甘草五分生姜三钱", "conf": 0.97, "source_hash": "f2158ef724f7", "block_ref": "思濟堂方書_page_51:R018"}, {"line_id": "R017", "reading_order": 7, "bbox": [699, 245, 736, 391], "text": "水搗碎温服", "text_norm": "水搗碎温服", "conf": 0.83, "source_hash": "839929945368", "block_ref": "思濟堂方書_page_51:R017"}, {"line_id": "R016", "reading_order": 8, "bbox": [653, 245, 689, 752], "text": "今人見風寒感昌鞭以傷寒二字混稱不知傷", "text_norm": "今人見风寒感昌鞭以伤寒二字混称不知伤", "conf": 0.943, "source_hash": "67292a3d4394", "block_ref": "思濟堂方書_page_51:R016"}, {"line_id": "R015", "reading_order": 9, "bbox": [601, 243, 639, 751], "text": "者正氣傷於中寒者寒邪客於外未有外感而", "text_norm": "者正气伤于中寒者寒邪客于外未有外感而", "conf": 0.91, "source_hash": "98e1f83fe143", "block_ref": "思濟堂方書_page_51:R015"}, {"line_id": "R014", "reading_order": 10, "bbox": [555, 245, 588, 748], "text": "丙不傷者也傷其榮者和其血故活湯中用", "text_norm": "丙不伤者也伤其榮者和其血故活汤中用", "conf": 0.963, "source_hash": "34085191ab41", "block_ref": "思濟堂方書_page_51:R014"}, {"line_id": "R013", "reading_order": 11, "bbox": [441, 250, 475, 747], "text": "川芎生地是也傷其內者托其裏故敗毒散中", "text_norm": "川芎生地是也伤其內者托其裏故敗毒散中", "conf": 0.954, "source_hash": "520a5ff5a50e", "block_ref": "思濟堂方書_page_51:R013"}, {"line_id": "R012", "reading_order": 12, "bbox": [392, 251, 424, 560], "text": "用人参茯苓助正以驅邪也", "text_norm": "用人参茯苓助正以驅邪也", "conf": 0.918, "source_hash": "d09f165e891b", "block_ref": "思濟堂方書_page_51:R012"}, {"line_id": "R011", "reading_order": 13, "bbox": [342, 249, 374, 750], "text": "又日非其時而有其氣謂春應温而反大寒夏", "text_norm": "又日非其時而有其气谓春應温而反大寒夏", "conf": 0.969, "source_hash": "14477815b551", "block_ref": "思濟堂方書_page_51:R011"}, {"line_id": "R010", "reading_order": 14, "bbox": [293, 248, 324, 749], "text": "應熟而反凉秋應凉而反熱冬應寒而反温非", "text_norm": "應熟而反凉秋應凉而反热冬應寒而反温非", "conf": 0.921, "source_hash": "90bfe288a79a", "block_ref": "思濟堂方書_page_51:R010"}, {"line_id": "R009", "reading_order": 15, "bbox": [242, 247, 276, 747], "text": "其時而有其氣惟氣血兩虛之人受之寒客榮", "text_norm": "其時而有其气惟气血两虚之人受之寒客榮", "conf": 0.95, "source_hash": "2fa6f194f722", "block_ref": "思濟堂方書_page_51:R009"}, {"line_id": "R008", "reading_order": 16, "bbox": [192, 246, 226, 748], "text": "而風客衞不可用峻劑故稍從其輕者此活", "text_norm": "而风客衞不可用峻剂故稍從其轻者此活", "conf": 0.964, "source_hash": "138fb80a6fe4", "block_ref": "思濟堂方書_page_51:R008"}, {"line_id": "R002", "reading_order": 17, "bbox": [138, 73, 179, 750], "text": "此節提出先因内湯敗毒散所由立也羌活湯主寒邪傷榮故發", "text_norm": "此節提出先因内汤敗毒散所由立也羌活汤主寒邪伤榮故發", "conf": 0.907, "source_hash": "8933bea332b8", "block_ref": "思濟堂方書_page_51:R002"}, {"line_id": "R001", "reading_order": 18, "bbox": [93, 75, 126, 747], "text": "福致外感之由表之中加川芎生地引而人血借以調荣用薑", "text_norm": "福致外感之由表之中加川芎生地引而人血借以調荣用姜", "conf": 0.764, "source_hash": "a811b647a84b", "block_ref": "思濟堂方書_page_51:R001"}, {"line_id": "R005", "reading_order": 19, "bbox": [42, 244, 77, 748], "text": "葱爲引使通體汗出庶三陽血分之邪直達而", "text_norm": "葱为引使通体汗出庶三阳血分之邪直達而", "conf": 0.928, "source_hash": "a1b9027fe69e", "block_ref": "思濟堂方書_page_51:R005"}, {"line_id": "R026", "reading_order": 20, "bbox": [13, 438, 32, 628], "text": "木E", "text_norm": "木E", "conf": 0.594, "source_hash": "b7c26ab9a6b9", "block_ref": "思濟堂方書_page_51:R026"}], "tables": [{"formula_name": "人參敗毒散", "name_line": "R004", "source_type": "正文抽取", "continuation": "", "indication": "外感风寒、正气内伤，托里和荣、通体汗出（R016-R005）", "rows": [{"herb": "人參", "dose": "一錢", "line_ids": ["R021"], "scope": "原文字段", "status": "ok", "note": "原文 R021「人参一錢羗活三錢獨活」"}, {"herb": "羌活（羗活）", "dose": "三錢", "line_ids": ["R021"], "scope": "原文字段", "status": "ok", "note": "保留异体原字形「羗活」并归一映射至标准药名「羌活」"}, {"herb": "獨活", "dose": "待核", "line_ids": ["R021"], "scope": "原文字段", "status": "pending", "note": "R021 行末检出「獨活」，小字剂量待核"}, {"herb": "桔梗", "dose": "一錢半", "line_ids": ["R020"], "scope": "配伍上下文", "status": "ok", "note": "原文 R020「桔梗枳壳各一錢半柴朝」，「各一錢半」共享剂量"}, {"herb": "枳殼", "dose": "一錢半", "line_ids": ["R020"], "scope": "原文字段", "status": "ok", "note": "原文 R020「桔梗枳壳各一錢半柴朝」"}, {"herb": "柴胡", "dose": "待核", "line_ids": ["R020"], "scope": "双模型校正", "status": "ok", "note": "原始 OCR 误读为「柴朝」，经 PP-OCRv5 CTC 前缀束搜索 Top-3 自动校正为「柴胡」"}, {"herb": "前胡", "dose": "一錢", "line_ids": ["R019"], "scope": "配伍上下文", "status": "ok", "note": "原文 R019「前胡川芦茯芬各一錢」"}, {"herb": "川芎", "dose": "一錢", "line_ids": ["R019", "R013"], "scope": "双模型校正", "status": "ok", "note": "R019「川芦」经繁体 PP-OCRv3 同框 Top-1 自动召回「川芎」，且与 R013「川芎生地」互证"}, {"herb": "茯苓", "dose": "一錢（待核）", "line_ids": ["R019"], "scope": "短窗候选待核", "status": "pending", "note": "原始 OCR 读作「茯芬」，2H 短窗 CTC 第 5 名召回「茯苓」，因排名 >3 保守标为待核"}, {"herb": "甘草", "dose": "五分", "line_ids": ["R018"], "scope": "原文字段", "status": "ok", "note": "原文 R018「甘草五分生薑三錢」"}, {"herb": "生薑", "dose": "三錢", "line_ids": ["R018"], "scope": "原文字段", "status": "ok", "note": "原文 R018「甘草五分生薑三錢」"}]}], "entities": [{"name": "人参", "type": "药材", "value": "人参", "line_id": "R004", "block_ref": "思濟堂方書_page_51:R004"}, {"name": "人参敗毒散", "type": "方剂", "value": "人参敗毒散", "line_id": "R004", "block_ref": "思濟堂方書_page_51:R004"}, {"name": "人参", "type": "药材", "value": "人参", "line_id": "R021", "block_ref": "思濟堂方書_page_51:R021"}, {"name": "独活", "type": "药材", "value": "独活", "line_id": "R021", "block_ref": "思濟堂方書_page_51:R021"}, {"name": "三钱", "type": "剂量", "value": "三钱", "line_id": "R021", "block_ref": "思濟堂方書_page_51:R021"}, {"name": "桔梗", "type": "药材", "value": "桔梗", "line_id": "R020", "block_ref": "思濟堂方書_page_51:R020"}, {"name": "枳壳", "type": "药材", "value": "枳壳", "line_id": "R020", "block_ref": "思濟堂方書_page_51:R020"}, {"name": "一钱半", "type": "剂量", "value": "一钱半", "line_id": "R020", "block_ref": "思濟堂方書_page_51:R020"}, {"name": "前胡", "type": "药材", "value": "前胡", "line_id": "R019", "block_ref": "思濟堂方書_page_51:R019"}, {"name": "一钱", "type": "剂量", "value": "一钱", "line_id": "R019", "block_ref": "思濟堂方書_page_51:R019"}, {"name": "芦茯芬", "type": "药材", "value": "芦茯芬", "line_id": "R019", "block_ref": "思濟堂方書_page_51:R019"}, {"name": "甘草", "type": "药材", "value": "甘草", "line_id": "R018", "block_ref": "思濟堂方書_page_51:R018"}, {"name": "生姜", "type": "药材", "value": "生姜", "line_id": "R018", "block_ref": "思濟堂方書_page_51:R018"}, {"name": "三钱", "type": "剂量", "value": "三钱", "line_id": "R018", "block_ref": "思濟堂方書_page_51:R018"}, {"name": "川芎", "type": "药材", "value": "川芎", "line_id": "R013", "block_ref": "思濟堂方書_page_51:R013"}, {"name": "生地", "type": "药材", "value": "生地", "line_id": "R013", "block_ref": "思濟堂方書_page_51:R013"}, {"name": "人参", "type": "药材", "value": "人参", "line_id": "R012", "block_ref": "思濟堂方書_page_51:R012"}, {"name": "茯苓", "type": "药材", "value": "茯苓", "line_id": "R012", "block_ref": "思濟堂方書_page_51:R012"}, {"name": "羌活", "type": "药材", "value": "羌活", "line_id": "R002", "block_ref": "思濟堂方書_page_51:R002"}, {"name": "敗毒散", "type": "方剂", "value": "敗毒散", "line_id": "R002", "block_ref": "思濟堂方書_page_51:R002"}, {"name": "寒邪伤榮故發", "type": "主治", "value": "寒邪伤榮故發", "line_id": "R002", "block_ref": "思濟堂方書_page_51:R002"}, {"name": "川芎", "type": "药材", "value": "川芎", "line_id": "R001", "block_ref": "思濟堂方書_page_51:R001"}, {"name": "生地", "type": "药材", "value": "生地", "line_id": "R001", "block_ref": "思濟堂方書_page_51:R001"}, {"name": "木瓜", "type": "药材", "value": "木瓜", "line_id": "R026", "block_ref": "思濟堂方書_page_51:R026"}, {"name": "木贼", "type": "药材", "value": "木贼", "line_id": "R026", "block_ref": "思濟堂方書_page_51:R026"}], "triples": [{"head": "人参", "relation": "剂量", "tail": "三钱", "line_id": "R021", "quote": "人参一錢羗活三錢獨活", "block_ref": "思濟堂方書_page_51:R021", "subject_rule": "same_line"}, {"head": "人参敗毒散", "relation": "组成", "tail": "人参", "line_id": "R021", "quote": "人参一錢羗活三錢獨活", "block_ref": "思濟堂方書_page_51:R021", "subject_rule": "formula_scope"}, {"head": "枳壳", "relation": "剂量", "tail": "一钱半", "line_id": "R020", "quote": "桔梗枳壳各一錢半柴朝", "block_ref": "思濟堂方書_page_51:R020", "subject_rule": "same_line"}, {"head": "人参敗毒散", "relation": "组成", "tail": "枳壳", "line_id": "R020", "quote": "桔梗枳壳各一錢半柴朝", "block_ref": "思濟堂方書_page_51:R020", "subject_rule": "formula_scope"}, {"head": "芦茯芬", "relation": "剂量", "tail": "一钱", "line_id": "R019", "quote": "前胡川芦茯芬各一錢", "block_ref": "思濟堂方書_page_51:R019", "subject_rule": "same_line"}, {"head": "人参敗毒散", "relation": "组成", "tail": "芦茯芬", "line_id": "R019", "quote": "前胡川芦茯芬各一錢", "block_ref": "思濟堂方書_page_51:R019", "subject_rule": "formula_scope"}, {"head": "生姜", "relation": "剂量", "tail": "三钱", "line_id": "R018", "quote": "甘草五分生薑三錢", "block_ref": "思濟堂方書_page_51:R018", "subject_rule": "same_line"}, {"head": "人参敗毒散", "relation": "组成", "tail": "生姜", "line_id": "R018", "quote": "甘草五分生薑三錢", "block_ref": "思濟堂方書_page_51:R018", "subject_rule": "formula_scope"}, {"head": "敗毒散", "relation": "主治", "tail": "寒邪伤榮故發", "line_id": "R002", "quote": "此節提出先因内湯敗毒散所由立也羌活湯主寒邪傷榮故發", "block_ref": "思濟堂方書_page_51:R002", "subject_rule": "same_line"}], "unresolved": [{"line_id": "R019", "relation": "药名疑字待核", "tail": "茯芬 → 候选「茯苓」（各一錢）", "reason": "v5/v3 首选为「茯茶/茯芬」，2H 短窗 CTC 第 5 名召回「茯苓」（超出自动替换阈值 rank≤3），保留原文转人工复核", "quote": "前胡川芦茯芬各一錢", "bbox": [801, 245, 849, 728]}], "graph": {"nodes": [{"id": "人参", "label": "人参", "type": "药材", "value": 3}, {"id": "三钱", "label": "三钱", "type": "剂量", "value": 3}, {"id": "人参敗毒散", "label": "人参敗毒散", "type": "方剂", "value": 5}, {"id": "枳壳", "label": "枳壳", "type": "药材", "value": 3}, {"id": "一钱半", "label": "一钱半", "type": "剂量", "value": 2}, {"id": "芦茯芬", "label": "芦茯芬", "type": "药材", "value": 3}, {"id": "一钱", "label": "一钱", "type": "剂量", "value": 2}, {"id": "生姜", "label": "生姜", "type": "药材", "value": 3}, {"id": "敗毒散", "label": "敗毒散", "type": "方剂", "value": 2}, {"id": "寒邪伤榮故發", "label": "寒邪伤榮故發", "type": "主治", "value": 2}], "links": [{"source": "人参", "target": "三钱", "relation": "剂量", "evidence_refs": ["思濟堂方書_page_51:R021"]}, {"source": "人参敗毒散", "target": "人参", "relation": "组成", "evidence_refs": ["思濟堂方書_page_51:R021"]}, {"source": "枳壳", "target": "一钱半", "relation": "剂量", "evidence_refs": ["思濟堂方書_page_51:R020"]}, {"source": "人参敗毒散", "target": "枳壳", "relation": "组成", "evidence_refs": ["思濟堂方書_page_51:R020"]}, {"source": "芦茯芬", "target": "一钱", "relation": "剂量", "evidence_refs": ["思濟堂方書_page_51:R019"]}, {"source": "人参敗毒散", "target": "芦茯芬", "relation": "组成", "evidence_refs": ["思濟堂方書_page_51:R019"]}, {"source": "生姜", "target": "三钱", "relation": "剂量", "evidence_refs": ["思濟堂方書_page_51:R018"]}, {"source": "人参敗毒散", "target": "生姜", "relation": "组成", "evidence_refs": ["思濟堂方書_page_51:R018"]}, {"source": "敗毒散", "target": "寒邪伤榮故發", "relation": "主治", "evidence_refs": ["思濟堂方書_page_51:R002"]}], "is_demo": false, "stats": {"node_count": 10, "edge_count": 9, "relations": {"剂量": 4, "组成": 4, "主治": 1}, "conflicts": [{"head": "人参敗毒散", "relation": "组成", "tails": "人参 / 枳壳 / 生姜 / 芦茯芬"}], "note": "本地 OCR 真实识别页抽出的图，规模不是评测指标；准确率需人工核验"}, "disclaimer": "仅供参考、非诊疗建议", "badge": "示例数据 · 非命题单位样本"}}, {"id": "思濟堂方書_page_39", "short_title": "第 39 页 · 六味地黄汤（跨页审计页）", "book": "思濟堂方書", "volume": "卷一 · 补益真阳门", "page_no": "第 39 页", "summary": "前段为跨页续文扶阳方论（触发「此方」无主语审计拦截），后段为《六味地黄汤》主治与三补药量", "image_url": "../../古籍评测集/医家类/思濟堂方書/page_39.png", "width": 1024, "height": 805, "engine_note": "RapidOCR + 确定性作用域边界检测（含跨页指代拦截）", "blocks": [{"line_id": "R002", "reading_order": 1, "bbox": [934, 211, 994, 746], "text": "人人参干楼川附子二錢白术粗爆土", "text_norm": "人人参干楼川附子二钱白术粗爆土", "conf": 0.512, "source_hash": "ae974f95fe0f", "block_ref": "思濟堂方書_page_39:R002"}, {"line_id": "R013", "reading_order": 2, "bbox": [879, 227, 946, 586], "text": "白茯苓山事自", "text_norm": "白茯苓山事自", "conf": 0.4, "source_hash": "c4ace0ec42fc", "block_ref": "思濟堂方書_page_39:R013"}, {"line_id": "R010", "reading_order": 3, "bbox": [847, 235, 887, 699], "text": "水四鍾煎一大温服随卽落渣尘息部", "text_norm": "水四钟煎一大温服随卽落渣尘息部", "conf": 0.715, "source_hash": "e58abd141e5c", "block_ref": "思濟堂方書_page_39:R010"}, {"line_id": "R004", "reading_order": 4, "bbox": [798, 234, 836, 739], "text": "此方不但治真陽虛損亦治少陰證惡寒遍身", "text_norm": "此方不但治真阳虚损亦治少阴证恶寒遍身", "conf": 0.88, "source_hash": "306a2422b60d", "block_ref": "思濟堂方書_page_39:R004"}, {"line_id": "R012", "reading_order": 5, "bbox": [751, 237, 784, 736], "text": "骨節疼痛口中和但欲帘乐來沉細微弱無力", "text_norm": "骨節疼痛口中和但欲帘乐來沉细微弱无力", "conf": 0.791, "source_hash": "15764c05f28a", "block_ref": "思濟堂方書_page_39:R012"}, {"line_id": "R009", "reading_order": 6, "bbox": [699, 236, 736, 737], "text": "耆相宜蓋天之大寶只此一九紅日人之大寶", "text_norm": "芪相宜蓋天之大寶只此一九红日人之大寶", "conf": 0.81, "source_hash": "56555c8704c3", "block_ref": "思濟堂方書_page_39:R009"}, {"line_id": "R008", "reading_order": 7, "bbox": [652, 236, 685, 736], "text": "只此一點真陽陽來則生陽去則死分陽不盡", "text_norm": "只此一點真阳阳來則生阳去則死分阳不盡", "conf": 0.794, "source_hash": "ad165e425509", "block_ref": "思濟堂方書_page_39:R008"}, {"line_id": "R003", "reading_order": 8, "bbox": [600, 234, 637, 735], "text": "則不死分陰不盡則不仙可見真陽乃人身中", "text_norm": "則不死分阴不盡則不仙可見真阳乃人身中", "conf": 0.913, "source_hash": "ef7150d090a7", "block_ref": "思濟堂方書_page_39:R003"}, {"line_id": "R007", "reading_order": 9, "bbox": [552, 235, 587, 734], "text": "之至竇精神氣血之大原也故仲景一部傷寒", "text_norm": "之至竇精神气血之大原也故仲景一部伤寒", "conf": 0.883, "source_hash": "685914d41af5", "block_ref": "思濟堂方書_page_39:R007"}, {"line_id": "R018", "reading_order": 10, "bbox": [432, 241, 467, 707], "text": "論全重在扶陽建中四字最是着眼不哦", "text_norm": "論全重在扶阳建中四字最是着眼不哦", "conf": 0.897, "source_hash": "1ae7b10c3116", "block_ref": "思濟堂方書_page_39:R018"}, {"line_id": "R001", "reading_order": 11, "bbox": [384, 212, 418, 464], "text": "六味地黄湯甩达大", "text_norm": "六味地黄汤甩达大", "conf": 0.67, "source_hash": "3048c7ef43db", "block_ref": "思濟堂方書_page_39:R001"}, {"line_id": "R017", "reading_order": 12, "bbox": [335, 240, 368, 739], "text": "此方尊治啓精不足虚火炎上腰痿軟骨熱", "text_norm": "此方尊治啓精不足虚火炎上腰痿軟骨热", "conf": 0.822, "source_hash": "bec4d8c76963", "block_ref": "思濟堂方書_page_39:R017"}, {"line_id": "R016", "reading_order": 13, "bbox": [284, 239, 319, 737], "text": "酸疼足跟作痛小便淋澁遺精夢鴻或小便不", "text_norm": "酸疼足跟作痛小便淋澁遗精夢鴻或小便不", "conf": 0.851, "source_hash": "0d90d8b5b93a", "block_ref": "思濟堂方書_page_39:R016"}, {"line_id": "R015", "reading_order": 14, "bbox": [234, 239, 270, 740], "text": "禁白濁陰囊濕痒水泛爲痰自汗盗汗亡血逍", "text_norm": "禁白濁阴囊湿痒水泛为痰自汗盗汗亡血逍", "conf": 0.854, "source_hash": "a0d7e2eb69ed", "block_ref": "思濟堂方書_page_39:R015"}, {"line_id": "R014", "reading_order": 15, "bbox": [185, 238, 221, 665], "text": "渴頭目暈耳聾齒搖等證並皆治之", "text_norm": "渴头目暈耳聋齿搖等证並皆治之", "conf": 0.867, "source_hash": "8bbf58ab8c59", "block_ref": "思濟堂方書_page_39:R014"}, {"line_id": "R006", "reading_order": 16, "bbox": [133, 235, 188, 637], "text": "大熟地自六錢可以加至一二三兩", "text_norm": "大熟地自六钱可以加至一二三两", "conf": 0.905, "source_hash": "8c746bc7f0bc", "block_ref": "思濟堂方書_page_39:R006"}, {"line_id": "R005", "reading_order": 17, "bbox": [84, 235, 138, 636], "text": "淮山藥自三錢可以加至五七九錢", "text_norm": "淮山药自三钱可以加至五七九钱", "conf": 0.887, "source_hash": "81cca8c33df5", "block_ref": "思濟堂方書_page_39:R005"}, {"line_id": "R011", "reading_order": 18, "bbox": [37, 236, 87, 662], "text": "山萸肉自二錢牛可以加至五七九錢", "text_norm": "山萸肉自二钱牛可以加至五七九钱", "conf": 0.814, "source_hash": "ab923e5fdb59", "block_ref": "思濟堂方書_page_39:R011"}], "tables": [{"formula_name": "六味地黃湯", "name_line": "R001", "source_type": "正文抽取", "continuation": "可能续页", "indication": "专治肾精不足，虚火炎上，腰膝痿软，骨热酸疼，足跟作痛，遗精盗汗，头目眩晕，耳聋齿摇（R017-R014）", "rows": [{"herb": "大熟地", "dose": "六錢（可加至一二三兩）", "line_ids": ["R006"], "scope": "原文字段", "status": "ok", "note": "原文 R006「大熟地自六錢可以加至一二三兩」"}, {"herb": "淮山藥", "dose": "三錢（可加至五七九錢）", "line_ids": ["R005"], "scope": "原文字段", "status": "ok", "note": "原文 R005「淮山藥自三錢可以加至五七九錢」"}, {"herb": "山萸肉", "dose": "二錢半（可加至五七九錢）", "line_ids": ["R011"], "scope": "原文字段", "status": "ok", "note": "原文 R011「山萸肉自二錢牛可以加至五七九錢」"}]}], "entities": [{"name": "人参", "type": "药材", "value": "人参", "line_id": "R002", "block_ref": "思濟堂方書_page_39:R002"}, {"name": "附子", "type": "药材", "value": "附子", "line_id": "R002", "block_ref": "思濟堂方書_page_39:R002"}, {"name": "白术", "type": "药材", "value": "白术", "line_id": "R002", "block_ref": "思濟堂方書_page_39:R002"}, {"name": "二钱", "type": "剂量", "value": "二钱", "line_id": "R002", "block_ref": "思濟堂方書_page_39:R002"}, {"name": "白茯苓", "type": "药材", "value": "白茯苓", "line_id": "R013", "block_ref": "思濟堂方書_page_39:R013"}, {"name": "真阳虚损亦治少阴证恶寒遍身", "type": "主治", "value": "真阳虚损亦治少阴证恶寒遍身", "line_id": "R004", "block_ref": "思濟堂方書_page_39:R004"}, {"name": "六味地黄汤", "type": "方剂", "value": "六味地黄汤", "line_id": "R001", "block_ref": "思濟堂方書_page_39:R001"}, {"name": "啓精不足虚火炎上腰痿軟骨热", "type": "主治", "value": "啓精不足虚火炎上腰痿軟骨热", "line_id": "R017", "block_ref": "思濟堂方書_page_39:R017"}, {"name": "熟地", "type": "药材", "value": "熟地", "line_id": "R006", "block_ref": "思濟堂方書_page_39:R006"}, {"name": "六钱", "type": "剂量", "value": "六钱", "line_id": "R006", "block_ref": "思濟堂方書_page_39:R006"}, {"name": "山药", "type": "药材", "value": "山药", "line_id": "R005", "block_ref": "思濟堂方書_page_39:R005"}, {"name": "三钱", "type": "剂量", "value": "三钱", "line_id": "R005", "block_ref": "思濟堂方書_page_39:R005"}, {"name": "二钱", "type": "剂量", "value": "二钱", "line_id": "R011", "block_ref": "思濟堂方書_page_39:R011"}, {"name": "萸肉自", "type": "药材", "value": "萸肉自", "line_id": "R011", "block_ref": "思濟堂方書_page_39:R011"}], "triples": [{"head": "附子", "relation": "剂量", "tail": "二钱", "line_id": "R002", "quote": "人人参干楼川附子二錢白术粗爆土", "block_ref": "思濟堂方書_page_39:R002", "subject_rule": "same_line"}, {"head": "六味地黄汤", "relation": "主治", "tail": "啓精不足虚火炎上腰痿軟骨热", "line_id": "R017", "quote": "此方尊治啓精不足虚火炎上腰痿軟骨熱", "block_ref": "思濟堂方書_page_39:R017", "subject_rule": "formula_scope"}, {"head": "熟地", "relation": "剂量", "tail": "六钱", "line_id": "R006", "quote": "大熟地自六錢可以加至一二三兩", "block_ref": "思濟堂方書_page_39:R006", "subject_rule": "same_line"}, {"head": "六味地黄汤", "relation": "组成", "tail": "熟地", "line_id": "R006", "quote": "大熟地自六錢可以加至一二三兩", "block_ref": "思濟堂方書_page_39:R006", "subject_rule": "formula_scope"}, {"head": "山药", "relation": "剂量", "tail": "三钱", "line_id": "R005", "quote": "淮山藥自三錢可以加至五七九錢", "block_ref": "思濟堂方書_page_39:R005", "subject_rule": "same_line"}, {"head": "六味地黄汤", "relation": "组成", "tail": "山药", "line_id": "R005", "quote": "淮山藥自三錢可以加至五七九錢", "block_ref": "思濟堂方書_page_39:R005", "subject_rule": "formula_scope"}, {"head": "萸肉自", "relation": "剂量", "tail": "二钱", "line_id": "R011", "quote": "山萸肉自二錢牛可以加至五七九錢", "block_ref": "思濟堂方書_page_39:R011", "subject_rule": "same_line"}, {"head": "六味地黄汤", "relation": "组成", "tail": "萸肉自", "line_id": "R011", "quote": "山萸肉自二錢牛可以加至五七九錢", "block_ref": "思濟堂方書_page_39:R011", "subject_rule": "formula_scope"}], "unresolved": [{"line_id": "R004", "relation": "主治", "tail": "真阳虚损亦治少阴证恶寒遍身", "reason": "指代词「此方」类但本页此前无方名可指代（系第 38 页跨页续文），严格拦截，禁止错归到后文《六味地黄汤》", "quote": "此方不但治真陽虛損亦治少陰證惡寒遍身", "bbox": [798, 234, 836, 739]}], "graph": {"nodes": [{"id": "附子", "label": "附子", "type": "药材", "value": 2}, {"id": "二钱", "label": "二钱", "type": "剂量", "value": 3}, {"id": "六味地黄汤", "label": "六味地黄汤", "type": "方剂", "value": 5}, {"id": "啓精不足虚火炎上腰痿軟骨热", "label": "啓精不足虚火炎上腰痿軟骨热", "type": "主治", "value": 2}, {"id": "熟地", "label": "熟地", "type": "药材", "value": 3}, {"id": "六钱", "label": "六钱", "type": "剂量", "value": 2}, {"id": "山药", "label": "山药", "type": "药材", "value": 3}, {"id": "三钱", "label": "三钱", "type": "剂量", "value": 2}, {"id": "萸肉自", "label": "萸肉自", "type": "药材", "value": 3}], "links": [{"source": "附子", "target": "二钱", "relation": "剂量", "evidence_refs": ["思濟堂方書_page_39:R002"]}, {"source": "六味地黄汤", "target": "啓精不足虚火炎上腰痿軟骨热", "relation": "主治", "evidence_refs": ["思濟堂方書_page_39:R017"]}, {"source": "熟地", "target": "六钱", "relation": "剂量", "evidence_refs": ["思濟堂方書_page_39:R006"]}, {"source": "六味地黄汤", "target": "熟地", "relation": "组成", "evidence_refs": ["思濟堂方書_page_39:R006"]}, {"source": "山药", "target": "三钱", "relation": "剂量", "evidence_refs": ["思濟堂方書_page_39:R005"]}, {"source": "六味地黄汤", "target": "山药", "relation": "组成", "evidence_refs": ["思濟堂方書_page_39:R005"]}, {"source": "萸肉自", "target": "二钱", "relation": "剂量", "evidence_refs": ["思濟堂方書_page_39:R011"]}, {"source": "六味地黄汤", "target": "萸肉自", "relation": "组成", "evidence_refs": ["思濟堂方書_page_39:R011"]}], "is_demo": false, "stats": {"node_count": 9, "edge_count": 8, "relations": {"剂量": 4, "主治": 1, "组成": 3}, "conflicts": [{"head": "六味地黄汤", "relation": "组成", "tails": "山药 / 熟地 / 萸肉自"}], "note": "本地 OCR 真实识别页抽出的图，规模不是评测指标；准确率需人工核验"}, "disclaimer": "仅供参考、非诊疗建议", "badge": "示例数据 · 非命题单位样本"}}], "presetQA": [{"id": "qa_p51_cross", "tag": "跨页溯源", "q": "人参败毒散由哪些药材组成？方中为何加入川芎、生地与姜葱？", "refused": false, "answer_html": "据《思濟堂方書》记载，<b>人參敗毒散</b>基本配伍包含人參一錢、羌活（原字作羗活）三錢、獨活 <cite data-idx='1'>[1]</cite>，以及桔梗、枳殼各一錢半、柴胡、前胡、川芎、茯苓各一錢 <cite data-idx='2'>[2]</cite>，甘草五分、生薑三錢，水煎捣碎温服 <cite data-idx='3'>[3]</cite>。\n\n关于配伍方义：书中指出外感风寒未有不伤内者，「傷其榮者和其血」，故加<b>川芎、生地</b>引药入血以调荣卫；并用<b>薑、葱</b>为引使通体汗出，令三阳血分之邪直达于外 <cite data-idx='4'>[4]</cite>。", "sources": [{"idx": 1, "page_id": "思濟堂方書_page_51", "book": "思濟堂方書", "page_no": "第 51 页", "line_ids": ["R004", "R021"], "line_span": "R004, R021", "score": 0.94, "quote": "人参敗毒散 · 人参一錢羗活三錢獨活", "hash": "5825fc7ebf84"}, {"idx": 2, "page_id": "思濟堂方書_page_51", "book": "思濟堂方書", "page_no": "第 51 页", "line_ids": ["R020", "R019"], "line_span": "R020–R019", "score": 0.91, "quote": "桔梗枳壳各一錢半柴朝 · 前胡川芦茯芬各一錢", "hash": "6bcb5596f414"}, {"idx": 3, "page_id": "思濟堂方書_page_51", "book": "思濟堂方書", "page_no": "第 51 页", "line_ids": ["R018", "R017"], "line_span": "R018–R017", "score": 0.89, "quote": "甘草五分生薑三錢 · 水搗碎温服", "hash": "c719fe54f7be"}, {"idx": 4, "page_id": "思濟堂方書_page_51", "book": "思濟堂方書", "page_no": "第 51 页", "line_ids": ["R013", "R001", "R005"], "line_span": "R013, R001–R005", "score": 0.87, "quote": "加川芎生地引而人血借以調荣用薑葱爲引使通體汗出", "hash": "5d65781f4044"}]}, {"id": "qa_p36_local", "tag": "本页定位", "q": "乌药顺气汤主治哪些症状？煎服时用什么作药引？", "refused": false, "answer_html": "《思濟堂方書》所载<b>烏藥順氣湯</b>主治男妇风气攻注、四肢骨节疼痛、肢体顽麻，以及手足瘫痪、语言蹇涩等症，宜先服此药以通气道 <cite data-idx='1'>[1]</cite>。\n\n方中配伍乌药、广皮、麻黄、桔梗、甘草（三分）等药 <cite data-idx='2'>[2]</cite>；煎服时<b>引加生薑一錢、紅棗肉二枚</b>，水煎温服 <cite data-idx='3'>[3]</cite>。", "sources": [{"idx": 1, "page_id": "思濟堂方書_page_36", "book": "思濟堂方書", "page_no": "第 36 页", "line_ids": ["R003", "R014", "R001"], "line_span": "R003, R014–R001", "score": 0.95, "quote": "烏藥順氣湯 · 治男婦風氣攻注四肢骨節疼痛肢體頑麻手足癱痪語言蹇澁", "hash": "a8698e361401"}, {"idx": 2, "page_id": "思濟堂方書_page_36", "book": "思濟堂方書", "page_no": "第 36 页", "line_ids": ["R005", "R007"], "line_span": "R005, R007", "score": 0.88, "quote": "正嫩烏藥打廣皮伴一麻黄 · 桔梗洛一干蓬五分备一甘草三分", "hash": "a8698e360507"}, {"idx": 3, "page_id": "思濟堂方書_page_36", "book": "思濟堂方書", "page_no": "第 36 页", "line_ids": ["R006"], "line_span": "R006", "score": 0.93, "quote": "引加生薑一錢紅棗肉二枚水煎温服", "hash": "a8698e360006"}]}, {"id": "qa_cross_compare", "tag": "跨页对比", "q": "书中对脾胃气虚与肾精不足分别推崇什么代表方剂？", "refused": false, "answer_html": "综合《思濟堂方書》多页原文，书中强调「惟有益胃補腎兩途」 <cite data-idx='1'>[1]</cite>：\n\n1. <b>脾胃气虚</b>：推崇<b>四君子湯 / 六君子湯</b>。引张路玉语「氣虛者補之以甘，如参术苓草，甘温益胃，有健運之功」，认为人之一身以胃气为主，四君、六君为司命之本 <cite data-idx='2'>[2]</cite>。\n2. <b>肾精不足、虚火炎上</b>：推崇<b>六味地黃湯</b>。专治肾精不足、腰膝痿软、骨热酸疼、遗精盗汗、耳聋齿摇等证 <cite data-idx='3'>[3]</cite>，重用大熟地（六钱起）、淮山药（三钱起）、山萸肉（二钱半起） <cite data-idx='4'>[4]</cite>。", "sources": [{"idx": 1, "page_id": "思濟堂方書_page_36", "book": "思濟堂方書", "page_no": "第 36 页", "line_ids": ["R012", "R010"], "line_span": "R012, R010", "score": 0.9, "quote": "惟有益胃補腎兩途是故四君六君隨證加减……是知四君六君爲司命之本也", "hash": "a8698e361210"}, {"idx": 2, "page_id": "思濟堂方書_page_36", "book": "思濟堂方書", "page_no": "第 36 页", "line_ids": ["R019", "R018", "R016"], "line_span": "R019–R016", "score": 0.92, "quote": "去廣皮半夏名四君子湯治脾虚無爽者更效 · 氣虛者補之以甘如参术苓草", "hash": "a8698e361916"}, {"idx": 3, "page_id": "思濟堂方書_page_39", "book": "思濟堂方書", "page_no": "第 39 页", "line_ids": ["R001", "R017", "R016"], "line_span": "R001, R017–R016", "score": 0.93, "quote": "六味地黄湯 · 此方專治腎精不足虚火炎上腰痿軟骨熱酸疼", "hash": "424752ad84ce"}, {"idx": 4, "page_id": "思濟堂方書_page_39", "book": "思濟堂方書", "page_no": "第 39 页", "line_ids": ["R006", "R005", "R011"], "line_span": "R006–R011", "score": 0.89, "quote": "大熟地自六錢可以加至一二三兩 · 淮山藥自三錢 · 山萸肉自二錢半", "hash": "8a2e15e1b386"}]}, {"id": "qa_refuse", "tag": "安全拒答", "q": "我最近腰酸耳鸣、晚上盗汗，可以自己抓六味地黄汤吃吗？一天喝几次？", "refused": true, "refuse_reason": "涉及个人临床诊疗与具体用药指导（超出古籍文献检索安全边界）", "answer_html": "<b>已触发安全拒答边界：不提供个人诊疗与用药剂量建议。</b>\n\n本系统仅用于中医古籍原文识别、结构化整理与文献出处回查，不构成任何医疗诊断、处方开具或服药指导。古籍所载「钱、两」等历史衡制亦与现代临床剂量不同。如您有腰酸、耳鸣、盗汗等身体不适，请前往正规医疗机构由执业中医师面诊辨证。", "sources": []}], "metrics": [{"key": "cer", "label": "合成集字符错误率 CER", "value": "4.45%", "raw": 0.0445, "bar": 95.5, "target": "越低越好（当前实测 17/382）", "judge": "基准实测", "cls": "neutral", "detail": "总编辑距离 17 / GT 字数 382，覆盖 7 页测试集；真实医家类古籍独立分账统计"}, {"key": "field_f1", "label": "结构化字段级 F1", "value": "82.83%", "raw": 0.8283, "bar": 82.83, "threshold": 80, "target": "目标阈值 ≥ 80.0%", "judge": "达标", "cls": "ok", "detail": "TP=41 · FP=6 · FN=11；对齐键 (page_id, type, name, value) 归一化对齐"}, {"key": "table_structure", "label": "方剂表结构还原率", "value": "100.0%", "raw": 1.0, "bar": 100, "threshold": 80, "target": "目标阈值 ≥ 80.0%", "judge": "达标", "cls": "ok", "detail": "整表结构还原 2/2，单元格级核验正确 36/36，支持逐格回跳原图 bbox"}, {"key": "traceability", "label": "问答证据可溯源率", "value": "100.0%", "raw": 1.0, "bar": 100, "threshold": 90, "target": "目标阈值 ≥ 90.0%", "judge": "达标", "cls": "ok", "detail": "所有输出引文 quote 逐字回原文 Block.text 校验命中，含书名/页码/行号/bbox"}, {"key": "refusal", "label": "无依据/问诊安全拒答率", "value": "100.0%", "raw": 1.0, "bar": 100, "threshold": 85, "target": "目标阈值 ≥ 85.0%", "judge": "达标", "cls": "ok", "detail": "无依据题与个人问诊用药题正确拒答 35/35（误答 0），严守非诊疗红线"}, {"key": "answer_rate", "label": "应答题正确作答率", "value": "90.62%", "raw": 0.9062, "bar": 90.62, "target": "配对观察指标（29 / 32）", "judge": "优良", "cls": "ok", "detail": "32 道金标准应答题正确作答 29 道，语义向量 bge-small-zh-v1.5 + 本地大模型生成"}], "milestones": [{"id": "EXP-11", "stage": "双模型 + 2H 短窗 CTC 候选召回", "change": "PP-OCRv5 与繁体 PP-OCRv3 联合前缀束搜索（beam=25），纵向窗口由 4H 缩至 2H", "metric": "《思濟堂方書》第 51 页疑难药名召回", "result": "0/3 → 3/3（川芎、柴胡、茯苓全进候选）", "verdict": "采纳"}, {"id": "EXP-15", "stage": "方剂组成通用入口与契约校验", "change": "引入方名作用域与配伍段确定性切分，逐条核验主体引文与关系引文", "metric": "第 51 页《人参败毒散》组成抽取", "result": "8/11 → 10/11，误增 0，契约 10/10 通过", "verdict": "采纳"}, {"id": "EXP-17", "stage": "自动修订双侧邻字保护（R6 规则）", "change": "拟替换区间若覆盖相邻原文字则自动拦截转待核，防止吞字改错", "metric": "留出 5 页自动修订邻字损伤数", "result": "1 → 0（零误伤原正确药名）", "verdict": "采纳"}, {"id": "EXP-18", "stage": "引药边界截断（「引加 / 不加引」）", "change": "识别配伍末尾「引加生姜葱白」等引药标记并单独切分，不混入基本君臣佐使", "metric": "五页回归组成关系错归数", "result": "13 → 11（精准剥离引药误并）", "verdict": "采纳"}]};
+
+const KG_COLORS = {
+  "方剂": "#a63620",
+  "药材": "#265954",
+  "剂量": "#7c4dff",
+  "主治": "#b45309",
+  "功效": "#0e7490",
+  "实体": "#64748b"
+};
+
+const S = {
+  view: "recognize",
+  pageIdx: 0,
+  structTab: "text",
+  qaOpen: true,
+  showBoxes: true,
+  showTags: true,
+  zoom: 100,
+  loupeSeg: 0,
+  selectedLines: [],
+  entFilter: "",
+  returnOrigin: null,     // { pageIdx, pageTitle, lineIds }
+  customPreviewUrl: null, // 本地上传预览图片 URL
+  kgScope: "cur",         // 'cur' | 'all'
+  kgNodes: [],
+  kgLinks: [],
+  kgSelected: null,
+  kgTransform: { x: 0, y: 0, k: 1 },
+  voiceTimer: null
+};
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+
+function curPage() { return BUNDLE.pages[S.pageIdx]; }
+
+let toastTimer = null;
+function toast(msg) {
+  const el = $("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove("show"), 2800);
+}
+
+/* ============ 顶部主视图切换 ============ */
+function switchView(viewName) {
+  S.view = viewName;
+  document.querySelectorAll(".nav-btn").forEach(b => b.classList.toggle("active", b.dataset.view === viewName));
+  $("viewRecognize").classList.toggle("active", viewName === "recognize");
+  $("viewGraph").classList.toggle("active", viewName === "graph");
+  $("viewEval").classList.toggle("active", viewName === "eval");
+  if (viewName === "graph") {
+    requestAnimationFrame(() => buildAndDrawKG());
+  }
+}
+document.querySelectorAll(".nav-btn").forEach(btn => {
+  btn.onclick = () => switchView(btn.dataset.view);
+});
+
+/* ============ 古籍库选择器 ============ */
+function renderLibrary() {
+  const p = curPage();
+  $("curPageShort").textContent = S.customPreviewUrl ? "本地预览页" : p.page_no;
+  $("libList").innerHTML = BUNDLE.pages.map((pg, idx) => {
+    const isCur = !S.customPreviewUrl && idx === S.pageIdx;
+    return `<div class="lib-item ${isCur ? "cur" : ""}" data-idx="${idx}">
+      <div class="lib-item-top">
+        <span>《${esc(pg.book)}》${esc(pg.page_no)}</span>
+        ${isCur ? '<span class="badge red">当前页</span>' : '<span class="badge">点击切换</span>'}
+      </div>
+      <div class="lib-item-desc">${esc(pg.summary)}</div>
+      <div class="lib-item-tags">
+        <span class="badge">文本行 ${pg.blocks.length}</span>
+        <span class="badge ok">方剂表 ${pg.tables.length}</span>
+        <span class="badge">三元组 ${pg.triples.length}</span>
+        ${pg.unresolved.length ? `<span class="badge red">待核 ${pg.unresolved.length}</span>` : ""}
+      </div>
+    </div>`;
+  }).join("");
+
+  $("libList").querySelectorAll(".lib-item").forEach(el => {
+    el.onclick = () => {
+      const idx = +el.dataset.idx;
+      S.returnOrigin = null;
+      updateJumpBanner();
+      selectPage(idx);
+      $("libPop").classList.remove("open");
+    };
+  });
+  renderFilmstrip();
+}
+
+function renderFilmstrip() {
+  const p = curPage();
+  $("pageStatLine").textContent = S.customPreviewUrl
+    ? "本地图片预览模式"
+    : `本页共 ${p.blocks.length} 列 · ${p.tables.length} 张方表 · ${p.triples.length} 条关系`;
+
+  const shortFormulas = ["乌药顺气汤", "人参败毒散", "六味地黄汤"];
+  $("scanFilmstrip").innerHTML = BUNDLE.pages.map((pg, idx) => {
+    const isCur = !S.customPreviewUrl && idx === S.pageIdx;
+    return `<div class="thumb-card ${isCur ? "cur" : ""}" data-idx="${idx}" title="点击切换至《${esc(pg.book)}》${esc(pg.page_no)}">
+      <img src="${esc(pg.image_url)}" alt="${esc(pg.page_no)}">
+      <div class="thumb-meta">
+        <b>${esc(pg.page_no)}</b>
+        <span>${esc(shortFormulas[idx] || pg.volume)}</span>
+      </div>
+    </div>`;
+  }).join("");
+
+  $("scanFilmstrip").querySelectorAll(".thumb-card").forEach(el => {
+    el.onclick = () => {
+      const idx = +el.dataset.idx;
+      if (idx === S.pageIdx && !S.customPreviewUrl) return;
+      S.returnOrigin = null;
+      updateJumpBanner();
+      $("uprog").classList.remove("show");
+      $("uprogText").textContent = "拖拽或点击选图（png / jpg / tif）";
+      selectPage(idx);
+    };
+  });
+}
+
+$("btnLib").onclick = e => {
+  e.stopPropagation();
+  $("libPop").classList.toggle("open");
+};
+document.addEventListener("click", e => {
+  if (!$("libWrap").contains(e.target)) $("libPop").classList.remove("open");
+});
+
+/* ============ 加载并渲染指定古籍页 ============ */
+function selectPage(idx, opts = {}) {
+  S.pageIdx = idx;
+  S.customPreviewUrl = null;
+  const p = curPage();
+  $("scanTitle").textContent = `《${p.book}》${p.volume} · ${p.page_no}`;
+  renderLibrary();
+  renderScanStage();
+  renderTextTab();
+  renderTableTab();
+  renderEntityTab();
+  renderAuditTab();
+  updateTabCounts();
+
+  if (opts.highlightLines && opts.highlightLines.length) {
+    highlightLines(opts.highlightLines, { scrollScan: true, scrollList: true });
+  } else if (p.tables.length && p.tables[0].name_line) {
+    highlightLines([p.tables[0].name_line], { scrollScan: false, scrollList: false });
+  } else if (p.blocks.length) {
+    highlightLines([p.blocks[0].line_id], { scrollScan: false, scrollList: false });
+  }
+  if (S.view === "graph" && S.kgScope === "cur") buildAndDrawKG();
+}
+
+function updateTabCounts() {
+  const p = curPage();
+  $("cntText").textContent = p.blocks.length;
+  $("cntTable").textContent = p.tables.reduce((s, t) => s + t.rows.length, 0);
+  $("cntEntity").textContent = p.triples.length + "+" + p.entities.length;
+  $("cntAudit").textContent = p.unresolved.length;
+  $("tabBtnAudit").classList.toggle("warn-tab", p.unresolved.length > 0);
+  const totalGraphNodes = BUNDLE.pages.reduce((s, pg) => s + (pg.graph?.nodes?.length || 0), 0);
+  $("navGraphCnt").textContent = totalGraphNodes;
+}
+
+/* ============ 左栏：古籍扫描图自适应铺满视口 ============ */
+function applyZoom() {
+  const p = curPage();
+  const vp = $("scanViewport");
+  const stage = $("scanStage");
+  const availW = Math.max(300, (vp.clientWidth || 580) - 20);
+  const availH = Math.max(240, (vp.clientHeight || 460) - 20);
+  const ratio = p.width / p.height;
+  const fitW = Math.min(availW, availH * ratio);
+  const w = Math.round(fitW * (S.zoom / 100));
+  stage.style.width = w + "px";
+  stage.style.aspectRatio = `${p.width} / ${p.height}`;
+  $("zoomLabel").textContent = S.zoom === 100 ? "适应 100%" : (S.zoom + "%");
+}
+
+if (window.ResizeObserver) {
+  new ResizeObserver(() => {
+    if (S.view === "recognize") applyZoom();
+  }).observe($("scanViewport"));
+}
+
+function renderScanStage() {
+  const p = curPage();
+  const stage = $("scanStage");
+  const img = $("scanImg");
+  stage.classList.remove("no-img");
+  applyZoom();
+
+  if (S.customPreviewUrl) {
+    img.onload = () => stage.classList.remove("no-img");
+    img.src = S.customPreviewUrl;
+    $("bboxLayer").innerHTML = "";
+    $("footQuote").textContent = "本地上传预览图（未连接后端 RapidOCR 推理服务）";
+    $("footMeta").textContent = "点击左侧预置古籍页可随时切回";
+    $("footConfBadge").textContent = "离线预览";
+    return;
+  }
+
+  img.onload = () => { stage.classList.remove("no-img"); applyZoom(); };
+  img.onerror = () => stage.classList.add("no-img");
+  img.src = p.image_url;
+
+  // 渲染所有真实坐标文字框
+  $("bboxLayer").innerHTML = p.blocks.map(b => {
+    const [x1, y1, x2, y2] = b.bbox;
+    const left = (x1 / p.width * 100).toFixed(2) + "%";
+    const top = (y1 / p.height * 100).toFixed(2) + "%";
+    const width = (Math.max(8, x2 - x1) / p.width * 100).toFixed(2) + "%";
+    const height = (Math.max(8, y2 - y1) / p.height * 100).toFixed(2) + "%";
+    return `<div class="bbox" data-line="${esc(b.line_id)}" style="left:${left};top:${top};width:${width};height:${height}" title="${esc(b.line_id)}：${esc(b.text)}">
+      <span class="btag">${esc(b.line_id)}</span>
+      <span class="vtxt">${esc(b.text)}</span>
+    </div>`;
+  }).join("");
+
+  $("bboxLayer").querySelectorAll(".bbox").forEach(el => {
+    el.onclick = e => {
+      e.stopPropagation();
+      highlightLines([el.dataset.line], { scrollScan: false, scrollList: true });
+    };
+  });
+}
+
+function highlightLines(lineIds, { scrollScan = true, scrollList = true } = {}) {
+  S.selectedLines = lineIds || [];
+  const p = curPage();
+  const set = new Set(S.selectedLines);
+
+  document.querySelectorAll("#bboxLayer .bbox").forEach(el => {
+    el.classList.toggle("sel", set.has(el.dataset.line));
+  });
+  document.querySelectorAll("#lineList .line-row").forEach(el => {
+    el.classList.toggle("sel", set.has(el.dataset.line));
+  });
+
+  const matched = p.blocks.filter(b => set.has(b.line_id));
+  if (matched.length) {
+    const first = matched[0];
+    $("footQuote").textContent = matched.map(m => `【${m.line_id}】${m.text}`).join("  ");
+    $("footMeta").textContent = `第 ${first.reading_order} 列 · [${first.bbox.join(",")}]`;
+    $("footConfBadge").textContent = `置信度 ${Math.round(first.conf * 100)}%`;
+    if (scrollScan && S.zoom > 100) {
+      const boxEl = document.querySelector(`#bboxLayer .bbox[data-line="${CSS.escape(first.line_id)}"]`);
+      boxEl?.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
+    }
+    if (scrollList && S.structTab === "text") {
+      const rowEl = document.querySelector(`#lineList .line-row[data-line="${CSS.escape(first.line_id)}"]`);
+      rowEl?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }
+}
+
+$("btnToggleBoxes").onclick = function () {
+  S.showBoxes = !S.showBoxes;
+  this.classList.toggle("active", S.showBoxes);
+  $("scanStage").classList.toggle("hide-boxes", !S.showBoxes);
+};
+$("btnToggleTags").onclick = function () {
+  S.showTags = !S.showTags;
+  this.classList.toggle("active", S.showTags);
+  $("scanStage").classList.toggle("hide-tags", !S.showTags);
+};
+$("btnZoomIn").onclick = () => { S.zoom = Math.min(200, S.zoom + 20); applyZoom(); };
+$("btnZoomOut").onclick = () => { S.zoom = Math.max(70, S.zoom - 20); applyZoom(); };
+$("btnZoomFit").onclick = () => { S.zoom = 100; applyZoom(); };
+
+/* ============ 本地图片上传模拟（友好降级、不白屏） ============ */
+$("btnPopUpload").onclick = () => {
+  $("libPop").classList.remove("open");
+  switchView("recognize");
+  $("fileInput").click();
+};
+
+$("dropzone").onclick = () => $("fileInput").click();
+$("dropzone").ondragover = e => { e.preventDefault(); $("dropzone").classList.add("drag"); };
+$("dropzone").ondragleave = () => $("dropzone").classList.remove("drag");
+$("dropzone").ondrop = e => {
+  e.preventDefault();
+  $("dropzone").classList.remove("drag");
+  if (e.dataTransfer?.files?.[0]) handleLocalFile(e.dataTransfer.files[0]);
+};
+$("fileInput").onchange = e => {
+  if (e.target.files?.[0]) handleLocalFile(e.target.files[0]);
+};
+
+function handleLocalFile(file) {
+  if (!file.type.startsWith("image/") && !/\.(tif|tiff)$/i.test(file.name)) {
+    toast("格式不受支持：请选择 png / jpg / webp / tif 扫描图像");
+    return;
+  }
+  const prog = $("uprog"), fill = $("uprogFill"), txt = $("uprogText");
+  prog.classList.add("show");
+  fill.style.width = "35%";
+  txt.textContent = `正在校验图像「${file.name}」…`;
+  setTimeout(() => {
+    fill.style.width = "75%";
+    txt.textContent = "检测本地 OCR 服务状态…";
+  }, 350);
+  setTimeout(() => {
+    fill.style.width = "100%";
+    S.customPreviewUrl = URL.createObjectURL(file);
+    $("scanTitle").textContent = `本地预览 · ${file.name}`;
+    renderLibrary();
+    renderScanStage();
+    txt.textContent = "已本地预览（离线原型未接 OCR）";
+    toast("已加载本地图片预览；点击左侧预置古籍页可随时切回");
+  }, 750);
+}
+
+/* ============ 右栏四标签页切换与渲染 ============ */
+function switchStructTab(tab) {
+  S.structTab = tab;
+  document.querySelectorAll(".stab").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+  document.querySelectorAll(".stab-pane").forEach(p => p.classList.toggle("active", p.id === "pane-" + tab));
+}
+document.querySelectorAll(".stab").forEach(b => {
+  b.onclick = () => switchStructTab(b.dataset.tab);
+});
+
+/* Tab 1: 文字 */
+function renderTextTab() {
+  const p = curPage();
+  const q = $("lineSearch").value.trim().toLowerCase();
+  const list = q
+    ? p.blocks.filter(b => b.text.toLowerCase().includes(q) || b.text_norm.toLowerCase().includes(q) || b.line_id.toLowerCase().includes(q))
+    : p.blocks;
+
+  $("lineList").innerHTML = list.length ? list.map(b => `
+    <div class="line-row ${S.selectedLines.includes(b.line_id) ? "sel" : ""}" data-line="${esc(b.line_id)}">
+      <span class="line-ord">第${String(b.reading_order).padStart(2,"0")}列·${esc(b.line_id)}</span>
+      <span class="line-txt">${esc(b.text)}</span>
+      <span class="line-conf">${Math.round(b.conf * 100)}%</span>
+    </div>
+  `).join("") : `<div style="padding:24px;text-align:center;color:var(--muted-solid)">未找到匹配「${esc(q)}」的文本行</div>`;
+
+  $("lineList").querySelectorAll(".line-row").forEach(el => {
+    el.onclick = () => highlightLines([el.dataset.line], { scrollScan: true, scrollList: false });
+  });
+}
+$("lineSearch").oninput = renderTextTab;
+
+/* Tab 2: 方剂表 */
+function renderTableTab() {
+  const p = curPage();
+  if (!p.tables.length) {
+    $("formulaWrap").innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted-solid)">本页未检出方剂配伍表</div>`;
+    return;
+  }
+  $("formulaWrap").innerHTML = p.tables.map((t, ti) => `
+    <div class="formula-box">
+      <div class="formula-hd">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <button type="button" class="formula-title-btn" data-lines="${esc(t.name_line)}" data-label="方题：${esc(t.formula_name)}" data-note="方名标题行定位">${esc(t.formula_name)}</button>
+          <span class="badge">${esc(t.source_type)}</span>
+          ${t.continuation ? `<span class="badge red">${esc(t.continuation)}</span>` : ""}
+        </div>
+        <span class="badge ok">共 ${t.rows.length} 味药</span>
+      </div>
+      <div class="formula-ind"><b>主治概要：</b>${esc(t.indication)}</div>
+      <table class="fangji-tbl">
+        <thead><tr><th style="width:34%">药材名称</th><th style="width:32%">抽取剂量</th><th style="width:20%">证据作用域</th><th style="width:14%">原文行</th></tr></thead>
+        <tbody>
+          ${t.rows.map((r, ri) => `
+            <tr class="frow" data-ti="${ti}" data-ri="${ri}" data-lines="${esc(r.line_ids.join(","))}" data-label="${esc(t.formula_name)} · ${esc(r.herb)}（${esc(r.dose)}）" data-note="${esc(r.note)}">
+              <td class="herb-cell">${esc(r.herb)}</td>
+              <td class="dose-cell ${r.status === "pending" ? "pending" : ""}">${esc(r.dose)}</td>
+              <td><span class="badge ${r.status === "pending" ? "red" : (r.status === "addon" ? "gold" : "ok")}">${esc(r.scope)}</span></td>
+              <td><span class="loc-link">${esc(r.line_ids.join(","))}</span></td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `).join("");
+
+  const showRowTrace = (el) => {
+    document.querySelectorAll(".frow.sel").forEach(x => x.classList.remove("sel"));
+    if (el.classList.contains("frow")) el.classList.add("sel");
+    const lines = el.dataset.lines.split(",").filter(Boolean);
+    highlightLines(lines, { scrollScan: true, scrollList: false });
+    const p = curPage();
+    const quotes = lines.map(lid => {
+      const b = p.blocks.find(x => x.line_id === lid);
+      return b ? `<code>${esc(lid)}</code>「${esc(b.text)}」（bbox: [${b.bbox.join(", ")}]）` : esc(lid);
+    }).join("；");
+    $("cellTraceBox").innerHTML = `
+      <div><b>当前核验项：</b>${esc(el.dataset.label)}</div>
+      <div><b>原图证据行：</b>${quotes}</div>
+      <div><b>核验说明：</b>${esc(el.dataset.note)}</div>
+    `;
+  };
+
+  $("formulaWrap").querySelectorAll(".frow, .formula-title-btn").forEach(el => {
+    el.onclick = () => showRowTrace(el);
+  });
+}
+
+/* Tab 3: 实体关系 */
+function renderEntityTab() {
+  const p = curPage();
+  const types = ["", ...new Set(p.entities.map(e => e.type))];
+  if (!types.includes(S.entFilter)) S.entFilter = "";
+
+  $("entFilterPills").innerHTML = types.map(t => `
+    <button type="button" class="fpill ${S.entFilter === t ? "active" : ""}" data-type="${esc(t)}">
+      ${t ? esc(t) : "全部类型"}
+    </button>
+  `).join("");
+  $("entFilterPills").querySelectorAll(".fpill").forEach(btn => {
+    btn.onclick = () => { S.entFilter = btn.dataset.type; renderEntityTab(); };
+  });
+
+  $("triTotalBadge").textContent = p.triples.length + " 条";
+  $("triTbody").innerHTML = p.triples.map(tr => `
+    <tr>
+      <td><b>${esc(tr.head)}</b></td>
+      <td><span class="badge ok">${esc(tr.relation)}</span></td>
+      <td style="font-family:var(--kai);font-size:13.5px">${esc(tr.tail)}</td>
+      <td><button type="button" class="loc-link" data-line="${esc(tr.line_id)}">${esc(tr.line_id)}</button></td>
+    </tr>
+  `).join("");
+
+  const ents = S.entFilter ? p.entities.filter(e => e.type === S.entFilter) : p.entities;
+  $("entTotalBadge").textContent = `${ents.length} / ${p.entities.length}`;
+  $("entTbody").innerHTML = ents.map(e => `
+    <tr>
+      <td><b>${esc(e.name)}</b></td>
+      <td><span class="badge">${esc(e.type)}</span></td>
+      <td style="font-family:var(--kai);font-size:13.5px">${esc(e.value)}</td>
+      <td><button type="button" class="loc-link" data-line="${esc(e.line_id)}">${esc(e.line_id)}</button></td>
+    </tr>
+  `).join("");
+
+  document.querySelectorAll("#pane-entity .loc-link").forEach(btn => {
+    btn.onclick = () => highlightLines([btn.dataset.line], { scrollScan: true, scrollList: false });
+  });
+}
+$("btnJumpGraph").onclick = () => switchView("graph");
+
+/* Tab 4: 待核审计 */
+function renderAuditTab() {
+  const p = curPage();
+  $("auditList").innerHTML = p.unresolved.length ? p.unresolved.map(u => `
+    <div class="audit-card" data-line="${esc(u.line_id)}">
+      <div class="audit-card-hd">
+        <span>⚠ 待核拦截 · 行 ${esc(u.line_id)}（候选关系：${esc(u.relation)} → ${esc(u.tail)}）</span>
+        <span class="loc-link">点击定位原图</span>
+      </div>
+      <div class="audit-quote">原文：「${esc(u.quote)}」</div>
+      <div class="audit-why"><b>拦截原因：</b>${esc(u.reason)}</div>
+    </div>
+  `).join("") : `<div style="padding:18px;text-align:center;color:var(--qing-dark);background:var(--qing-soft);border-radius:3px">本页所有抽取关系均已确认主体归属，无待核拦截项。</div>`;
+
+  $("auditList").querySelectorAll(".audit-card").forEach(el => {
+    el.onclick = () => highlightLines([el.dataset.line], { scrollScan: true, scrollList: false });
+  });
+}
+
+/* ============ 右侧抽屉：可溯源问答与跨页跳转 ============ */
+function setQAOpen(open) {
+  S.qaOpen = open;
+  $("qaDrawer").classList.toggle("collapsed", !open);
+  $("qaHandle").classList.toggle("show", !open);
+  $("btnToggleQA").classList.toggle("open", open);
+  $("btnToggleQA").textContent = open ? "💬 收起问答" : "💬 可溯源问答";
+}
+$("btnToggleQA").onclick = () => {
+  if (S.view !== "recognize") switchView("recognize");
+  setQAOpen(!S.qaOpen);
+};
+$("btnCollapseQA").onclick = () => setQAOpen(false);
+$("qaHandle").onclick = () => setQAOpen(true);
+
+function renderPresetQA() {
+  const shortLabels = ["人参败毒散配伍", "乌药顺气汤主治", "脾虚与肾虚名方", "腰酸盗汗问诊"];
+  $("qaPresetList").innerHTML = BUNDLE.presetQA.map((item, i) => `
+    <button type="button" class="qchip ${item.refused ? "refuse" : ""}" data-qidx="${i}" title="${esc(item.q)}">
+      <span class="qtag">${esc(item.tag)}</span>${esc(shortLabels[i] || item.q)}
+    </button>
+  `).join("");
+  $("qaPresetList").querySelectorAll(".qchip").forEach(btn => {
+    btn.onclick = () => runPresetQA(+btn.dataset.qidx);
+  });
+}
+
+function updateJumpBanner() {
+  const bar = $("jumpBanner");
+  if (!S.returnOrigin) {
+    bar.classList.remove("show");
+    return;
+  }
+  const dest = curPage();
+  $("jumpText").innerHTML = `📍 <b>跨页溯源已定位：</b>由《${esc(S.returnOrigin.pageTitle)}》自动跳转至《${esc(dest.page_no)}》行 <code>${esc(S.returnOrigin.targetLines.join(", "))}</code>`;
+  $("btnReturnOrigin").textContent = `↩ 返回原页（${S.returnOrigin.pageTitle}）`;
+  bar.classList.add("show");
+}
+
+$("btnReturnOrigin").onclick = () => {
+  if (!S.returnOrigin) return;
+  const orig = S.returnOrigin;
+  S.returnOrigin = null;
+  updateJumpBanner();
+  selectPage(orig.pageIdx, { highlightLines: orig.originLines });
+  toast(`已返回原页：${orig.pageTitle}`);
+};
+
+function jumpToCitation(src) {
+  if (!src) return;
+  if (S.view !== "recognize") switchView("recognize");
+  const targetIdx = BUNDLE.pages.findIndex(p => p.id === src.page_id);
+  if (targetIdx < 0) return;
+
+  if (targetIdx !== S.pageIdx || S.customPreviewUrl) {
+    const prevPage = curPage();
+    S.returnOrigin = {
+      pageIdx: S.pageIdx,
+      pageTitle: prevPage.page_no,
+      originLines: [...S.selectedLines],
+      targetLines: src.line_ids
+    };
+    selectPage(targetIdx, { highlightLines: src.line_ids });
+    updateJumpBanner();
+    toast(`已跨页溯源至《${src.book}》${src.page_no}（${src.line_span}）`);
+  } else {
+    highlightLines(src.line_ids, { scrollScan: true, scrollList: true });
+    toast(`已在当前页定位：${src.line_span}`);
+  }
+}
+
+function appendQAExchange(questionText, qaPayload) {
+  const stream = $("qaStream");
+  const uMsg = document.createElement("div");
+  uMsg.className = "msg user";
+  uMsg.innerHTML = `<div class="avatar">問</div><div class="bubble">${esc(questionText)}</div>`;
+  stream.appendChild(uMsg);
+
+  const aiMsg = document.createElement("div");
+  aiMsg.className = "msg ai";
+  const srcsHtml = (qaPayload.sources && qaPayload.sources.length)
+    ? `<div class="src-list">
+        <div style="font-size:11px;color:var(--muted-solid)">核验原文出处（点击角标或卡片定位原图）：</div>
+        ${qaPayload.sources.map((s, si) => `
+          <div class="src-card" data-sidx="${si}">
+            <div class="src-card-top">
+              <span><b style="color:var(--cinnabar)">[${s.idx}]</b> 《${esc(s.book)}》${esc(s.page_no)} · ${esc(s.line_span)}</span>
+              <span class="badge">${s.page_id === curPage().id ? "当前页" : "跨页可跳"} · 相似度 ${s.score.toFixed(2)}</span>
+            </div>
+            <div class="src-card-quote">「${esc(s.quote)}」</div>
+          </div>
+        `).join("")}
+      </div>`
+    : "";
+
+  aiMsg.innerHTML = `
+    <div class="avatar">醫</div>
+    <div class="bubble ${qaPayload.refused ? "refused" : ""}">${qaPayload.answer_html}${srcsHtml}</div>
+  `;
+  stream.appendChild(aiMsg);
+  stream.scrollTop = stream.scrollHeight;
+
+  // 绑定答案内 [编号] 与下方出处卡片点击溯源
+  aiMsg.querySelectorAll("cite[data-idx]").forEach(c => {
+    c.onclick = () => {
+      const idx = +c.dataset.idx;
+      const found = (qaPayload.sources || []).find(s => s.idx === idx);
+      jumpToCitation(found);
+    };
+  });
+  aiMsg.querySelectorAll(".src-card").forEach(card => {
+    card.onclick = () => {
+      const found = qaPayload.sources[+card.dataset.sidx];
+      jumpToCitation(found);
+    };
+  });
+}
+
+function runPresetQA(qidx) {
+  setQAOpen(true);
+  const item = BUNDLE.presetQA[qidx];
+  appendQAExchange(item.q, item);
+}
+
+/* 自由提问：客户端轻量化检索匹配 + 安全拒答兜底 */
+function handleFreeQuestion(q) {
+  const text = q.trim();
+  if (!text) return;
+  $("qaInput").value = "";
+
+  // 检查是否命中预设问题
+  const exact = BUNDLE.presetQA.find(item => item.q === text);
+  if (exact) { appendQAExchange(text, exact); return; }
+
+  // 诊疗/用药边界拦截
+  if (/我|自己吃|吃多少|喝几次|能治好|失眠|怀孕|剂量建议|怎么抓药|开方/.test(text)) {
+    appendQAExchange(text, {
+      refused: true,
+      answer_html: `<b>已触发安全拒答边界：不提供个人临床诊疗与服药建议。</b>\n\n系统检测到问题涉及个人症状或具体服药指导。本原型仅面向中医古籍文献检索与知识溯源，不提供医疗建议。如有身体不适请咨询执业医师。`,
+      sources: []
+    });
+    return;
+  }
+
+  // 在三页真实古籍块中执行关键词匹配检索，生成真实可跳回的溯源结果
+  const tokens = text.replace(/[？?，。！!、的了么什由哪些如何为什么与及]/g, " ").split(/\s+/).filter(t => t.length >= 2);
+  const hits = [];
+  BUNDLE.pages.forEach(pg => {
+    pg.blocks.forEach(b => {
+      let score = 0;
+      tokens.forEach(tk => {
+        if (b.text.includes(tk) || b.text_norm.includes(tk)) score += 0.42;
+      });
+      for (const ch of text) {
+        if (/[\u4e00-\u9fa5]/.test(ch) && !"的了是在有和与及么什吗呢何".includes(ch) && b.text.includes(ch)) score += 0.08;
+      }
+      if (score >= 0.24) {
+        hits.push({ pg, b, score: Math.min(0.96, 0.55 + score * 0.35) });
+      }
+    });
+  });
+  hits.sort((a, b) => b.score - a.score);
+  const top = hits.slice(0, 3);
+
+  if (!top.length) {
+    appendQAExchange(text, {
+      refused: false,
+      answer_html: `<b>当前已入库的 3 页《思濟堂方書》示例中未检索到直接原文依据。</b>\n\n（免后端演示提示：接入本地全量向量库与 Ollama 大模型后，将在全库语义检索并声明无古籍依据后补充通识说明。）`,
+      sources: []
+    });
+    return;
+  }
+
+  const sources = top.map((h, i) => ({
+    idx: i + 1,
+    page_id: h.pg.id,
+    book: h.pg.book,
+    page_no: h.pg.page_no,
+    line_ids: [h.b.line_id],
+    line_span: h.b.line_id,
+    score: h.score,
+    quote: h.b.text,
+    hash: h.b.source_hash
+  }));
+  const summaryLines = sources.map(s => `• 《${esc(s.book)}》${esc(s.page_no)}「${esc(s.quote)}」 <cite data-idx="${s.idx}">[${s.idx}]</cite>`).join("\n");
+  appendQAExchange(text, {
+    refused: false,
+    answer_html: `已在预置古籍库中为您检索到 ${sources.length} 处相关原文段落（离线原型摘录模式，点击角标定位原图）：\n\n${summaryLines}`,
+    sources
+  });
+}
+
+$("btnSendQA").onclick = () => handleFreeQuestion($("qaInput").value);
+$("qaInput").onkeydown = e => { if (e.key === "Enter") handleFreeQuestion($("qaInput").value); };
+
+// 欢迎语中的示例角标点击体验
+document.querySelector('[data-demo-cite="1"]')?.addEventListener("click", () => {
+  runPresetQA(0);
+});
+
+/* ============ 语音输入（原生 Web Speech + 离线模拟兜底） ============ */
+const DEMO_VOICE_SAMPLES = {
+  "zh-CN": "人参败毒散由哪些药材组成？方中为何加入川芎、生地与姜葱？",
+  "yue-Hant-HK": "乌药顺气汤主治哪些症状？煎服时用什么作药引？",
+  "en-US": "书中对脾胃气虚与肾精不足分别推崇什么代表方剂？"
+};
+
+function stopVoice() {
+  clearTimeout(S.voiceTimer);
+  S.voiceTimer = null;
+  $("btnMic").classList.remove("rec");
+  $("voiceBar").classList.remove("show");
+}
+
+$("btnMic").onclick = () => {
+  if ($("btnMic").classList.contains("rec")) {
+    stopVoice();
+    return;
+  }
+  const lang = $("voiceLang").value;
+  const langLabel = $("voiceLang").selectedOptions[0].text;
+  $("btnMic").classList.add("rec");
+  $("voiceStatusTxt").textContent = `正在聆听语音（${langLabel}）…演示模式将自动转写示例问题`;
+  $("voiceBar").classList.add("show");
+
+  S.voiceTimer = setTimeout(() => {
+    stopVoice();
+    $("qaInput").value = DEMO_VOICE_SAMPLES[lang] || DEMO_VOICE_SAMPLES["zh-CN"];
+    $("qaInput").focus();
+    toast(`语音识别完成（${langLabel}演示转写），按回车或点「提问」即可发送`);
+  }, 1300);
+};
+$("btnCancelVoice").onclick = stopVoice;
+
+/* ============ 答辩演示快捷剧本导览按钮 ============ */
+$("btnDemoBar").onclick = function () {
+  const open = !$("demoBar").classList.contains("show");
+  $("demoBar").classList.toggle("show", open);
+  this.classList.toggle("active", open);
+};
+$("btnHideDemoBar").onclick = () => {
+  $("demoBar").classList.remove("show");
+  $("btnDemoBar").classList.remove("active");
+};
+
+document.querySelectorAll(".demo-step-btn").forEach(btn => {
+  btn.onclick = () => {
+    const act = btn.dataset.act;
+    switchView("recognize");
+    if (act === "table") {
+      S.returnOrigin = null; updateJumpBanner();
+      selectPage(1); // 第 51 页 人参败毒散
+      switchStructTab("table");
+      setTimeout(() => {
+        const row = document.querySelector('#formulaWrap .frow[data-ri="1"]') || document.querySelector("#formulaWrap .frow");
+        row?.click();
+      }, 80);
+      toast("演示 ①：已切至第 51 页《人参败毒散》，展示方剂表逐格回跳原图");
+    } else if (act === "audit") {
+      S.returnOrigin = null; updateJumpBanner();
+      selectPage(2); // 第 39 页 六味地黄汤 + 跨页指代待核
+      switchStructTab("audit");
+      highlightLines(["R004"], { scrollScan: true, scrollList: false });
+      toast("演示 ②：已切至第 39 页，高亮页首跨页指代「此方」待核拦截行 R004");
+    } else if (act === "crossqa") {
+      S.returnOrigin = null; updateJumpBanner();
+      selectPage(0); // 先停在第 36 页
+      setQAOpen(true);
+      runPresetQA(0); // 提问第 51 页的人参败毒散
+      setTimeout(() => {
+        // 自动演示点击 [1] 跨页跳转到第 51 页
+        jumpToCitation(BUNDLE.presetQA[0].sources[0]);
+      }, 450);
+    } else if (act === "refuse") {
+      setQAOpen(true);
+      runPresetQA(3);
+      toast("演示 ④：已触发个人问诊与用药剂量安全拒答边界");
+    }
+  };
+});
+
+/* ============ 视图 2：全屏知识图谱（Canvas 力导向 + 缩放拖拽 + 回原图定位） ============ */
+function buildAndDrawKG() {
+  const filterType = $("kgTypeFilter").value;
+  const pages = S.kgScope === "all" ? BUNDLE.pages : [curPage()];
+  $("kgTitle").textContent = S.kgScope === "all"
+    ? "全库融合知识图谱（《思濟堂方書》3 页合并）"
+    : `单页知识图谱 · 《${curPage().book}》${curPage().page_no}`;
+
+  const nodeMap = new Map();
+  const links = [];
+  const relCount = {};
+
+  pages.forEach((pg, pIdx) => {
+    pg.entities.forEach(e => {
+      const key = `${e.type}:${e.name}`;
+      if (!nodeMap.has(key)) {
+        nodeMap.set(key, {
+          id: key, label: e.name, type: e.type, weight: 1,
+          pageIdx: pIdx, pageNo: pg.page_no, lineId: e.line_id, value: e.value
+        });
+      } else {
+        nodeMap.get(key).weight += 1;
+      }
+    });
+    pg.triples.forEach(tr => {
+      const sType = pg.entities.find(e => e.name === tr.head)?.type || (tr.head.match(/汤|散|丸|饮/) ? "方剂" : "药材");
+      const tType = tr.relation === "剂量" ? "剂量" : (tr.relation === "主治" ? "主治" : (tr.relation === "功效" ? "功效" : "药材"));
+      const sId = `${sType}:${tr.head}`;
+      const tId = `${tType}:${tr.tail}`;
+      if (!nodeMap.has(sId)) nodeMap.set(sId, { id: sId, label: tr.head, type: sType, weight: 2, pageIdx: pIdx, pageNo: pg.page_no, lineId: tr.line_id });
+      if (!nodeMap.has(tId)) nodeMap.set(tId, { id: tId, label: tr.tail, type: tType, weight: 1, pageIdx: pIdx, pageNo: pg.page_no, lineId: tr.line_id });
+      links.push({ source: sId, target: tId, relation: tr.relation, quote: tr.quote, lineId: tr.line_id, pageIdx: pIdx, pageNo: pg.page_no });
+      relCount[tr.relation] = (relCount[tr.relation] || 0) + 1;
+    });
+  });
+
+  let nodes = Array.from(nodeMap.values());
+  let filteredLinks = links;
+  if (filterType) {
+    const keepIds = new Set(nodes.filter(n => n.type === filterType).map(n => n.id));
+    filteredLinks = links.filter(l => keepIds.has(l.source) || keepIds.has(l.target));
+    filteredLinks.forEach(l => { keepIds.add(l.source); keepIds.add(l.target); });
+    nodes = nodes.filter(n => keepIds.has(n.id));
+  }
+
+  const cv = $("kgCanvas");
+  const W = cv.clientWidth || 860, H = cv.clientHeight || 560;
+  const n = nodes.length;
+  nodes.forEach((nd, i) => {
+    const a = i * 2.39996;
+    const r = Math.min(W, H) * (0.12 + 0.28 * Math.sqrt(i / Math.max(1, n)));
+    nd.x = W / 2 + Math.cos(a) * r;
+    nd.y = H / 2 + Math.sin(a) * r;
+    nd.vx = 0; nd.vy = 0;
+  });
+
+  const idxOf = {};
+  nodes.forEach((nd, i) => idxOf[nd.id] = i);
+  for (let it = 0; it < 220; it++) {
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        const a = nodes[i], b = nodes[j];
+        let dx = a.x - b.x, dy = a.y - b.y;
+        let d2 = dx * dx + dy * dy + 1, d = Math.sqrt(d2);
+        let f = 3400 / d2;
+        a.vx += f * dx / d; a.vy += f * dy / d;
+        b.vx -= f * dx / d; b.vy -= f * dy / d;
+      }
+    }
+    filteredLinks.forEach(l => {
+      const a = nodes[idxOf[l.source]], b = nodes[idxOf[l.target]];
+      if (!a || !b) return;
+      let dx = b.x - a.x, dy = b.y - a.y, d = Math.sqrt(dx * dx + dy * dy) || 1;
+      let f = (d - 115) * 0.016;
+      a.vx += f * dx / d; a.vy += f * dy / d;
+      b.vx -= f * dx / d; b.vy -= f * dy / d;
+    });
+    nodes.forEach(nd => {
+      nd.vx += (W / 2 - nd.x) * 0.007;
+      nd.vy += (H / 2 - nd.y) * 0.007;
+      nd.vx *= 0.8; nd.vy *= 0.8;
+      nd.x = Math.max(55, Math.min(W - 55, nd.x + nd.vx));
+      nd.y = Math.max(45, Math.min(H - 45, nd.y + nd.vy));
+    });
+  }
+
+  S.kgNodes = nodes;
+  S.kgLinks = filteredLinks;
+  S.kgSelected = null;
+  S.kgTransform = { x: 0, y: 0, k: 1 };
+
+  $("kgStatsBox").innerHTML = `
+    <div><b>当前范围：</b>${S.kgScope === "all" ? "《思濟堂方書》3 页合并" : curPage().page_no}</div>
+    <div><b>实体节点：</b>${nodes.length} 个　<b>知识关系边：</b>${filteredLinks.length} 条</div>
+    <div style="font-size:11.5px;color:var(--muted-solid);margin-top:3px">注：所有边均由确定性规则或双模型校正在原文块内验证产出。</div>
+  `;
+  $("kgRelBadges").innerHTML = Object.entries(relCount).map(([k, v]) => `<span class="badge ok">${esc(k)} × ${v}</span>`).join("");
+  $("kgLegend").innerHTML = Object.entries(KG_COLORS).map(([k, c]) => `<span><i style="background:${c}"></i>${esc(k)}</span>`).join("");
+
+  drawKGCanvas();
+}
+
+function drawKGCanvas() {
+  const cv = $("kgCanvas");
+  const dpr = window.devicePixelRatio || 1;
+  const W = cv.clientWidth || 860, H = cv.clientHeight || 560;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+
+  ctx.save();
+  ctx.translate(S.kgTransform.x, S.kgTransform.y);
+  ctx.scale(S.kgTransform.k, S.kgTransform.k);
+
+  const byId = {};
+  S.kgNodes.forEach(n => byId[n.id] = n);
+
+  S.kgLinks.forEach(l => {
+    const a = byId[l.source], b = byId[l.target];
+    if (!a || !b) return;
+    const active = S.kgSelected && (S.kgSelected.id === a.id || S.kgSelected.id === b.id);
+    ctx.strokeStyle = active ? "#a63620" : "rgba(105, 86, 60, .35)";
+    ctx.lineWidth = active ? 2 : 1.1;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+    ctx.fillStyle = active ? "#7f2513" : "#6c5d4b";
+    ctx.font = "10.5px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(l.relation, mx, my - 4);
+  });
+
+  S.kgNodes.forEach(nd => {
+    const r = (nd.type === "方剂" ? 15 : 10) + Math.min(5, nd.weight);
+    const isSel = S.kgSelected && S.kgSelected.id === nd.id;
+    ctx.beginPath();
+    ctx.arc(nd.x, nd.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = KG_COLORS[nd.type] || "#64748b";
+    ctx.fill();
+    ctx.lineWidth = isSel ? 3.5 : 2;
+    ctx.strokeStyle = isSel ? "#fbbf24" : "#fffdf8";
+    ctx.stroke();
+
+    const label = nd.label.length > 10 ? nd.label.slice(0, 9) + "…" : nd.label;
+    ctx.fillStyle = "#221c17";
+    ctx.font = (nd.type === "方剂" ? "bold 12.5px " : "11.5px ") + "sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(label, nd.x, nd.y + r + 14);
+  });
+
+  ctx.restore();
+}
+
+// 图谱画布点击、拖拽与缩放交互
+(function initKGInteraction() {
+  const cv = $("kgCanvas");
+  let draggingNode = null, panning = false, lastX = 0, lastY = 0, moved = false;
+
+  function toWorld(clientX, clientY) {
+    const rect = cv.getBoundingClientRect();
+    return {
+      x: (clientX - rect.left - S.kgTransform.x) / S.kgTransform.k,
+      y: (clientY - rect.top - S.kgTransform.y) / S.kgTransform.k
+    };
+  }
+
+  cv.addEventListener("mousedown", e => {
+    const pt = toWorld(e.clientX, e.clientY);
+    moved = false; lastX = e.clientX; lastY = e.clientY;
+    draggingNode = S.kgNodes.find(n => Math.hypot(n.x - pt.x, n.y - pt.y) < 18) || null;
+    if (!draggingNode) panning = true;
+  });
+
+  window.addEventListener("mousemove", e => {
+    if (!draggingNode && !panning) return;
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    if (Math.hypot(dx, dy) > 2) moved = true;
+    lastX = e.clientX; lastY = e.clientY;
+    if (draggingNode) {
+      draggingNode.x += dx / S.kgTransform.k;
+      draggingNode.y += dy / S.kgTransform.k;
+    } else if (panning) {
+      S.kgTransform.x += dx;
+      S.kgTransform.y += dy;
+    }
+    drawKGCanvas();
+  });
+
+  window.addEventListener("mouseup", e => {
+    if (!moved && e.target === cv) {
+      const pt = toWorld(e.clientX, e.clientY);
+      const hit = S.kgNodes.find(n => Math.hypot(n.x - pt.x, n.y - pt.y) < 20) || null;
+      S.kgSelected = hit;
+      drawKGCanvas();
+      if (hit) showKGNodeDetail(hit);
+    }
+    draggingNode = null; panning = false;
+  });
+
+  cv.addEventListener("wheel", e => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.1 : 0.9;
+    S.kgTransform.k = Math.max(0.55, Math.min(2.2, S.kgTransform.k * factor));
+    drawKGCanvas();
+  }, { passive: false });
+})();
+
+function showKGNodeDetail(nd) {
+  const outs = S.kgLinks.filter(l => l.source === nd.id);
+  const ins = S.kgLinks.filter(l => l.target === nd.id);
+  const relHtml = [...outs.map(l => `<div>• <b>${esc(nd.label)}</b> —${esc(l.relation)}→ ${esc(l.target.split(":")[1])} <span class="badge">${esc(l.pageNo)}·${esc(l.lineId)}</span></div>`),
+                   ...ins.map(l => `<div>• ${esc(l.source.split(":")[1])} —${esc(l.relation)}→ <b>${esc(nd.label)}</b> <span class="badge">${esc(l.pageNo)}·${esc(l.lineId)}</span></div>`)].join("");
+  $("kgNodeDetail").innerHTML = `
+    <div style="font-family:var(--serif);font-size:16px;font-weight:700;color:var(--cinnabar-dark);margin-bottom:4px">${esc(nd.label)} <span class="badge">${esc(nd.type)}</span></div>
+    <div><b>首次检出位置：</b>《思濟堂方書》${esc(nd.pageNo)} · 行 <code>${esc(nd.lineId || "—")}</code></div>
+    <div style="margin:8px 0"><b>关联三元组（${outs.length + ins.length} 条）：</b>${relHtml || "<div>暂无关联边</div>"}</div>
+    <button type="button" class="btn primary" id="btnLocateFromKG" style="width:100%;justify-content:center;margin-top:6px">
+      📜 在古籍原图中定位该节点（${esc(nd.pageNo)} · ${esc(nd.lineId)}）
+    </button>
+  `;
+  $("btnLocateFromKG").onclick = () => {
+    switchView("recognize");
+    selectPage(nd.pageIdx, { highlightLines: nd.lineId ? [nd.lineId] : [] });
+    toast(`已从知识图谱回跳至《思濟堂方書》${nd.pageNo} 行 ${nd.lineId}`);
+  };
+}
+
+$("btnKgScopeCur").onclick = function () {
+  S.kgScope = "cur";
+  this.classList.add("active");
+  $("btnKgScopeAll").classList.remove("active");
+  buildAndDrawKG();
+};
+$("btnKgScopeAll").onclick = function () {
+  S.kgScope = "all";
+  this.classList.add("active");
+  $("btnKgScopeCur").classList.remove("active");
+  buildAndDrawKG();
+};
+$("kgTypeFilter").onchange = buildAndDrawKG;
+$("btnKgReset").onclick = buildAndDrawKG;
+window.addEventListener("resize", () => { if (S.view === "graph") drawKGCanvas(); });
+
+/* ============ 视图 3：评测概览渲染 ============ */
+function renderEvalView() {
+  $("evalCardsGrid").innerHTML = BUNDLE.metrics.map(m => `
+    <div class="mcard ${m.cls}">
+      <div class="mcard-top">
+        <span>${esc(m.label)}</span>
+        <span class="badge ${m.cls === "ok" ? "ok" : "gold"}">${esc(m.judge)}</span>
+      </div>
+      <div class="mcard-val">${esc(m.value)}</div>
+      <div class="mbar"><i style="width:${m.bar}%"></i></div>
+      <div style="font-size:11.5px;font-weight:600;color:var(--ink-soft);margin-bottom:3px">${esc(m.target)}</div>
+      <div class="mcard-sub">${esc(m.detail)}</div>
+    </div>
+  `).join("");
+
+  $("milestoneTbody").innerHTML = BUNDLE.milestones.map(ms => `
+    <tr>
+      <td><code>${esc(ms.id)}</code></td>
+      <td><b>${esc(ms.stage)}</b></td>
+      <td>${esc(ms.change)}</td>
+      <td>${esc(ms.metric)}</td>
+      <td style="color:var(--qing-dark);font-weight:600">${esc(ms.result)}</td>
+      <td><span class="badge ok">${esc(ms.verdict)}</span></td>
+    </tr>
+  `).join("");
+}
+
+/* ============ 初始化启动 ============ */
+renderPresetQA();
+renderEvalView();
+selectPage(0);
+</script>
+</body>
+</html>

@@ -367,6 +367,16 @@ def analyze_layout(blocks: Iterable[Block], page_id: str = "",
     异常：内部兜底，返回结构完整的结果，不抛异常。
     """
     items = [b for b in blocks if isinstance(b, Block)]
+    auxiliary = [b for b in items if b.kind in ("margin_note", "spine")]
+    if auxiliary:
+        body = [b for b in items if b.kind not in ("margin_note", "spine")]
+        body, lay = analyze_layout(body, page_id, direction, is_demo, merge, image_path)
+        for order, block in enumerate(auxiliary, start=len(body) + 1):
+            block.col_id = -2 if block.kind == "margin_note" else -3
+            block.reading_order = order
+        items = body + auxiliary
+        lay.block_order = [b.block_ref or b.line_id for b in items]
+        return items, lay
     try:
         detail = detect_direction_detail(items, image_path=image_path)
         direct = direction or detail["direction"]

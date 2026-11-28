@@ -22,6 +22,7 @@ from app.demo import load_demo_ocr
 from app.schemas import OCRResult, source_hash_of
 
 from . import correct, layout, normalize, score, table
+from .dual_track import run_dual_track
 from .recognize import RecognizeResult, _image_size, recognize
 
 
@@ -39,6 +40,19 @@ def _recognize_page(image_path: str, page_id: str, backend: Optional[str]) -> Re
     择优信号见 `ocr/score.py`（合法字符率 / 平均置信度 / 列数合理性 / 重复率惩罚），
     不再用 Σ(字数×conf)——那个口径把逐列路径系统性压死。
     """
+    if CONFIG.ocr.frame_isolate and image_path:
+        try:
+            from .recognize import get_adapter
+            adapter, adapter_notes = get_adapter(backend)
+            if adapter.name == "rapidocr":
+                from .frame import recognize_with_frame_isolation
+                isolated = recognize_with_frame_isolation(image_path, page_id, adapter.infer)
+                if isolated is not None:
+                    isolated.notes.extend(adapter_notes)
+                    return isolated
+        except Exception:
+            # 隔离路径失败时保留原有识别链路。
+            pass
     base = recognize(image_path, page_id, backend)
     pick = (CONFIG.ocr.pick or "auto").strip().lower()
     if not CONFIG.ocr.vertical_split or not image_path or pick == "page":
@@ -165,6 +179,59 @@ def _postprocess(blocks, page_id: str, notes: List[str], is_demo: bool,
     return blocks, lay, tables
 
 
+def _attach_dual_track(image_path: str, pid: str, blocks, rec: RecognizeResult,
+                       width: int, height: int, notes: List[str]) -> dict:
+    """阶段七：在整页 OCR 之后挂双轨证据（并列，不改 blocks / tables / layout）。
+
+    三条硬约束：
+      ① 永不抛异常——双轨失败只能让整页 OCR 少一份证据，不能拖垮 OCR 本体；
+      ② 不改任何已有字段，只补 dual_track_*；
+      ③ 状态与证据必须互相自洽（见 OCRResult.validate_dual_track）。
+    """
+    if not CONFIG.ocr.dual_track_enabled:
+        notes.append("双轨小字：已关闭（TCM_OCR_DUAL_TRACK=0），状态 not_run")
+        return {"dual_track_status": "not_run", "dual_track_evidence": None,
+                "dual_track_audit": None, "dual_track_run": False}
+    try:
+        out = run_dual_track(
+            image_path, pid, blocks=blocks, mode=CONFIG.ocr.dual_track_mode,
+            is_demo=rec.is_demo, engine=rec.engine, width=width, height=height,
+            zoom=CONFIG.ocr.dual_track_zoom,
+            crop_dir=(CONFIG.ocr.dual_track_crop_dir or None),
+            max_groups=(CONFIG.ocr.dual_track_max_groups or None),
+            cfg={'detector': getattr(CONFIG.ocr, 'dual_track_detector', 'stage5')})
+    except Exception as exc:                       # 双轨异常绝不外溢
+        notes.append(f"双轨小字：异常已隔离（{type(exc).__name__}），整页 OCR 结果不受影响；"
+                     "状态 failed")
+        return {"dual_track_status": "failed", "dual_track_evidence": None,
+                "dual_track_audit": [{"kind": "entry_exception",
+                                      "reason": type(exc).__name__}],
+                "dual_track_run": True}
+
+    status = out.get("status") or "failed"
+    ev = out.get("evidence")
+    sides = out.get("sides") or {}
+    plan = out.get("plan") or {}
+    reason = out.get("error") or ""
+    if status == "completed":
+        n = len(ev or [])
+        notes.append(f"双轨小字：完成（搜索区域 {plan.get('regions', 0)} 个/"
+                     f"{plan.get('source', '-')}，成对确认 {out.get('groups', 0)} 组，"
+                     f"证据 {n} 条，分侧 {sides or '{}'}）")
+    elif status == "partial":
+        notes.append(f"双轨小字：部分完成（证据 {len(ev or [])} 条；局部失败见审计，"
+                     f"整页 OCR 结果照常返回）")
+    elif status == "failed":
+        notes.append(f"双轨小字：整体失败（{reason or '未知原因'}），已保留整页 OCR 结果")
+    else:
+        skip = next((a.get("reason") for a in (out.get("audit") or [])
+                     if a.get("kind") == "skip"), "")
+        notes.append(f"双轨小字：已跳过（{skip or reason or '条件不满足'}）")
+    return {"dual_track_status": status, "dual_track_evidence": ev,
+            "dual_track_audit": out.get("audit") or [],
+            "dual_track_run": bool(out.get("attempted"))}
+
+
 def run_ocr(image_path: str = "", page_id: Optional[str] = None,
             backend: Optional[str] = None) -> OCRResult:
     """OCR 流水线入口。
@@ -172,6 +239,9 @@ def run_ocr(image_path: str = "", page_id: Optional[str] = None,
     输入：本地图像路径、可选 page_id、可选后端覆盖
     输出：OCRResult（真实识别时 engine=rapidocr / model_loaded=True / is_demo=False）
     异常：显式降级为示例数据并标注，绝不静默伪造识别结果。
+
+    阶段七起，本入口同时挂双轨小字证据（`dual_track_status` / `dual_track_evidence`）：
+    证据只做并列展示与核对，整页 blocks / tables / layout / 阅读顺序一律不动。
     """
     pid = page_id or new_page_id()
     notes: List[str] = []
@@ -196,6 +266,56 @@ def run_ocr(image_path: str = "", page_id: Optional[str] = None,
 
         blocks, lay, tables = _postprocess(blocks, pid, notes, is_demo=rec.is_demo,
                                            image_path=image_path)
+        dual = _attach_dual_track(image_path, pid, blocks, rec, width, height, notes)
+        if CONFIG.ocr.merge_jiazhu and not rec.is_demo and image_path and dual.get("dual_track_evidence"):
+            try:
+                from copy import deepcopy
+                from .vertical import imread_unicode
+                from .jiazhu_merge import select_verified_jiazhu_groups, splice_jiazhu_into_blocks
+                image = imread_unicode(image_path)
+                groups = select_verified_jiazhu_groups(image, dual["dual_track_evidence"])
+                candidate = deepcopy(blocks)
+                candidate, traces = splice_jiazhu_into_blocks(image, candidate, groups)
+                if traces:
+                    changed = [i for i, (old, new) in enumerate(zip(blocks, candidate))
+                               if old.text != new.text]
+                    updated = [candidate[i] for i in changed]
+                    if CONFIG.ocr.correct_enabled:
+                        updated, _ = correct.correct_blocks(updated)
+                    if CONFIG.ocr.normalize_enabled:
+                        updated = normalize.normalize_blocks(updated)
+                    for i, block in zip(changed, updated):
+                        blocks[i] = block
+                    notes.append(f"双行夹注回插：{len(traces)} 块，{sum(len(t['groups']) for t in traces)} 组")
+            except Exception as exc:
+                notes.append(f"双行夹注回插：异常已隔离（{type(exc).__name__}）")
+        if CONFIG.ocr.col_seg_jiazhu and not rec.is_demo and image_path:
+            try:
+                from copy import deepcopy
+                from .vertical import imread_unicode
+                from .column_jiazhu import apply_column_seg_jiazhu
+                image = imread_unicode(image_path)
+                if image is None:
+                    raise ValueError("图像不可读")
+                candidate, traces = apply_column_seg_jiazhu(
+                    image, deepcopy(blocks), scale=CONFIG.ocr.col_seg_jiazhu_scale,
+                    thin_mode=CONFIG.ocr.col_seg_jiazhu_thin)
+                changed = [i for i, (old, new) in enumerate(zip(blocks, candidate))
+                           if old.text != new.text or old.segments != new.segments]
+                updated = [candidate[i] for i in changed]
+                if updated and CONFIG.ocr.correct_enabled:
+                    updated, _ = correct.correct_blocks(updated)
+                if updated and CONFIG.ocr.normalize_enabled:
+                    updated = normalize.normalize_blocks(updated)
+                for block in updated:
+                    for segment in block.segments:
+                        segment["text_norm"] = (normalize.normalize_text(segment["text"])
+                                                if CONFIG.ocr.normalize_enabled else segment["text"])
+                for i, block in zip(changed, updated):
+                    blocks[i] = block
+                notes.append(f"列内分段夹注重组：{len(traces)} 块（scale={CONFIG.ocr.col_seg_jiazhu_scale}, thin={CONFIG.ocr.col_seg_jiazhu_thin}）")
+            except Exception as exc:
+                notes.append(f"列内分段夹注重组：异常已隔离（{type(exc).__name__}）")
         return OCRResult(
             page_id=pid, image_path=image_path, width=width, height=height,
             blocks=blocks, tables=tables, layout=lay,
@@ -203,6 +323,7 @@ def run_ocr(image_path: str = "", page_id: Optional[str] = None,
             source_hash=source_hash_of("ocr", pid, image_path, rec.engine),
             notes=notes + ([] if not rec.is_demo else [CONFIG.demo_badge]),
             created_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            **dual,
         )
     except Exception as exc:
         demo = load_demo_ocr(pid, image_path)

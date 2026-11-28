@@ -52,7 +52,7 @@ def _env_float(key: str, default: float) -> float:
 
 
 # 识别模型自动探测候选（按优先级）。路径相对 PROJECT_ROOT，模型权重不进仓库。
-REC_MODEL_CANDIDATES = ("模型权重/ch_PP-OCRv5_rec_mobile.onnx",)
+REC_MODEL_CANDIDATES = ("模型权重/PP-OCRv5_server_rec_official.onnx", "模型权重/ch_PP-OCRv5_rec_mobile.onnx")
 # 包内自带的后备模型（rapidocr-onnxruntime 分发，简体 ch_PP-OCRv3_rec）
 BUNDLED_REC_MODEL = "ch_PP-OCRv3_rec（rapidocr 包内简体）"
 
@@ -125,12 +125,56 @@ class OcrConfig:
     normalize_enabled: bool = _env_bool("OCR_NORMALIZE_ENABLED", True)
     # 字形纠错层：只做上下文可判定的纠错，可整体关闭（TCM_OCR_CORRECT=0）
     correct_enabled: bool = _env_bool("OCR_CORRECT", True)
+    ctc_rerank: bool = _env_bool("OCR_CTC_RERANK", True)
     # 竖排逐列检测（P1）：竖排页先切列再逐列识别；=0 时完全回到整页识别，便于 A/B
     vertical_split: bool = _env_bool("OCR_VERTICAL_SPLIT", True)
+    frame_isolate: bool = _env_bool("OCR_FRAME_ISOLATE", False)
+    remove_grid: bool = _env_bool("OCR_REMOVE_GRID", False)
+    strip_kunten: bool = _env_bool("OCR_STRIP_KUNTEN", False)
     # 实验性小字证据：默认关闭，保留原 OCR 与方剂抽取作为可回退基线。
     small_columns_enabled: bool = _env_bool("OCR_SMALL_COLUMNS", False)
     # 仅小字右轨低置信时使用官方 server 识别器；默认关闭，不替换整页模型。
     small_columns_server_enabled: bool = _env_bool("OCR_SMALL_COLUMNS_SERVER", False)
+    # 双轨小字（阶段七）：默认开启，作为**并列证据**挂在 OCRResult 上，不替换正文。
+    #   TCM_OCR_DUAL_TRACK=0            关闭 → status=not_run
+    #   TCM_OCR_DUAL_TRACK_MODE=live    按阶段 4 现算搜索区域（默认 auto 同 live）
+    #   TCM_OCR_DUAL_TRACK_MODE=replay  回放冻结的 stage4 search_regions.json
+    #   TCM_OCR_DUAL_TRACK_MODE=off     等同关闭（不尝试运行）
+    col_seg_jiazhu: bool = _env_bool("OCR_COL_SEG_JIAZHU", True)
+    col_seg_jiazhu_scale: float = _env_float("OCR_COL_SEG_JIAZHU_SCALE", 2.0)
+    col_seg_jiazhu_thin: str = _env("OCR_COL_SEG_JIAZHU_THIN", "none")
+    merge_jiazhu: bool = _env_bool("OCR_MERGE_JIAZHU", False)
+    dual_track_enabled: bool = _env_bool("OCR_DUAL_TRACK", True)
+    dual_track_mode: str = _env("OCR_DUAL_TRACK_MODE", "auto")
+    # 成对确认用哪个检测器（阶段八新增）：
+    #   stage5 —— 默认，阶段五逐窗字形状态机（冻结基线）
+    #   stage8 —— 阶段八修正版：列槽周期切分 + 子框裁到槽内 + 按墨迹收紧 x
+    #             （列内检测仍复用 ocr.small_columns.propose_in_column）
+    dual_track_detector: str = _env("OCR_DUAL_TRACK_DETECTOR", "stage5")
+    # 阶段八修正版的逐项开关（唯一读取点是 dual_track_fix/settings.py；
+    # 跑批与正常入口都从这里取，避免两条路径各拼一套参数）。
+    # 默认值 = stage8-v1 冻结配置：slots/clip/tighten/use_limits/relax_span 开，dedupe 关。
+    dual_track_slots: bool = _env_bool("OCR_DUAL_TRACK_SLOTS", True)
+    dual_track_clip: bool = _env_bool("OCR_DUAL_TRACK_CLIP", True)
+    dual_track_tighten: bool = _env_bool("OCR_DUAL_TRACK_TIGHTEN", True)
+    dual_track_use_limits: bool = _env_bool("OCR_DUAL_TRACK_USE_LIMITS", True)
+    dual_track_relax_span: bool = _env_bool("OCR_DUAL_TRACK_RELAX_SPAN", True)
+    # 同槽纵向重叠去重是负结果（命中 32→30、配对率跌破 0.90），默认必须关
+    dual_track_dedupe_slot: bool = _env_bool("OCR_DUAL_TRACK_DEDUPE_SLOT", False)
+    # 断组跨度上限比例：仅 relax_span 打开时生效（max(150, r×列高)）
+    dual_track_span_ratio: float = _env_float("OCR_DUAL_TRACK_SPAN_RATIO", 0.9)
+    # 轨框被列槽截断时，按最近空隙外延（而不是在槽边硬切）；贴底版框的组补到框内
+    dual_track_gap_clip: bool = _env_bool("OCR_DUAL_TRACK_GAP_CLIP", False)
+    dual_track_bound_bottom: bool = _env_bool("OCR_DUAL_TRACK_BOUND_BOTTOM", False)
+    dual_track_band_slots: bool = _env_bool("OCR_DUAL_TRACK_BAND_SLOTS", False)
+    # v4：从原图 + 现有列槽自动触发跨槽联合取样（默认开；消融时才关）
+    dual_track_auto_joint: bool = _env_bool("OCR_DUAL_TRACK_AUTO_JOINT", True)
+    # 单页最多复识多少个组（0=不限）；用于上传通道的时延兜底。
+    dual_track_max_groups: int = _env_int("OCR_DUAL_TRACK_MAX_GROUPS", 0)
+    # 复识裁图的放大倍数（与既有小字实验一致：native=1.0；2.0 用于低清页对照）
+    dual_track_zoom: float = _env_float("OCR_DUAL_TRACK_ZOOM", 1.0)
+    # 非空时把每条证据的裁图（旋转后）落盘到该目录；空=不留图（线上默认）
+    dual_track_crop_dir: str = _env("OCR_DUAL_TRACK_CROP_DIR", "")
     # 两路候选的取舍策略（P2）：
     #   auto     —— 默认，按 ocr/score.py 的复合无监督分择优
     #   vertical —— 强制逐列（无逐列结果时回退整页），用于 A/B 对照
@@ -154,7 +198,8 @@ class OcrConfig:
     col_gap_ratio: float = _env_float("OCR_COL_GAP_RATIO", 0.02)
     rotate: int = _env_int("OCR_ROTATE", 90)     # 90=逆时针（实测有效），270=顺时针
     # 识别模型路径：三级回退（见 _resolve_rec_model）——
-    #   ① TCM_OCR_REC_MODEL 显式指定；② 自动探测 模型权重/ch_PP-OCRv5_rec_mobile.onnx；
+    #   ① TCM_OCR_REC_MODEL 显式指定；② 自动探测 模型权重/PP-OCRv5_server_rec_official.onnx，
+    #   不存在时探测 模型权重/ch_PP-OCRv5_rec_mobile.onnx；
     #   ③ 都没有则用包内简体 ch_PP-OCRv3_rec（CER 明显更差，会在 notes / health 里标注）。
     rec_model: str = _REC_MODEL_PATH
     rec_model_source: str = _REC_MODEL_SOURCE
@@ -342,6 +387,9 @@ class Config:
             "ocr_auto_fallback": self.ocr.auto_fallback,
             "ocr_rec_model": rec_name,
             "ocr_rec_model_source": self.ocr.rec_model_source,
+            "ocr_col_seg_jiazhu": self.ocr.col_seg_jiazhu,
+            "ocr_col_seg_jiazhu_scale": self.ocr.col_seg_jiazhu_scale,
+            "ocr_col_seg_jiazhu_thin": self.ocr.col_seg_jiazhu_thin,
             "ocr_small_columns_enabled": self.ocr.small_columns_enabled,
             "ocr_small_columns_server_enabled": self.ocr.small_columns_server_enabled,
             "extract_dose_strict": self.ocr.extract_dose_strict,

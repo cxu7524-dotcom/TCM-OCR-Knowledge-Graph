@@ -798,6 +798,13 @@ def get_ocr(page_id: str):
         "rec_model": rec_model_name(),
         "model_loaded": page.get("model_loaded", False),
         "notes": page.get("notes", []),
+        # 双轨小字（阶段七）：状态与证据并列返回，正文 / 表格 / 阅读顺序不受影响。
+        # 三态（not_run / failed / skipped）证据必为 None；completed 无检出时为 []。
+        "dual_track_status": ocr_obj.dual_track_status,
+        "dual_track_evidence": ocr_obj.dual_track_evidence,
+        "dual_track_audit": ocr_obj.dual_track_audit,
+        "dual_track_run": ocr_obj.dual_track_run,
+        "dual_track_problems": ocr_obj.validate_dual_track(),
         **_flags_for(ocr_obj),
         "disclaimer": DISCLAIMER,
     }

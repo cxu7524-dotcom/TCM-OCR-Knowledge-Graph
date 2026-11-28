@@ -25,7 +25,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import asdict, dataclass, field, fields
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, Iterable, List, Optional
 
 # bbox: [x1, y1, x2, y2]
 BBox = List[float]
@@ -33,6 +33,11 @@ EMPTY_BBOX: BBox = [0.0, 0.0, 0.0, 0.0]
 
 BLOCK_KINDS = ("paragraph", "table_cell", "title", "dose", "small_column_evidence")
 ENTITY_TYPES = ("药材", "性味", "归经", "功效", "主治", "禁忌", "方剂", "剂量")
+
+# 双轨小字（阶段七）：状态枚举 + 无证据的三种状态。
+# 语义以状态为准；dual_track_run 只表示「本次是否尝试运行」，不参与展示判断。
+DUAL_TRACK_STATUSES = ("not_run", "completed", "partial", "failed", "skipped")
+DUAL_TRACK_NO_EVIDENCE = ("not_run", "failed", "skipped")
 
 
 def source_hash_of(*parts: Any) -> str:
@@ -117,6 +122,7 @@ class Block(Provenance):
     evidence_status: str = ""      # 小字裁块仅作为证据；未核实时标待核
     parent_block_ref: str = ""     # 保留原 OCR 父块，不替换原文
     evidence_engine: str = ""      # 对应裁块实际使用的局部识别模型
+    segments: List[Dict[str, Any]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         # 文本块自身即原文：quote 缺省时回填 text，保证溯源字段永不缺失
@@ -133,6 +139,10 @@ class Block(Provenance):
             problems.append(f"kind 非法: {self.kind}")
         if not self.text:
             problems.append("text 为空")
+        if not isinstance(self.segments, list):
+            problems.append("segments 必须为列表")
+        elif any(not isinstance(segment, dict) for segment in self.segments):
+            problems.append("segments 含非对象条目")
         return problems
 
 
@@ -174,7 +184,16 @@ class LayoutResult(_Record):
 
 @dataclass
 class OCRResult(_Record):
-    """ocr/pipeline.py 的完整产出。"""
+    """ocr/pipeline.py 的完整产出。
+
+    双轨小字（阶段七）字段：
+      dual_track_status   not_run / completed / partial / failed / skipped
+      dual_track_evidence None 或「逐组逐侧」证据列表（completed 时可为空列表）
+      dual_track_audit    None 或审计条目（跳过原因、失败位置、空读数、异常、待核）
+      dual_track_run      是否**尝试**运行过双轨；展示与判断一律以 status 为准
+    约定：not_run / failed / skipped 三态 evidence 必须是 None；completed / partial 必须是列表。
+    `None` 与 `[]` 语义不同（没跑 vs 跑了没检出），序列化与读回都必须保留这个差别。
+    """
 
     page_id: str = ""
     image_path: str = ""
@@ -189,6 +208,10 @@ class OCRResult(_Record):
     source_hash: str = ""
     notes: List[str] = field(default_factory=list)
     created_at: str = ""
+    dual_track_status: str = "not_run"
+    dual_track_evidence: Optional[List[Dict[str, Any]]] = None
+    dual_track_audit: Optional[List[Dict[str, Any]]] = None
+    dual_track_run: bool = False
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any] | None):
@@ -199,6 +222,19 @@ class OCRResult(_Record):
                        for t in d.get("tables", [])]
         lay = d.get("layout")
         d["layout"] = lay if isinstance(lay, LayoutResult) else LayoutResult.from_dict(lay)
+        # 旧记录缺字段 → not_run / None；显式空列表保持 []，不合并成 None
+        if "dual_track_status" not in d:
+            d["dual_track_status"] = "not_run"
+        if "dual_track_evidence" not in d:
+            d["dual_track_evidence"] = None
+        elif d["dual_track_evidence"] is not None:
+            d["dual_track_evidence"] = [dict(e) for e in d["dual_track_evidence"]]
+        if "dual_track_audit" not in d:
+            d["dual_track_audit"] = None
+        elif d["dual_track_audit"] is not None:
+            d["dual_track_audit"] = [dict(e) for e in d["dual_track_audit"]]
+        if "dual_track_run" not in d:
+            d["dual_track_run"] = d["dual_track_status"] not in DUAL_TRACK_NO_EVIDENCE
         return cls(**_clean(d, cls))
 
     def validate(self) -> List[str]:
@@ -207,6 +243,29 @@ class OCRResult(_Record):
             problems.append("缺 page_id")
         for i, b in enumerate(self.blocks):
             problems.extend(f"blocks[{i}].{p}" for p in b.validate())
+        problems.extend(f"dual_track.{p}" for p in self.validate_dual_track())
+        return problems
+
+    def validate_dual_track(self) -> List[str]:
+        """双轨字段的内部一致性（状态 ⇄ 证据）。旧数据 not_run/None 天然合规。"""
+        problems: List[str] = []
+        st = self.dual_track_status or ""
+        if st not in DUAL_TRACK_STATUSES:
+            problems.append(f"status 非法: {st}")
+            return problems
+        if st in DUAL_TRACK_NO_EVIDENCE:
+            if self.dual_track_evidence is not None:
+                problems.append(f"status={st} 时 evidence 必须为 None")
+        else:
+            if self.dual_track_evidence is None:
+                problems.append(f"status={st} 时 evidence 必须为列表（可为空）")
+            elif any(not isinstance(e, dict) for e in self.dual_track_evidence):
+                problems.append("evidence 含非对象条目")
+        if self.dual_track_audit is not None:
+            if not isinstance(self.dual_track_audit, list):
+                problems.append("audit 必须为 None 或列表")
+            elif any(not isinstance(e, dict) for e in self.dual_track_audit):
+                problems.append("audit 含非对象条目")
         return problems
 
 

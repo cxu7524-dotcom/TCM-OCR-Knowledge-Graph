@@ -1,6 +1,9 @@
 import json,unittest
+from dataclasses import replace
 from pathlib import Path
+from unittest.mock import patch
 import numpy as np
+import ocr.recognize as recognize
 from ocr.small_columns_hybrid import _main_link_evidence,propose_hybrid_page
 from ocr.vertical import imread_unicode,page_layout
 ROOT=Path(__file__).resolve().parents[1]
@@ -15,6 +18,8 @@ class HybridSmallColumnsTests(unittest.TestCase):
  def test_real_development_extension_and_main_fallback(self):
   weight=ROOT/'模型权重/ch_PP-OCRv5_rec_mobile.onnx'
   if not CACHE.exists() or not weight.exists():self.skipTest('local model or recorded development OCR unavailable')
+  config=replace(recognize.CONFIG,ocr=replace(recognize.CONFIG.ocr,rec_model='模型权重/ch_PP-OCRv5_rec_mobile.onnx'))
+  config_patch=patch.object(recognize,'CONFIG',config);config_patch.start();self.addCleanup(config_patch.stop)
   pages=json.loads(CACHE.read_text(encoding='utf8'))
   for n in (31,36):
    path=ROOT/'古籍评测集/医家类/思濟堂方書'/f'page_{n}.png'

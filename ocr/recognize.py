@@ -22,9 +22,12 @@ from __future__ import annotations
 
 import importlib.util
 import logging
+import math
+import os
 import threading
+from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Any, List, Tuple
+from typing import Any, List, Sequence, Tuple
 
 from app.config import CONFIG
 from app.demo import load_demo_ocr
@@ -32,6 +35,7 @@ from app.schemas import Block, source_hash_of
 
 _ENGINES: dict = {}
 _ENGINE_LOCK = threading.Lock()
+_INFERENCE_LOCK = threading.RLock()
 _LOG = logging.getLogger(__name__)
 
 
@@ -57,6 +61,22 @@ def rec_model_name() -> str:
     return resolve_rec_model()[1]
 
 
+def _resolve_rec_keys(model_path: str) -> str:
+    """查找识别模型的外部字典，环境变量优先于同名伴随文件。"""
+    from pathlib import Path as _P
+    if not model_path:
+        return ""
+    raw = os.environ.get("TCM_OCR_REC_KEYS", "").strip()
+    if raw:
+        path = _P(raw)
+        if not path.is_absolute():
+            path = _P(__file__).resolve().parents[1] / path
+        if path.is_file():
+            return str(path.resolve())
+    companion = _P(model_path).with_suffix(".keys.txt")
+    return str(companion.resolve()) if companion.is_file() else ""
+
+
 def _engine(rec_model: str | None = None):
     """懒加载 + 按识别模型缓存，避免重复初始化 ONNX Runtime。
 
@@ -71,12 +91,16 @@ def _engine(rec_model: str | None = None):
         raw = str(_P(__file__).resolve().parents[1] / raw)
     if raw and not _P(raw).is_file():
         raw = ""          # 配置指向的权重不存在 → 显式回退包内 v3，不抛异常
-    key = raw
+    model_path = raw
+    keys_path = _resolve_rec_keys(model_path)
+    key = (model_path, keys_path)
     if key not in _ENGINES:
         with _ENGINE_LOCK:
             if key not in _ENGINES:
                 from rapidocr_onnxruntime import RapidOCR
-                kwargs = {"rec_model_path": key} if key else {}
+                kwargs = {"rec_model_path": model_path} if model_path else {}
+                if keys_path:
+                    kwargs["rec_keys_path"] = keys_path
                 _ENGINES[key] = RapidOCR(**kwargs)
     return _ENGINES[key]
 
@@ -88,6 +112,31 @@ def _text_recognizer(engine: Any):
         if rec is not None:
             return rec
     raise AttributeError("RapidOCR exposes neither text_rec nor text_recognizer")
+
+
+
+@contextmanager
+def _rerank_inference(engine):
+    # All calls using a shared engine participate, including calls with reranking off.
+    with _INFERENCE_LOCK:
+        rec = getattr(engine, "text_rec", None) or getattr(engine, "text_recognizer", None)
+        if rec is None or getattr(rec, "postprocess_op", None) is None:
+            yield
+            return
+        context = None
+        if CONFIG.ocr.ctc_rerank:
+            try:
+                from ocr.ctc_rerank import ctc_rerank_context
+                context = ctc_rerank_context(engine)
+                context.__enter__()
+            except Exception:
+                _LOG.exception("Unable to enable CTC reranking; using original recognition")
+                context = None
+        try:
+            yield
+        finally:
+            if context is not None:
+                context.__exit__(None, None, None)
 
 
 def model_charset() -> set:
@@ -120,6 +169,117 @@ class RecognizeResult:
     width: int = 0
     height: int = 0
     notes: List[str] = field(default_factory=list)
+
+
+@dataclass
+class CharCTC:
+    char: str
+    prob: float
+    timestep: int
+    total_steps: int
+    content_steps: float
+    rel_pos: float
+    rel_end: float
+
+
+@dataclass
+class CropCTCResult:
+    text: str = ""
+    conf: float = 0.0
+    chars: List[CharCTC] = field(default_factory=list)
+    conf_mean: float = 0.0
+    conf_var: float = 0.0
+    conf_min: float = 0.0
+    total_steps: int = 0
+    content_steps: float = 0.0
+
+
+def compute_content_steps(img_shape: Tuple[int, ...], rec_image_shape: Sequence[int],
+                          total_steps: int) -> float:
+    """Estimate the portion of CTC steps occupied by the unpadded image."""
+    try:
+        steps = max(0, int(total_steps))
+        if not steps:
+            return 0.0
+        h, w = float(img_shape[0]), float(img_shape[1])
+        img_h, img_w = float(rec_image_shape[1]), float(rec_image_shape[2])
+        if not all(math.isfinite(v) and v > 0 for v in (h, w, img_h, img_w)):
+            return 0.0
+        ratio = w / h
+        padded = int(img_h * max(img_w / img_h, ratio))
+        resized = min(padded, int(math.ceil(img_h * ratio)))
+        if padded <= 0:
+            return 0.0
+        return max(1.0, min(float(steps), steps * resized / float(padded)))
+    except (TypeError, ValueError, IndexError, OverflowError, ZeroDivisionError):
+        return 0.0
+
+
+def extract_ctc_chars(probs: Any, charset: Sequence[str], *,
+                      content_steps: float | None = None,
+                      text_override: str | None = None,
+                      conf_override: float | None = None) -> CropCTCResult:
+    """Greedily collapse a (time, character) CTC probability matrix."""
+    import numpy as np
+
+    try:
+        matrix = np.asarray(probs)
+        if matrix.ndim != 2:
+            return CropCTCResult()
+        total, columns = matrix.shape
+        if not total:
+            return CropCTCResult()
+        content = float(content_steps) if content_steps is not None else float(total)
+        if not math.isfinite(content):
+            content = float(total)
+        content = max(1.0, min(float(total), content))
+        selected = []
+        if columns:
+            indices = np.argmax(matrix, axis=1)
+            for t, raw_idx in enumerate(indices):
+                idx = int(raw_idx)
+                if idx and (t == 0 or idx != int(indices[t - 1])) and idx < len(charset):
+                    selected.append((t, idx))
+        override = text_override.strip() if text_override is not None else ""
+        replacements = override if override and len(override) == len(selected) else None
+        chars = []
+        for i, (t, idx) in enumerate(selected):
+            char = replacements[i] if replacements is not None else charset[idx]
+            if replacements is not None:
+                try:
+                    replacement_idx = charset.index(char)
+                    if replacement_idx < columns:
+                        idx = replacement_idx
+                except (ValueError, AttributeError):
+                    pass
+            prob = float(matrix[t, idx])
+            prob = max(0.0, min(1.0, prob)) if math.isfinite(prob) else 0.0
+            start = max(0.0, min(1.0, t / content))
+            end_t = selected[i + 1][0] if i + 1 < len(selected) else t + content / max(1, len(selected))
+            end = max(start, min(1.0, end_t / content))
+            chars.append(CharCTC(char, prob, t, total, content, start, end))
+        values = [c.prob for c in chars]
+        mean = sum(values) / len(values) if values else 0.0
+        variance = sum((p - mean) ** 2 for p in values) / len(values) if values else 0.0
+        text = override or "".join(c.char for c in chars)
+        return CropCTCResult(text, float(conf_override) if conf_override is not None else mean,
+                             chars, mean, variance, min(values) if values else 0.0,
+                             total, content)
+    except (TypeError, ValueError, IndexError, OverflowError):
+        return CropCTCResult()
+
+
+def map_chars_to_y_spans(chars: Sequence[CharCTC], y1: float, y2: float) -> List[Tuple[str, float, float, float]]:
+    """Map relative reading positions into the supplied vertical interval."""
+    if y2 < y1:
+        y1, y2 = y2, y1
+    result = []
+    for char in chars:
+        start = max(0.0, min(1.0, char.rel_pos))
+        end = max(start, min(1.0, char.rel_end))
+        result.append((char.char, char.prob, y1 + (y2 - y1) * start,
+                       y1 + (y2 - y1) * end))
+    return result
 
 
 class BaseAdapter:
@@ -171,14 +331,16 @@ class RapidOcrAdapter(BaseAdapter):
         except (ImportError, ValueError):
             return False
 
-    def infer(self, image_path: str) -> List[Tuple[Any, str, float]]:
+    def infer(self, image_input: Any) -> List[Tuple[Any, str, float]]:
         """调用本地 ONNX 模型，返回 [(box, text, conf)]。异常时不伪造，返回空列表。"""
         try:
-            result, _ = _engine()(
-                image_path,
-                box_thresh=CONFIG.ocr.det_box_thresh,
-                text_score=CONFIG.ocr.det_text_score,
-            )
+            engine = _engine()
+            with _rerank_inference(engine):
+                result, _ = engine(
+                    image_input,
+                    box_thresh=CONFIG.ocr.det_box_thresh,
+                    text_score=CONFIG.ocr.det_text_score,
+                )
         except Exception:
             return []
         if not result:
@@ -251,7 +413,8 @@ def recognize_crop(image_array: Any, min_conf: float = 0.15) -> Tuple[str, float
     """
     try:
         engine = _engine()
-        res, _ = _text_recognizer(engine)([image_array])
+        with _rerank_inference(engine):
+            res, _ = _text_recognizer(engine)([image_array])
         if res:
             text, score = res[0]
             text, score = str(text).strip(), float(score)
@@ -261,6 +424,43 @@ def recognize_crop(image_array: Any, min_conf: float = 0.15) -> Tuple[str, float
         _LOG.warning("Crop OCR failed (%s): %s", type(exc).__name__, exc)
         return "", 0.0
     return "", 0.0
+
+
+def recognize_crop_with_ctc(image_array: Any, min_conf: float = 0.0, *,
+                            rec_model: str | None = None) -> CropCTCResult:
+    """Recognize one crop and optionally expose its per-character CTC signals."""
+    try:
+        engine = _engine(rec_model)
+        rec = _text_recognizer(engine)
+        with _INFERENCE_LOCK:
+            orig_op = rec.postprocess_op
+            charset = list(getattr(orig_op, "character", None) or [])
+            rec_shape = getattr(rec, "rec_image_shape", (3, 48, 320))
+            captured = []
+            with _rerank_inference(engine):
+                current_op = rec.postprocess_op
+
+                def capture(preds, *args, **kwargs):
+                    captured.append(preds[0].copy())
+                    return current_op(preds, *args, **kwargs)
+
+                rec.postprocess_op = capture
+                try:
+                    res, _ = rec([image_array])
+                finally:
+                    rec.postprocess_op = current_op
+        if not res or not captured:
+            return CropCTCResult()
+        text, score = str(res[0][0]).strip(), float(res[0][1])
+        if not text or not math.isfinite(score) or score < min_conf:
+            return CropCTCResult()
+        probs = captured[0]
+        content = compute_content_steps(image_array.shape, rec_shape, probs.shape[0])
+        return extract_ctc_chars(probs, charset, content_steps=content,
+                                 text_override=text, conf_override=score)
+    except Exception as exc:
+        _LOG.warning("Crop CTC OCR failed (%s): %s", type(exc).__name__, exc)
+        return CropCTCResult()
 
 
 def _box_to_bbox(box: Any) -> List[int]:

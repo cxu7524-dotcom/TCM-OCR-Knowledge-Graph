@@ -89,7 +89,11 @@ CREATE TABLE IF NOT EXISTS pages (
     is_demo       INTEGER DEFAULT 1,
     source_hash   TEXT,
     run_id        TEXT,
-    created_at    TEXT NOT NULL
+    created_at    TEXT NOT NULL,
+    dual_track_status   TEXT DEFAULT 'not_run',
+    dual_track_evidence TEXT DEFAULT '',
+    dual_track_audit    TEXT DEFAULT '',
+    dual_track_run      INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS blocks (
@@ -231,6 +235,13 @@ def init_db() -> str:
         _ensure_column(conn, "unresolved", "llm_metadata", "TEXT DEFAULT ''")
         _ensure_column(conn, "pages", "extraction_meta", "TEXT DEFAULT ''")
         _ensure_column(conn, "pages", "ocr_payload", "TEXT DEFAULT ''")
+        # 阶段七：双轨状态与证据单独成列，便于不解析整份 payload 就能查「这页跑没跑、跑成什么」
+        _ensure_column(conn, "pages", "dual_track_status", "TEXT DEFAULT 'not_run'")
+        _ensure_column(conn, "pages", "dual_track_evidence", "TEXT DEFAULT ''")
+        _ensure_column(conn, "pages", "dual_track_audit", "TEXT DEFAULT ''")
+        # 「是否尝试过」必须独立成列：failed/skipped 也是有 run 状态的组合，
+        # 只靠 status 反推会把 failed+run=true 读成 false（stage7-v2 修的缺陷）。
+        _ensure_column(conn, "pages", "dual_track_run", "INTEGER DEFAULT 0")
         conn.commit()
     finally:
         conn.close()
@@ -247,6 +258,29 @@ def _bbox_json(value: Any) -> str:
         return json.dumps(list(value or [0, 0, 0, 0]), ensure_ascii=False)
     except TypeError:
         return "[0,0,0,0]"
+
+
+def _dual_json(value: Any) -> str:
+    """双轨 payload 落库：None → ''（没跑/失败/跳过），[] → '[]'（跑了没检出）。
+
+    两种「空」必须分开存，否则读回后无法区分 not_run 与 completed 无结果。
+    """
+    if value is None:
+        return ""
+    try:
+        return json.dumps(value, ensure_ascii=False)
+    except (TypeError, ValueError):
+        return ""
+
+
+def _dual_evidence_from(value: Any) -> Optional[List[Dict[str, Any]]]:
+    if value is None or value == "":
+        return None
+    try:
+        parsed = json.loads(value) if isinstance(value, str) else value
+    except (TypeError, ValueError):
+        return None
+    return parsed if isinstance(parsed, list) else None
 
 
 AUDIT_FIELDS = ("page_id", "line_id", "relation", "tail", "reason",
@@ -308,16 +342,25 @@ def save_page(
                      (rid, "ingest", f"{ocr.page_id} · engine={ocr.engine}", _now()))
         cur = conn.execute(
             "INSERT OR IGNORE INTO pages"
-            "(page_id,image_path,width,height,engine,model_loaded,is_demo,source_hash,run_id,created_at)"
-            " VALUES(?,?,?,?,?,?,?,?,?,?)",
+            "(page_id,image_path,width,height,engine,model_loaded,is_demo,source_hash,run_id,created_at,"
+            " dual_track_status,dual_track_evidence,dual_track_audit,dual_track_run)"
+            " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (ocr.page_id, ocr.image_path, ocr.width, ocr.height, ocr.engine,
-             int(ocr.model_loaded), int(ocr.is_demo), sh, rid, _now()))
+             int(ocr.model_loaded), int(ocr.is_demo), sh, rid, _now(),
+             ocr.dual_track_status or "not_run",
+             _dual_json(ocr.dual_track_evidence),
+             _dual_json(ocr.dual_track_audit),
+             int(bool(getattr(ocr, "dual_track_run", False)))))
         stat["skipped"] += 1 if cur.rowcount == 0 else 0
 
         if extraction_meta is not None:
-            conn.execute("UPDATE pages SET image_path=?,width=?,height=?,engine=?,model_loaded=?,is_demo=?,source_hash=?,run_id=?,extraction_meta=?,ocr_payload=? WHERE page_id=?",
+            conn.execute("UPDATE pages SET image_path=?,width=?,height=?,engine=?,model_loaded=?,is_demo=?,source_hash=?,run_id=?,extraction_meta=?,ocr_payload=?,dual_track_status=?,dual_track_evidence=?,dual_track_audit=?,dual_track_run=? WHERE page_id=?",
                          (ocr.image_path, ocr.width, ocr.height, ocr.engine, int(ocr.model_loaded), int(ocr.is_demo), sh, rid,
-                          json.dumps(extraction_meta, ensure_ascii=False), json.dumps(ocr.to_dict(), ensure_ascii=False), ocr.page_id))
+                          json.dumps(extraction_meta, ensure_ascii=False), json.dumps(ocr.to_dict(), ensure_ascii=False),
+                          ocr.dual_track_status or "not_run",
+                          _dual_json(ocr.dual_track_evidence),
+                          _dual_json(ocr.dual_track_audit),
+                          int(bool(getattr(ocr, "dual_track_run", False))), ocr.page_id))
             for table in ("blocks", "entities", "triples"):
                 conn.execute(f"DELETE FROM {table} WHERE page_id=?", (ocr.page_id,))
 
@@ -412,9 +455,11 @@ def save_page(
         if previous is not None:
             snapshot["formula_extraction"] = previous
     try:
-        (PATHS.store_dir / "pages").mkdir(parents=True, exist_ok=True)
-        (PATHS.store_dir / "pages" / f"{ocr.page_id}.json").write_text(
-            json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8")
+        snap = PATHS.store_dir / "pages" / f"{ocr.page_id}.json"
+        # page_id 可能带书页层级（如「丹方彚编/page_12」），先建父目录再写
+        snap.parent.mkdir(parents=True, exist_ok=True)
+        snap.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2),
+                        encoding="utf-8")
     except OSError:
         if extraction_meta is None:
             raise
@@ -463,7 +508,7 @@ def get_page(page_id: str) -> Optional[Dict[str, Any]]:
     conn = connect()
     try:
         conn.execute("BEGIN")
-        managed = conn.execute("SELECT extraction_meta,ocr_payload,is_demo FROM pages WHERE page_id=?", (page_id,)).fetchone()
+        managed = conn.execute("SELECT extraction_meta,ocr_payload,is_demo,dual_track_status,dual_track_evidence,dual_track_audit,dual_track_run FROM pages WHERE page_id=?", (page_id,)).fetchone()
         if managed and managed["extraction_meta"]:
             entities = []
             for row in conn.execute("SELECT * FROM entities WHERE page_id=? ORDER BY id", (page_id,)):
@@ -488,7 +533,32 @@ def get_page(page_id: str) -> Optional[Dict[str, Any]]:
                 data["bbox"] = json.loads(data.get("bbox") or "[0,0,0,0]")
                 unresolved.append(_norm_audit(data, page_id))
             formula = conn.execute("SELECT payload FROM formula_extractions WHERE page_id=?", (page_id,)).fetchone()
-            return {"page": json.loads(managed["ocr_payload"]), "extraction": json.loads(managed["extraction_meta"]),
+            # 负载可能为空/损坏（历史页、手工清库）；退回页面列重建，保证双轨状态仍可读回
+            page: Optional[Dict[str, Any]] = None
+            if managed["ocr_payload"]:
+                try:
+                    parsed = json.loads(managed["ocr_payload"])
+                    page = parsed if isinstance(parsed, dict) else None
+                except (TypeError, ValueError):
+                    page = None
+            if page is None:
+                row = conn.execute("SELECT * FROM pages WHERE page_id=?", (page_id,)).fetchone()
+                page = {k: row[k] for k in row.keys()
+                        if k not in ("extraction_meta", "ocr_payload")}
+            # 旧页面的 payload 里没有双轨字段：用列值补齐，保持「None 与 [] 不同」的语义
+            page.setdefault("dual_track_status", managed["dual_track_status"] or "not_run")
+            if "dual_track_evidence" not in page:
+                page["dual_track_evidence"] = _dual_evidence_from(managed["dual_track_evidence"])
+            elif not isinstance(page["dual_track_evidence"], (list, type(None))):
+                page["dual_track_evidence"] = _dual_evidence_from(page["dual_track_evidence"])
+            if "dual_track_audit" not in page:
+                page["dual_track_audit"] = _dual_evidence_from(managed["dual_track_audit"])
+            elif not isinstance(page["dual_track_audit"], (list, type(None))):
+                page["dual_track_audit"] = _dual_evidence_from(page["dual_track_audit"])
+            # 「是否尝试过」以列为准（failed + None + run=true 不能靠 status 反推）
+            page["dual_track_run"] = bool(page.get("dual_track_run",
+                                                   managed["dual_track_run"]))
+            return {"page": page, "extraction": json.loads(managed["extraction_meta"]),
                     "entities": entities, "triples": triples, "unresolved": unresolved,
                     "formula_extraction": json.loads(formula[0]) if formula else None,
                     "is_demo": bool(managed["is_demo"])}
@@ -508,6 +578,11 @@ def get_page(page_id: str) -> Optional[Dict[str, Any]]:
         if not row:
             return None
         page = dict(row)
+        # 无 payload 的旧页：双轨字段只可能来自列值；缺列（极旧库）同样是 not_run/None
+        page["dual_track_status"] = page.get("dual_track_status") or "not_run"
+        page["dual_track_evidence"] = _dual_evidence_from(page.get("dual_track_evidence"))
+        page["dual_track_audit"] = _dual_evidence_from(page.get("dual_track_audit"))
+        page["dual_track_run"] = bool(page.get("dual_track_run"))
         result = {"page": page, "entities": [], "triples": [], "is_demo": bool(page.get("is_demo", 1))}
         saved = conn.execute("SELECT payload FROM formula_extractions WHERE page_id=?", (page_id,)).fetchone()
         if saved:

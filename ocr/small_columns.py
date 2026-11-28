@@ -13,23 +13,32 @@ STEP = 4
 MAX_VALLEY_RATIO = 0.10
 MIN_HALF_INK = 18
 MIN_WINDOWS = 2
+SPAN_LIMIT = 150
 
 
-def propose_in_column(image, bbox, x_limits=None, page_scale=None):
+def propose_in_column(image, bbox, x_limits=None, page_scale=None, span_ratio=None,
+                      *, bottom_override=None):
     """Generate dual-column proposals inside an automatically detected outer column.
 
     x_limits clip padding to neighboring detected columns. Returned parent bbox is the
     input detector bbox; all other boxes are source-image coordinates.
+
+    span_ratio: 断组跨度上限的调用参数（阶段八新增）。None=保持历史行为（150px 硬上限）；
+    给出比例 r 时改为 max(150, r × 本列高)，用于长注页（丹方 p12 组高 254–535px）。
+    默认值必须保持 None —— `propose_page` 等既有调用一律走 150px，行为不变。
     """
     if image is None or image.size == 0 or len(bbox) != 4:
         return []
     h,w=image.shape[:2];x1,y1,x2,y2=map(int,bbox)
     lo,hi=x_limits if x_limits is not None else (0,w)
     a=max(0,int(lo),x1-PADDING);z=min(w,int(hi),x2+PADDING)
-    top=max(0,y1,int(h*.20));bottom=min(h,y2,int(h*.92))
+    top=max(0,y1,int(h*.20))
+    bottom=min(h,y2,int(h*.92) if bottom_override is None else int(bottom_override))
     if z-a<20 or bottom-top<WINDOW or x1 < w*.03 or x2 > w*.97:return []
     gray=cv2.cvtColor(image[top:bottom,a:z],cv2.COLOR_BGR2GRAY) if image.ndim==3 else image[top:bottom,a:z]
     bw=cv2.adaptiveThreshold(gray,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY_INV,31,14)//255
+    # 跨度上限：None → SPAN_LIMIT（150，历史行为）；比例 → 按本列裁块高度放大，下限仍 150。
+    span_limit = SPAN_LIMIT if span_ratio is None else max(SPAN_LIMIT, int(round(float(span_ratio) * bw.shape[0])))
     hits=[];width=z-a
     for y in range(0,len(bw)-WINDOW+1,STEP):
         prof=bw[y:y+WINDOW].sum(axis=0);smooth=np.convolve(prof,[.25,.5,.25],'same');best=None
@@ -51,7 +60,7 @@ def propose_in_column(image, bbox, x_limits=None, page_scale=None):
         if len(group)<MIN_WINDOWS or (len(group)<5 and min(v[2] for v in group)>0.035):continue
         k=int(round(float(np.median([x[1] for x in group])))); start=group[0][0];end=group[-1][0]+WINDOW
         # Stage 1 is a core only. Stage 2 traces the two ink tracks separately.
-        details = _trace_boundaries(gray, bw, k, start, end, x2-x1)
+        details = _trace_boundaries(gray, bw, k, start, end, x2-x1, span_limit=span_limit)
         if details is None:
             continue
         main_top, main_bottom, lanes, evidence = details
@@ -79,8 +88,12 @@ def _runs(mask):
     return list(zip(np.flatnonzero(edges==1),np.flatnonzero(edges==-1)))
 
 
-def _trace_boundaries(gray, bw, split, core_start, core_end, main_width):
-    """Trace each lane separately and stop at the next full-width main glyph."""
+def _trace_boundaries(gray, bw, split, core_start, core_end, main_width, span_limit=SPAN_LIMIT):
+    """Trace each lane separately and stop at the next full-width main glyph.
+
+    span_limit: 一个双轨组允许的最大纵向跨度（px）。默认 SPAN_LIMIT=150 是历史值，
+    按思濟堂短注（组高 52–170px）标定；长注页由调用方按列高传入更大的值。
+    """
     height,width=bw.shape
     rows=(bw.sum(axis=1)>=3).astype(np.uint8)
     rows=cv2.morphologyEx(rows[:,None],cv2.MORPH_CLOSE,np.ones((11,1),np.uint8)).ravel()
@@ -89,7 +102,7 @@ def _trace_boundaries(gray, bw, split, core_start, core_end, main_width):
     main_bottom=cursor
     while cursor>0 and rows[cursor-1] and main_bottom-cursor<95:cursor-=1
     main_top=cursor
-    if not 18<=main_bottom-main_top<=95 or core_end-core_start>150:return None
+    if not 18<=main_bottom-main_top<=95 or core_end-core_start>span_limit:return None
     # Full-width ink spanning the seam is evidence of the next main character.
     stop_rows=(bw.sum(axis=1)>=3).astype(np.uint8)
     stop_rows=cv2.morphologyEx(stop_rows[:,None],cv2.MORPH_CLOSE,np.ones((5,1),np.uint8)).ravel()
