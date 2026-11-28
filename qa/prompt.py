@@ -39,6 +39,36 @@ SYSTEM_PROMPT = (
     "原文内容原样引用，绝不可改写成用药建议或「通常用量」。\n"
 )
 
+EXPERT_SYSTEM = (
+    "你是一位精通中医古籍文献的资深专家，现在用「专家模式」作答：读者是同行，能读懂术语。\n"
+    "\n"
+    "【回答要求】\n"
+    "1. 第一句先给结论，然后分条展开，不超过四条，每条以「·」开头，条内标注 [编号]。\n"
+    "2. 若多处原文说法不同，单列一条「异文」说明各书差异，各自标注 [编号]；"
+    "只有一处依据时不必写这一条。\n"
+    "3. 凡依据原文的结论必须标 [编号]；靠中医学常识补充的部分以「（据中医常识）」开头。\n"
+    "4. 不给个人诊断结论、处方剂量、疗效承诺；原文里的剂量只能原样引用。\n"
+    "5. 篇幅 500 字以内，不复述问题，不罗列检索过程。\n"
+)
+
+
+EXPERT_CHECK_SYSTEM = (
+    "你是审稿人，负责核对一份答案是否被原文支持。\n"
+    "只做一件事：找出答案里「原文片段并不支持」的断言。不要重写答案，不要解释理由。\n"
+    "\n"
+    "【判定尺度】（这条最重要，直接决定标不标）\n"
+    "· 句子是对原文的归纳、改写、换用现代说法，只要意思对得上，就算有据，不要挑措辞；\n"
+    "· 句子带 [编号]，且那一段确实谈到这件事，就算有据；\n"
+    "· 只有「原文完全没提」或「与原文相反」的断言才判无据；\n"
+    "· 已经写明「（据中医常识）」的句子不用标——作者自己声明过不是原文。\n"
+    "\n"
+    "【输出格式】（严格遵守）\n"
+    "· 若全部句子都能被原文片段支持，只输出一行：全部有据\n"
+    "· 否则每句一行，格式：无据|<这一句，原样照抄，不要改写>\n"
+    "· 最多 3 行；宁可不标，不要错标。\n"
+)
+
+
 NO_EVIDENCE_SYSTEM = (
     "你是一位精通中医古籍文献的资深专家。\n"
     "\n"
@@ -79,15 +109,29 @@ def format_passages(passages: Sequence) -> str:
 
 
 def build_messages(query: str, passages: Sequence,
-                   history: Optional[List[dict]] = None) -> List[dict]:
-    """有证据时的消息序列（检索增强）。"""
+                   history: Optional[List[dict]] = None,
+                   style: str = "standard") -> List[dict]:
+    """有证据时的消息序列（检索增强）。style=expert 时换用专家提示词。"""
     body = format_passages(passages)
     user = (
         f"【原文片段】\n{body}\n\n"
         f"【用户问题】\n{query}\n\n"
         "请严格依据上面的原文片段回答；片段不足时按第 3 条用常识补充并注明。"
     )
-    return _compose(SYSTEM_PROMPT, history, user)
+    system = EXPERT_SYSTEM if str(style).lower() == "expert" else SYSTEM_PROMPT
+    return _compose(system, history, user)
+
+
+def build_check_messages(query: str, passages: Sequence, answer: str) -> List[dict]:
+    """专家模式第二遍：把第一遍答案送去核对，只找「原文不支持」的句子。"""
+    body = format_passages(passages)
+    user = (
+        f"【原文片段】\n{body}\n\n"
+        f"【问题】\n{query}\n\n"
+        f"【待审答案】\n{answer}\n\n"
+        "请按格式逐句核对。"
+    )
+    return _compose(EXPERT_CHECK_SYSTEM, None, user)
 
 
 def build_open_messages(query: str, history: Optional[List[dict]] = None) -> List[dict]:

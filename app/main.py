@@ -18,6 +18,9 @@ app/main.py —— FastAPI 入口与路由（四步演示台的服务端）
     POST   /api/qa                  可溯源问答
     GET    /uploads/{name}          上传页预览
     GET    /docs                    FastAPI 自带接口文档
+    GET    /lounge                  聊天室页面（跨设备公开聊天，纯内存）
+    GET    /api/chat/messages       聊天室：增量消息 + 在室成员
+    POST   /api/chat/send           聊天室：发言
 
 运行：python app/main.py [--port 8100]  或  双击 启动操作台.bat
 
@@ -35,13 +38,16 @@ import io
 import json
 import json
 import logging
+import mimetypes
 import shutil
 import sys
 import threading
+import time
 from functools import wraps
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from urllib.parse import quote
 
 # 允许 `python app/main.py` 直接启动（此时 sys.path[0] 是 app/）
 _ROOT = Path(__file__).resolve().parents[1]
@@ -49,8 +55,11 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile  # noqa: E402
+from fastapi import Response                                                # noqa: E402
 from fastapi.responses import FileResponse, JSONResponse                  # noqa: E402
 from fastapi.staticfiles import StaticFiles                              # noqa: E402
+from fastapi.exceptions import RequestValidationError                        # noqa: E402
+from starlette.exceptions import HTTPException as StarletteHTTPException     # noqa: E402
 
 from app.config import CONFIG                                            # noqa: E402
 from app.demo import demo_flags, load_demo_ocr, load_demo_questions        # noqa: E402
@@ -336,6 +345,12 @@ def home_page():
     return FileResponse(CONFIG.paths.web_dir / "home.html", media_type="text/html; charset=utf-8")
 
 
+@app.get("/lounge", include_in_schema=False)
+def lounge_page():
+    """聊天室页面（新增）：游客之间跨设备互通，纯前端渲染 + 两条内存接口。"""
+    return FileResponse(CONFIG.paths.web_dir / "lounge.html", media_type="text/html; charset=utf-8")
+
+
 CONFIG.paths.uploads_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=str(CONFIG.paths.uploads_dir)), name="uploads")
 app.mount("/static", StaticFiles(directory=str(CONFIG.paths.web_dir)), name="static")
@@ -405,6 +420,40 @@ def rag_rebuild(payload: Dict[str, Any] = Body(default={})):
         raise HTTPException(status_code=500, detail=f"重建失败：{type(exc).__name__}: {exc}")
 
 
+# ---------------- 统一错误态：框架层的英文报错翻成可读中文 ----------------
+# 评委与用户最常撞到的是 422（字段缺失 / 类型不对）：FastAPI 默认给
+# {"detail":[{"type":"missing","loc":["body","question"],...}]}，前端只会看到一串英文。
+# 这里统一成一句话，并保留定位信息（哪个字段），方便报错时对照。
+_VALIDATION_TEXT = "请求参数不完整或格式不对"
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation_error_handler(request, exc):
+    errs = exc.errors() or []
+    where = ""
+    if errs:
+        loc = [str(x) for x in (errs[0].get("loc") or [])
+               if x not in ("body", "query", "path")]
+        if loc:
+            where = "（" + ".".join(loc) + "）"
+    return JSONResponse(status_code=422,
+                        content={"detail": _VALIDATION_TEXT + where, "errors": len(errs)})
+
+
+@app.exception_handler(StarletteHTTPException)
+async def _http_error_handler(request, exc):
+    """只翻译 /api/* 的英文默认文案；页面与静态文件的 404 原样返回。"""
+    detail = exc.detail
+    path = getattr(getattr(request, "url", None), "path", "") or ""
+    if path.startswith("/api/") and isinstance(detail, str):
+        if exc.status_code == 404 and detail == "Not Found":
+            detail = "接口不存在（404）：检查路径与方法是否写对"
+        elif exc.status_code == 405 and detail == "Method Not Allowed":
+            detail = "这个接口不支持该请求方法（405）"
+    return JSONResponse(status_code=exc.status_code, content={"detail": detail},
+                        headers=getattr(exc, "headers", None))
+
+
 @app.get("/api/health")
 def health():
     """配置快照与模块状态；不含密钥、不含任何实测指标。"""
@@ -471,6 +520,50 @@ _METRIC_ORDER = [
 ]
 
 
+@app.get("/api/lexicon/variants")
+def api_lexicon_variants():
+    """字形层对照表（繁简 / 异体 / 通假），供演示台在正文里加「原文形 → 正字」悬浮卡。
+
+    只读 data/lexicon/异体字表.json：不改写原文、不改抽取结果、不参与评测计分。
+    前端按「多字优先」匹配，单字条目不标（古籍里单字误标率高）。
+    """
+    path = CONFIG.paths.data_dir / "lexicon" / "异体字表.json"
+    if not path.exists():
+        return {"version": "", "entries": [], "count": 0,
+                "note": "异体字表未随仓库提供，正文不做字形标注"}
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise HTTPException(status_code=503, detail="异体字表读取失败：%s" % exc)
+    conf = raw.get("置信等级") or {}
+    conf_map = {}
+    if isinstance(conf, dict):
+        conf_map = {str(k): str(v) for k, v in conf.items()}
+    elif isinstance(conf, list):
+        for item in conf:
+            if isinstance(item, (list, tuple)) and len(item) >= 2:
+                conf_map[str(item[0])] = str(item[1])
+    entries, seen = [], set()
+    for kind in ("繁简", "异体", "通假"):   # 同一原文形只留先出现的分类（繁简 > 异体 > 通假）
+        table = raw.get(kind) or {}
+        if not isinstance(table, dict):
+            continue
+        for src, dst in table.items():
+            if not isinstance(src, str) or not isinstance(dst, str) or not src or not dst:
+                continue
+            if src in seen:
+                continue
+            seen.add(src)
+            entries.append({"from": src, "to": dst, "kind": kind,
+                            "confidence": conf_map.get(kind, "")})
+    entries.sort(key=lambda e: (-len(e["from"]), e["from"]))
+    return {"version": str(raw.get("版本") or ""),
+            "source": raw.get("来源") or [],
+            "confidence": conf_map,
+            "entries": entries,
+            "count": len(entries)}
+
+
 @app.get("/api/metrics")
 def metrics():
     """读取 eval/run_all.py 产出的 data/reports/评测明细.json，供前端展示评测概览。
@@ -500,11 +593,20 @@ def metrics():
                       "detail": r.get("detail")})
     if not items:
         return {"available": False, "items": [], "notice": "评测明细没有可展示的指标"}
+    extras = []
+    for _key, _label, _note in (
+        ("variant_hit", "异体字命中率", "字形对照命中，参考项，不计入达标判定"),
+        ("field_f1_legacy", "字段级 F1（修正前对照）", "原值对齐口径，用来对照正式口径的提升"),
+    ):
+        _r = results.get(_key)
+        if isinstance(_r, dict) and _r.get("value") is not None:
+            extras.append({"key": _key, "label": _label, "value": _r.get("value"),
+                           "detail": _r.get("detail"), "note": _note})
     dataset = data.get("dataset")
     if not isinstance(dataset, dict):
         dataset = {}
     test_pages = results.get("test_pages")
-    return {"available": True, "items": items,
+    return {"available": True, "items": items, "extras": extras,
             "generated_at": data.get("generated_at"),
             "gt_version": data.get("gt_version"),
             "test_only": results.get("test_only"),
@@ -871,6 +973,10 @@ def ask(payload: Dict[str, Any] = Body(default={})):
     """
     payload = payload or {}
     question = str(payload.get("question") or payload.get("q") or "").strip()
+    mode = str(payload.get("mode") or "standard").strip().lower()
+    if mode not in ("fast", "standard", "expert"):
+        mode = "standard"
+    t_start = time.time()
     page_id = payload.get("page_id") or _STATE["page_id"]
     if page_id and page_id != _STATE["page_id"]:
         snap = store.get_page(page_id) or {}
@@ -914,7 +1020,7 @@ def ask(payload: Dict[str, Any] = Body(default={})):
             if not isinstance(history, list):
                 history = None
             rag_ans = rag_answer(question, history=history, page_id=page_id,
-                                 scope=scope, is_demo=flags["is_demo"])
+                                 scope=scope, is_demo=flags["is_demo"], mode=mode)
             has_ev = bool(rag_ans.sources or rag_ans.evidences)
             # 页内模式：检索到该页原文才采纳（保住"页内无依据 → 正确拒答"的评测语义）；
             # 全库模式：无依据也可用常识作答（rag-open，显式声明）
@@ -934,7 +1040,8 @@ def ask(payload: Dict[str, Any] = Body(default={})):
     except Exception:
         pass
     return {**ans.to_dict(), **page_banner(), "page_id": page_id,
-            "badge": flags["badge"], "is_demo": flags["is_demo"]}
+            "badge": flags["badge"], "is_demo": flags["is_demo"],
+            "qa_mode": mode, "elapsed": round(time.time() - t_start, 2)}
 
 
 # ------------------------------------------------------------------
@@ -982,8 +1089,409 @@ async def api_asr(file: UploadFile = File(...), lang: str = Form("zh")):
 
 
 # ------------------------------------------------------------------
+# 聊天室（新增路由，只调用 app/chat_room.py；纯内存，不进数据库）
+# 目的：让「游客 + 五位编码」这套前端身份能真的跨设备说话。
+# 边界：公开一条消息流，重启即清空；删掉本段与 app/chat_room.py 即回退。
+# ------------------------------------------------------------------
+
+@app.get("/api/chat/messages")
+def api_chat_messages(room: str = "", since: int = 0, id: str = ""):
+    """取某间聊天室里 since 之后的新消息与在室列表（前端每 2.5 秒拉一次）。
+
+    room：聊天室 id（官方如 o-fangji，游客自建如 r7k2m）。
+    id：当前游客编码。带上就等于登记在场，所以「在室」是真实心跳，
+    不是「发过言的人」。
+    """
+    from app import chat_room
+    try:
+        return chat_room.snapshot(room, since, id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.post("/api/chat/send")
+def api_chat_send(payload: Dict[str, Any] = Body(default={})):
+    """发一条消息。
+
+    payload: {"room": "o-fangji", "id": "88129", "text": "..."}
+    昵称由服务端按 id 生成（游客88129），前端不传名字，避免伪造。
+    """
+    from app import chat_room
+    payload = payload or {}
+    try:
+        msg = chat_room.post(str(payload.get("room") or ""),
+                             str(payload.get("id") or ""),
+                             str(payload.get("text") or ""),
+                             reply=payload.get("reply"))
+    except chat_room.SlowDown as e:
+        raise HTTPException(status_code=429,
+                            detail="说得太快了，歇 %.1f 秒再发" % e.wait)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True, "seq": msg["seq"], "message": msg}
+
+
+@app.post("/api/chat/ask")
+def api_chat_ask(payload: Dict[str, Any] = Body(default={})):
+    """在聊天室里向古籍知识库提问：跑一遍问答链路，把结果作为一条消息落进房间。
+
+    payload: {"room": "o-fangji", "id": "88129", "question": "..."}
+    - 走的是 /api/qa 同一条链路（全库检索，不走页内），所以出处仍是 书/页/行；
+    - 提问按人限速（12 秒一条、五分钟三条），因为一次 RAG 要跑本机模型；
+    - 问答结果是对整间房可见的一条消息（kind=qa），不是私聊。
+    """
+    from app import chat_room
+    payload = payload or {}
+    room = str(payload.get("room") or "")
+    gid = str(payload.get("id") or "")
+    q = str(payload.get("question") or "").strip()
+    mode = str(payload.get("mode") or "standard").strip().lower()
+    if mode not in ("fast", "standard", "expert"):
+        mode = "standard"
+    if not q:
+        raise HTTPException(status_code=400, detail="先写一句要问的")
+    if len(q) > chat_room.MAX_ASK:
+        raise HTTPException(status_code=400,
+                            detail="问题太长（%d 字以内）" % chat_room.MAX_ASK)
+    try:
+        chat_room.room_meta(room)
+        chat_room.reserve_ask(gid)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    try:
+        ans = ask({"question": q, "scope": "library", "mode": mode})
+    except Exception as e:                       # 模型没起来 / 索引坏了，别把房间弄挂
+        raise HTTPException(status_code=503, detail="问答暂时不可用：%s" % e)
+    cites = []
+    for s in (ans.get("sources") or []):
+        if len(cites) >= 4:
+            break
+        cites.append({"book": s.get("book") or "",
+                      "page_id": s.get("page_id") or "",
+                      "line": s.get("line_span") or s.get("line_id") or "",
+                      "quote": s.get("quote") or ""})
+    text = str(ans.get("text") or "").strip() or "这次没有取到答案。"
+    try:
+        msg = chat_room.post_bot(room, q, text, cites=cites,
+                                 refused=bool(ans.get("refused")), by=gid,
+                                 backend=str(ans.get("backend") or ""))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True, "message": msg, "refused": bool(ans.get("refused")),
+            "backend": ans.get("backend") or "", "cites": len(cites),
+            "mode": mode,
+            "self_check": (ans.get("retrieval") or {}).get("self_check") or {},
+            "elapsed": ans.get("elapsed")}
+
+
+@app.post("/api/chat/invite")
+def api_chat_invite(payload: Dict[str, Any] = Body(default={})):
+    """按编号邀请某位游客。
+
+    payload: {"from": "88129", "to": "47217", "room": "o-fangji"}
+    只进内存队列，对方拉消息时取走；对方不在线也不会丢（十分钟内有效）。
+    """
+    from app import chat_room
+    payload = payload or {}
+    try:
+        inv = chat_room.invite(str(payload.get("from") or ""),
+                               str(payload.get("to") or ""),
+                               str(payload.get("room") or ""))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True, "invite": inv, "to_name": inv["to_name"]}
+
+
+@app.post("/api/chat/invite/respond")
+def api_chat_invite_respond(payload: Dict[str, Any] = Body(default={})):
+    """被邀请人处理邀请。payload: {"id": "i3", "me": "93074", "action": "accept"}
+
+    action 取 accept / decline / ignore，结果转给邀请人。
+    """
+    from app import chat_room
+    payload = payload or {}
+    try:
+        res = chat_room.respond(str(payload.get("id") or ""),
+                                str(payload.get("me") or ""),
+                                str(payload.get("action") or ""))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True, "result": res}
+
+
+@app.get("/api/rooms")
+def api_rooms(id: str = ""):
+    """聊天室列表：官方（固定 4 间）+ 游客自建（按创建时间倒序）。
+
+    带上 id 就一并算出每间的未读数与我的角色（左侧列表的红点用）。
+    """
+    from app import chat_room
+    return chat_room.list_rooms(id)
+
+
+@app.post("/api/rooms")
+def api_rooms_create(payload: Dict[str, Any] = Body(default={})):
+    """游客开一间。payload: {"name": "...", "desc": "...", "owner": "88129"}"""
+    from app import chat_room
+    payload = payload or {}
+    try:
+        room = chat_room.create_room(str(payload.get("name") or ""),
+                                     str(payload.get("desc") or ""),
+                                     str(payload.get("owner") or ""))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True, "room": room}
+
+
+@app.delete("/api/rooms")
+def api_rooms_delete(id: str = "", owner: str = ""):
+    """创建者删掉自己的聊天室。"""
+    from app import chat_room
+    try:
+        return chat_room.delete_room(id, owner)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/room")
+def api_room(id: str = ""):
+    """单间信息（房间页标题、类型、简介）。"""
+    from app import chat_room
+    try:
+        return chat_room.room_meta(id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.get("/api/chat/inbox")
+def api_chat_inbox(id: str = ""):
+    """收件箱：只取发给我的邀请与处理结果（列表页也会轮询这个）。"""
+    from app import chat_room
+    try:
+        return chat_room.inbox(id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/chat/invites")
+def api_chat_invites(me: str = ""):
+    """我发出的邀请及当前状态（对话框里的记录）。"""
+    from app import chat_room
+    try:
+        rows = chat_room.sent(me)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"invites": rows}
+
+
+@app.get("/api/chat/notice")
+def api_chat_notice(room: str = "", id: str = ""):
+    """看房间公告。id 只用来判断「我能不能改这一条」。"""
+    from app import chat_room
+    try:
+        n = chat_room.notice(room)
+        n["can_manage"] = chat_room.can_manage(room, id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return n
+
+
+@app.post("/api/chat/notice")
+def api_chat_set_notice(payload: Dict[str, Any] = Body(default={})):
+    """设置 / 撤下公告（官方房任何人都能改，游客房只有房主）。"""
+    from app import chat_room
+    payload = payload or {}
+    try:
+        n = chat_room.set_notice(str(payload.get("room") or ""),
+                                 str(payload.get("id") or ""),
+                                 str(payload.get("text") or ""))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True, **n}
+
+
+@app.get("/api/chat/files")
+def api_chat_files(room: str = ""):
+    """房间文件清单。"""
+    from app import chat_room
+    try:
+        return chat_room.list_files(room)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.post("/api/chat/files")
+async def api_chat_upload(room: str = Form(""), id: str = Form(""),
+                          file: UploadFile = File(...)):
+    """上传一个文件到房间（≤5 MB，单间 12 个）。"""
+    from app import chat_room
+    try:
+        data = await file.read()
+        row = chat_room.save_file(room, id, file.filename or "", data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="存文件失败：%s" % e)
+    return {"ok": True, "file": row}
+
+
+@app.get("/api/chat/files/{fid}")
+def api_chat_download(fid: str, room: str = "", inline: int = 0):
+    """房间文件：默认按原始文件名另存；inline=1 就在浏览器里直接看。
+
+    图片 / PDF / 纯文本走 inline，其余类型仍按下载给（避免浏览器乱解释可执行文件）。
+    """
+    from app import chat_room
+    try:
+        info = chat_room.file_path(room, fid)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    path = str(info["path"])
+    name = str(info["name"])
+    if not inline:
+        return FileResponse(path, filename=name, media_type="application/octet-stream")
+    mt = mimetypes.guess_type(name)[0] or "application/octet-stream"
+    viewable = (mt.startswith("image/") or mt == "application/pdf" or
+                mt.startswith("text/") or mt in ("application/json", "application/xml"))
+    if not viewable:
+        return FileResponse(path, filename=name, media_type="application/octet-stream")
+    if mt.startswith("text/") or mt in ("application/json", "application/xml"):
+        mt = mt + "; charset=utf-8"
+    return FileResponse(path, media_type=mt, headers={
+        "Content-Disposition": "inline; filename*=utf-8''%s" % quote(name)})
+
+
+@app.post("/api/chat/role")
+def api_chat_role(payload: Dict[str, Any] = Body(default={})):
+    """房主任命 / 撤销管理员。payload: {"room", "id", "target", "role": "admin|member"}"""
+    from app import chat_room
+    payload = payload or {}
+    try:
+        return chat_room.set_role(str(payload.get("room") or ""),
+                                  str(payload.get("id") or ""),
+                                  str(payload.get("target") or ""),
+                                  str(payload.get("role") or ""))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/chat/mute")
+def api_chat_mute(payload: Dict[str, Any] = Body(default={})):
+    """禁言 N 分钟（0 = 解除）。payload: {"room", "id", "target", "minutes": 10}"""
+    from app import chat_room
+    payload = payload or {}
+    try:
+        return chat_room.mute(str(payload.get("room") or ""),
+                              str(payload.get("id") or ""),
+                              str(payload.get("target") or ""),
+                              payload.get("minutes", 10))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/chat/kick")
+def api_chat_kick(payload: Dict[str, Any] = Body(default={})):
+    """把一个人移出这一间。payload: {"room", "id", "target"}"""
+    from app import chat_room
+    payload = payload or {}
+    try:
+        return chat_room.kick(str(payload.get("room") or ""),
+                              str(payload.get("id") or ""),
+                              str(payload.get("target") or ""))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/chat/roles")
+def api_chat_roles(room: str = ""):
+    """这一间的角色 / 禁言 / 移出名单（界面画标签与按钮用）。"""
+    from app import chat_room
+    try:
+        return chat_room.roles_of(room)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.get("/api/chat/export")
+def api_chat_export(room: str = "", id: str = ""):
+    """把整间房导成一份 Markdown（附件下载）。"""
+    from app import chat_room
+    try:
+        info = chat_room.export_markdown(room, id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    body = info["text"].encode("utf-8")
+    return Response(content=body,
+                    media_type="text/markdown; charset=utf-8",
+                    headers={"Content-Disposition":
+                             "attachment; filename*=utf-8''%s" % quote(info["filename"]),
+                             "Content-Length": str(len(body))})
+
+
+@app.get("/api/chat/search")
+def api_chat_search(room: str = "", q: str = "", limit: int = 40):
+    """在房间消息里搜字（含问答的问句）。"""
+    from app import chat_room
+    try:
+        return chat_room.search(room, q, limit)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/chat/invites/sent")
+def api_chat_invites_sent(id: str = "", room: str = ""):
+    """我发出的邀请（带「已进房 / 在线」），聊天室里用来审核。"""
+    from app import chat_room
+    try:
+        rows = chat_room.sent(id, room)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"invites": rows}
+
+
+@app.post("/api/chat/invites/revoke")
+def api_chat_invites_revoke(payload: Dict[str, Any] = Body(default={})):
+    """撤回一条还没被回应的邀请。"""
+    from app import chat_room
+    payload = payload or {}
+    try:
+        out = chat_room.revoke(str(payload.get("invite") or ""),
+                               str(payload.get("id") or ""))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return out
+
+
+@app.get("/api/chat/status")
+def api_chat_status():
+    """聊天室自检：条数、在室人数、限速与长度上限。"""
+    from app import chat_room
+    return chat_room.stats()
+
+
+# ------------------------------------------------------------------
 # 启动
 # ------------------------------------------------------------------
+
+def _warm_index() -> None:
+    """开机把检索索引热起来。
+
+    索引是懒加载的：进程刚起时第一问会边加载边触发重建，那一次常常取不到片段，
+    答出来就是「依据不足」。这里在端口开始监听前先把它建好，第一问就正常。
+    """
+    try:
+        t0 = time.time()
+        from qa.index import get_index, rebuild_now
+        idx = get_index()
+        if (idx.status() or {}).get("stale"):
+            rebuild_now(force=False)
+            idx = get_index()
+        st = idx.status() or {}
+        print("  [预热] 检索索引：%s 段 · stale=%s · 用时 %.1f 秒"
+              % (st.get("vectors"), st.get("stale"), time.time() - t0))
+    except Exception as e:                       # 预热失败不该拦住服务启动
+        print("  [预热] 跳过：%s" % e)
+
 
 def _cli() -> None:
     ap = argparse.ArgumentParser(description="赛题二原型 · 本地 Web 服务")
@@ -994,6 +1502,7 @@ def _cli() -> None:
 
     store.init_db()
     warn_if_degraded()
+    _warm_index()
     import uvicorn
     print(f"服务启动： http://{args.host}:{args.port}/")
     print(f"免责声明： {DISCLAIMER}")
